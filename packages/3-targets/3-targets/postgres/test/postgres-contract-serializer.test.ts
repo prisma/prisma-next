@@ -78,8 +78,6 @@ function makeContractWithTablesJson() {
                       tableName: 'user',
                       columns: ['id'],
                     },
-                    constraint: true,
-                    index: true,
                   },
                 ],
               },

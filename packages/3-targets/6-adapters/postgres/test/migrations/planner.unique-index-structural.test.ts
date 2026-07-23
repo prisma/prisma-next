@@ -83,6 +83,7 @@ describe('PostgresMigrationPlanner - unique constraints vs indexes (structural n
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
   }
 

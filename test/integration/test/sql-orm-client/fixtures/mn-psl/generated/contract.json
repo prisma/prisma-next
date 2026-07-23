@@ -265,8 +265,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "source": {
                     "columns": [
                       "user_id"
@@ -283,8 +281,6 @@
                   }
                 },
                 {
-                  "constraint": true,
-                  "index": true,
                   "source": {
                     "columns": [
                       "tag_id"
@@ -301,7 +297,20 @@
                   }
                 }
               ],
-              "indexes": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "tag_id"
+                  ],
+                  "name": "user_tags_tag_id_idx"
+                },
+                {
+                  "columns": [
+                    "user_id"
+                  ],
+                  "name": "user_tags_user_id_idx"
+                }
+              ],
               "primaryKey": {
                 "columns": [
                   "user_id",
@@ -349,7 +358,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "f5bc2e0d3f66935034b72ce923ec1a5e993941946cc8ecf59892fa2cdf8a87b8"
+    "storageHash": "f5e00bc888177f54e6fa6f170346f5a341433a6764169faa0230a48607d00b02"
   },
   "capabilities": {
     "postgres": {

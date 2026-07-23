@@ -293,6 +293,110 @@ describe('planMigration', () => {
     expect(failure.missingInvariants).toEqual(['cipher:create-v1']);
   });
 
+  it('rejects with extensionPathUnreachable when an empty-graph space declares a managed element', async () => {
+    // Advancing a marker without migrations (declared-state) is valid only
+    // for an all-external space: nothing Prisma Next owns exists there. An
+    // extension that declares a managed element but ships no migrations is
+    // an authoring bug and must fail loudly, not silently advance.
+    const managedContract = createSqlContract({
+      target: 'postgres',
+      storage: {
+        namespaces: {
+          __unbound__: {
+            id: '__unbound__',
+            entries: { table: { widget: {} } },
+          },
+        },
+      },
+    });
+    const extension = makeSpace({
+      spaceId: 'broken-extension',
+      contract: managedContract,
+      headRef: { hash: 'broken-extension-head', invariants: [] },
+    });
+    const aggregate = makeAggregate({
+      app: makeSpace({ spaceId: 'app' }),
+      extensions: [extension],
+    });
+
+    const planner = makeStubPlanner({
+      kind: 'success',
+      plan: makeSyntheticPlan('postgres'),
+    });
+
+    const result = await planMigration({
+      aggregate,
+      currentDBState: {
+        markersBySpaceId: new Map(),
+        schemaIntrospection: { tables: {} },
+      },
+      adapter: STUB_ADAPTER,
+      migrations: makeStubMigrations(planner),
+      frameworkComponents: [],
+      callerPolicy: { ignoreGraphFor: new Set(['app']) },
+      operationPolicy: POLICY,
+    });
+
+    expect(result.ok).toBe(false);
+    const failure = result.assertNotOk();
+    expect(failure).toEqual({
+      kind: 'extensionPathUnreachable',
+      spaceId: 'broken-extension',
+      target: 'broken-extension-head',
+    });
+  });
+
+  it('declares the no-op state for an empty-graph space whose elements are all external', async () => {
+    const externalContract = {
+      ...createSqlContract({
+        target: 'postgres',
+        storage: {
+          namespaces: {
+            __unbound__: {
+              id: '__unbound__',
+              entries: { table: { platform_users: {} } },
+            },
+          },
+        },
+      }),
+      defaultControlPolicy: 'external' as const,
+    };
+    const extension = makeSpace({
+      spaceId: 'supabase-like',
+      contract: externalContract,
+      headRef: { hash: 'supabase-like-head', invariants: [] },
+    });
+    const aggregate = makeAggregate({
+      app: makeSpace({ spaceId: 'app' }),
+      extensions: [extension],
+    });
+
+    const planner = makeStubPlanner({
+      kind: 'success',
+      plan: makeSyntheticPlan('postgres'),
+    });
+
+    const result = await planMigration({
+      aggregate,
+      currentDBState: {
+        markersBySpaceId: new Map(),
+        schemaIntrospection: { tables: {} },
+      },
+      adapter: STUB_ADAPTER,
+      migrations: makeStubMigrations(planner),
+      frameworkComponents: [],
+      callerPolicy: { ignoreGraphFor: new Set(['app']) },
+      operationPolicy: POLICY,
+    });
+
+    expect(result.ok).toBe(true);
+    const success = result.assertOk();
+    const plan = success.perSpace.get('supabase-like');
+    expect(plan?.strategy).toBe('declared-state');
+    expect(plan?.plan.operations).toEqual([]);
+    expect(plan?.plan.destination.storageHash).toBe('supabase-like-head');
+  });
+
   it('forwards plan-from-diff planner failures as planFromDiffFailed', async () => {
     const aggregate = makeAggregate({
       app: makeSpace({ spaceId: 'app' }),

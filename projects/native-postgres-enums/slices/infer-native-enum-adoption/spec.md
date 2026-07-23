@@ -85,4 +85,4 @@ One reviewer holds: **"`contract infer` adopts native enum types instead of thro
 - Dead-wired seams: [`printer-config.ts`](../../../../packages/2-sql/9-family/src/core/psl-contract-infer/printer-config.ts) (`EnumInfo`, `PslPrinterOptions.enumInfo`), [`postgres-type-map.ts`](../../../../packages/3-targets/3-targets/postgres/src/core/psl-infer/postgres-type-map.ts) (`extractEnumInfo`), `enumNameMap` threading in `infer-psl-contract.ts` (~450, 553, 586, 910).
 - Authoring surface emitted into: Phase-1 `native_enum` blocks (project [`spec.md`](../../spec.md)); grounding example: [`contract.prisma`](../../../../packages/3-extensions/supabase/src/contract/contract.prisma) (`auth.AalLevel`).
 - Entity: [`postgres-native-enum.ts`](../../../../packages/3-targets/3-targets/postgres/src/core/postgres-native-enum.ts) (`PostgresNativeEnum`, optional `control`).
-- Consumer this unblocks: Supabase Slice F ([`extension-supabase/plan.md`](../../../extension-supabase/plan.md)).
+- Consumer this unblocks: Supabase Slice F (shipped in [#960](https://github.com/prisma/prisma-next/pull/960)).

@@ -728,8 +728,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": false,
                   "onDelete": "cascade",
                   "source": {
                     "columns": [
@@ -775,8 +773,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "source": {
                     "columns": [
                       "feature_assignee_person_id"
@@ -793,8 +789,6 @@
                   }
                 },
                 {
-                  "constraint": true,
-                  "index": false,
                   "onDelete": "cascade",
                   "source": {
                     "columns": [
@@ -812,7 +806,14 @@
                   }
                 }
               ],
-              "indexes": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "feature_assignee_person_id"
+                  ],
+                  "name": "features_feature_assignee_person_id_idx"
+                }
+              ],
               "primaryKey": {
                 "columns": [
                   "id"
@@ -896,8 +897,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "source": {
                     "columns": [
                       "task_id"
@@ -914,7 +913,14 @@
                   }
                 }
               ],
-              "indexes": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "task_id"
+                  ],
+                  "name": "task_comments_task_id_idx"
+                }
+              ],
               "primaryKey": {
                 "columns": [
                   "id"
@@ -966,8 +972,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "source": {
                     "columns": [
                       "project_id"
@@ -984,8 +988,6 @@
                   }
                 },
                 {
-                  "constraint": true,
-                  "index": true,
                   "source": {
                     "columns": [
                       "reporter_id"
@@ -1002,7 +1004,20 @@
                   }
                 }
               ],
-              "indexes": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "project_id"
+                  ],
+                  "name": "tasks_project_id_idx"
+                },
+                {
+                  "columns": [
+                    "reporter_id"
+                  ],
+                  "name": "tasks_reporter_id_idx"
+                }
+              ],
               "primaryKey": {
                 "columns": [
                   "id"
@@ -1034,8 +1049,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "source": {
                     "columns": [
                       "owner_id"
@@ -1052,7 +1065,14 @@
                   }
                 }
               ],
-              "indexes": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "owner_id"
+                  ],
+                  "name": "tickets_owner_id_idx"
+                }
+              ],
               "primaryKey": {
                 "columns": [
                   "id"
@@ -1104,8 +1124,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "source": {
                     "columns": [
                       "account_id"
@@ -1122,7 +1140,14 @@
                   }
                 }
               ],
-              "indexes": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "account_id"
+                  ],
+                  "name": "users_account_id_idx"
+                }
+              ],
               "primaryKey": {
                 "columns": [
                   "id"
@@ -1136,7 +1161,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "ea9e5b95b94f3d46d47d844c49de223e91a838de6c7a07105b0d2b292ee9aeb4"
+    "storageHash": "772a97fc75d5937717bf728ce122c529b50322863634c9eb52ff5b4859b89777"
   },
   "capabilities": {
     "postgres": {

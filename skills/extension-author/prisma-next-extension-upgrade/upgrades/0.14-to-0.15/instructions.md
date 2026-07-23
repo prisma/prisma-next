@@ -465,66 +465,16 @@ changes:
       contains:
         - "@prisma-next/extension-supabase"
       anyMatch: true
-  - id: strip-sha256-hash-prefixes
-    summary: |
-      Content hashes are bare lowercase hex from 0.15 — the `sha256:` prefix is gone from every
-      surface (emitted `contract.json` / `contract.d.ts`, migration manifests, refs, CLI output,
-      and the database marker/ledger), and framework validators (`coreHash()` / `profileHash()`
-      constructors, manifest and contract loaders) reject the legacy prefixed form. Contract hash
-      VALUES are unchanged (only the prefix drops; re-emit your pack's committed contract
-      artefacts), but `migrationHash` VALUES change because the hashed manifest bytes embed the
-      now-bare `from`/`to` strings. Run the colocated codemod over your extension's checked-in
-      `migrations/` trees: it strips the prefix from every hash literal (manifests, `ops.json`,
-      contract snapshots, `.d.ts` branded literals), maps the empty-tree sentinel `sha256:empty`
-      to `empty`, recomputes each `migrationHash`, and repoints `refs/*.json`. Then drop the
-      prefix from any hash literal your pack's source, fixtures, or tests hard-code — a prefixed
-      literal now fails validation instead of round-tripping.
-    detection:
-      glob: "**/*.{json,ts,mts,cts,tsx}"
-      contains:
-        - 'sha256:'
-      anyMatch: true
-    script: ./strip-sha256-hash-prefixes.ts
 ---
+<!--
+Release bump to 0.15.0 (PR #988): the version bump itself. Every
+`packages/3-extensions/*/package.json` advances to 0.15.0 (version field +
+`workspace:` specifier lockstep; one stray `workspace:*` in target-postgres
+normalized to the pinned form). No SPI, contract shape, or emitted artefact
+change beyond the pack version stamp. No extension-author action beyond the
+normal dependency upgrade this recipe covers. Incidental substrate diff only.
+-->
 
-# 0.14 → 0.15 — Extension-author upgrade instructions
-
-## `strip-sha256-hash-prefixes`
-
-Starting at the 0.15 release, every content hash the framework mints or accepts is bare lowercase hex — the `sha256:` prefix is removed across the board: emitted `contract.json` / `contract.d.ts` (including `StorageHashBase<'…'>` / `ProfileHashBase<'…'>` branded type literals), migration manifests, refs, CLI output, and the marker/ledger tables. The prefix carried no information (the algorithm never varied per hash), and the hash **value** — not an in-band tag — signals a format change. The hash constructors and every loader now reject the legacy prefixed form.
-
-Two distinct effects on your pack's checked-in artefacts:
-
-- **Contract hashes keep their value.** `storageHash` / `profileHash` are computed over contract content, which never embedded its own hash — only the textual prefix drops.
-- **Migration hash values change.** `migrationHash` is computed over the manifest bytes, which embed the `from` / `to` contract-hash strings; with those now bare, every recomputed `migrationHash` differs from the stored one.
-
-### Migrate checked-in `migrations/` trees
-
-Run the colocated codemod from your extension's repository root:
-
-```bash
-pnpm exec tsx ./strip-sha256-hash-prefixes.ts
-```
-
-For every on-disk migration package (a `migration.json` with a sibling `ops.json`) it strips the prefix from the manifest's `from` / `to`, from hash literals inside `ops.json` and the sibling contract snapshots (`*-contract.json`, `*.d.ts`, `migration.ts`), recomputes `migrationHash` over the bare-hex content, and rewrites `refs/*.json` — repointing refs that held old migration hashes at the recomputed ones, and mapping the empty-tree sentinel `sha256:empty` to `empty`. The edit is format-preserving (only hash literals and the recomputed hash value change) and idempotent: re-running over an already-bare tree makes no further changes.
-
-Use `--check` for a dry run that lists files still needing the fix and exits non-zero if any remain:
-
-```bash
-pnpm exec tsx ./strip-sha256-hash-prefixes.ts --check
-```
-
-### Re-emit committed contract artefacts
-
-If your pack commits emitted contract artefacts (a pack contract under `src/contract/`, test fixtures, example spaces), re-emit them the way your pack generates them (`prisma-next contract emit` or your regeneration script). The regenerated files differ only in hash representation — the hash values themselves are unchanged.
-
-### Update hash literals your pack hard-codes
-
-Sweep your pack's source, fixtures, and tests for `sha256:`-prefixed literals — hand-built contract fixtures, expected `migrationHash` assertions, stub hashes in unit tests. Drop the prefix everywhere; for migration hashes, take the new value from the regenerated manifest, since the value itself changed. Constructing a hash via the framework's `coreHash()` / `profileHash()` constructors with a prefixed string now throws instead of round-tripping.
-
-### Validation
-
-After the codemod and re-emit, run `pnpm typecheck && pnpm test` in your extension repo, and exercise any flow that loads your migrations — the loader recomputes and verifies each manifest's `migrationHash` on read, so a stale or still-prefixed manifest fails immediately. `git grep -n "sha256:"` over your repository should return no hits in committed artefacts.
 <!--
 TML-2503 (extension-supabase Slice E — launch close-out, PR #985): docs only.
 The `packages/3-extensions/` touch is `packages/3-extensions/supabase/README.md` —
@@ -840,4 +790,14 @@ ADR 234 and the Adapters & Targets subsystem doc, with the surface names
 updated to the shipped forms. No code, API, contract shape, or emitted
 artefact changes. No extension-author action required. Incidental docs-only
 diff.
+-->
+
+<!--
+PR #915 (middleware doc-comment lifecycle fixes): comments-only. The only
+`packages/3-extensions/` touch is doc comments in
+`packages/3-extensions/middleware-cache/src/cache-middleware.ts`, correcting
+stale claims about the cache-hit lifecycle (a hit skips only the driver call
+and per-row `onRow` hooks; `beforeExecute` has already run, `afterExecute`
+still fires; `decodeRow` still runs). No SPI or behavioural change.
+No user action required. Incidental substrate diff only.
 -->

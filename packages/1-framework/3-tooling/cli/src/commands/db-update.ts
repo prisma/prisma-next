@@ -1,4 +1,7 @@
-import { readFile } from 'node:fs/promises';
+import {
+  contractSnapshotDir,
+  readContractSnapshotJson,
+} from '@prisma-next/migration-tools/contract-snapshot-store';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -65,7 +68,7 @@ function mapDbUpdateFailure(failure: DbUpdateFailure): CliStructuredError {
         ? failure.meta['runnerErrorCode']
         : undefined;
     const fix =
-      runnerCode === 'LEGACY_MARKER_SHAPE'
+      runnerCode === 'MIGRATION.LEGACY_MARKER_SHAPE'
         ? 'Legacy marker-table shape detected. Drop `prisma_contract.marker` (Postgres) or `_prisma_marker` (SQLite) and re-run `prisma-next db init` to recreate it with the current per-space schema.'
         : 'Inspect the reported conflict, reconcile schema drift if needed, then re-run `prisma-next db update`';
     return errorRunnerFailed(failure.summary, {
@@ -135,16 +138,20 @@ async function executeDbUpdateCommand(
           errorUnexpected(
             `No migration bundle found for --to "${options.to}" (resolved hash: ${targetHash})`,
             {
-              why: `The ref resolved successfully but no on-disk migration package has an end-contract hash matching ${targetHash}.`,
+              why: `The ref resolved successfully but no on-disk migration package has a destination (\`to\`) hash matching ${targetHash}.`,
               fix: 'Provide a ref or hash that corresponds to an existing migration package, or run `migration list` to see available migrations.',
             },
           ),
         );
       }
-      const endContractPath = join(matchingBundle.dirPath, 'end-contract.json');
-      const raw = await readFile(endContractPath, 'utf-8');
-      contractJson = JSON.parse(raw) as Record<string, unknown>;
-      contractJsonPathForSnapshot = endContractPath;
+      contractJson = (await readContractSnapshotJson(migrationsDir, targetHash)) as Record<
+        string,
+        unknown
+      >;
+      contractJsonPathForSnapshot = join(
+        contractSnapshotDir(migrationsDir, targetHash),
+        'contract.json',
+      );
     } catch (error) {
       if (MigrationToolsError.is(error)) {
         return notOk(mapMigrationToolsError(error));
@@ -193,6 +200,7 @@ async function executeDbUpdateCommand(
           ...ifDefined('advanceRef', options.advanceRef),
           ...ifDefined('db', options.db),
           refsDir,
+          migrationsDir,
           contractIR,
           mode: result.value.mode,
           hash: advancementHash,

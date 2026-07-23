@@ -1,5 +1,4 @@
 export * from './exports/ast';
-export * from './exports/errors';
 export * from './exports/expression';
 export * from './exports/middleware';
 export * from './exports/plan';

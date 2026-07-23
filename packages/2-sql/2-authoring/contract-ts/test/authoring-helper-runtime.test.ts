@@ -15,6 +15,7 @@ import {
   isNamedConstraintOptionsLike,
 } from '../src/authoring-helper-runtime';
 import { createComposedAuthoringHelpers } from '../src/composed-authoring-helpers';
+import { nanoidIdPresetMirror } from './nanoid-preset-mirror';
 
 const textPreset = {
   kind: 'fieldPreset',
@@ -27,32 +28,6 @@ const createdAtPreset = {
     codecId: 'sql/timestamp@1',
     nativeType: 'timestamp',
     default: { kind: 'function', expression: 'CURRENT_TIMESTAMP' },
-  },
-} as const;
-
-const nanoidIdPreset = {
-  kind: 'fieldPreset',
-  args: [
-    {
-      kind: 'object',
-      optional: true,
-      properties: {
-        size: { kind: 'number', optional: true, integer: true, minimum: 2, maximum: 255 },
-      },
-    },
-  ],
-  output: {
-    codecId: 'sql/char@1',
-    nativeType: 'character',
-    typeParams: { length: { kind: 'arg', index: 0, path: ['size'], default: 21 } },
-    executionDefaults: {
-      onCreate: {
-        kind: 'generator',
-        id: 'nanoid',
-        params: { size: { kind: 'arg', index: 0, path: ['size'] } },
-      },
-    },
-    id: true,
   },
 } as const;
 
@@ -158,6 +133,9 @@ describe('authoring helper runtime', () => {
     expect(() => createTypeHelpersFromNamespace(unsafeNamespace)).toThrow(
       'Invalid authoring helper "nested.__proto__". Helper path segments must not use "__proto__".',
     );
+    expect(() => createTypeHelpersFromNamespace(unsafeNamespace)).toThrow(
+      expect.objectContaining({ code: 'CONTRACT.PACK_CONTRIBUTION_INVALID' }),
+    );
   });
 
   it('creates nested field helpers and passes the resolved helper path to leaf factories', () => {
@@ -197,7 +175,7 @@ describe('authoring helper runtime', () => {
   it('passes optional named constraint options through field preset helpers', () => {
     const helper = createFieldPresetHelper({
       helperPath: 'field.id.nanoid',
-      descriptor: nanoidIdPreset,
+      descriptor: nanoidIdPresetMirror,
       build: ({ args, namedConstraintOptions }) => ({
         args,
         namedConstraintOptions,
@@ -213,7 +191,7 @@ describe('authoring helper runtime', () => {
   it('rejects extra arguments for helpers that accept named constraint options', () => {
     const helper = createFieldPresetHelper({
       helperPath: 'field.id.nanoid',
-      descriptor: nanoidIdPreset,
+      descriptor: nanoidIdPresetMirror,
       build: ({ args, namedConstraintOptions }) => ({
         args,
         namedConstraintOptions,
@@ -223,12 +201,15 @@ describe('authoring helper runtime', () => {
     expect(() => helper({ size: 16 }, { name: 'short_link_pkey' }, { name: 'ignored' })).toThrow(
       'field.id.nanoid expects at most 2 argument(s), received 3',
     );
+    expect(() => helper({ size: 16 }, { name: 'short_link_pkey' }, { name: 'ignored' })).toThrow(
+      expect.objectContaining({ code: 'CONTRACT.ARGUMENT_INVALID' }),
+    );
   });
 
   it('rejects malformed named constraint option objects', () => {
     const helper = createFieldPresetHelper({
       helperPath: 'field.id.nanoid',
-      descriptor: nanoidIdPreset,
+      descriptor: nanoidIdPresetMirror,
       build: ({ args, namedConstraintOptions }) => ({
         args,
         namedConstraintOptions,

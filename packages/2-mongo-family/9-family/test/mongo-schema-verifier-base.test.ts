@@ -116,11 +116,9 @@ describe('MongoSchemaVerifierBase', () => {
     it('accumulates per-namespace issues + target-extension issues', () => {
       const nsIssue: SchemaDiffIssue = {
         path: ['users'],
-        reason: 'not-found',
       };
       const targetIssue: SchemaDiffIssue = {
         path: ['audit_log'],
-        reason: 'not-expected',
       };
 
       const verifier = new RecordingVerifier({ __unbound__: [nsIssue] }, [targetIssue]);

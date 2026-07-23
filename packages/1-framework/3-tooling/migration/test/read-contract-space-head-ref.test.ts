@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { canonicalizeJson } from '@prisma-next/framework-components/utils';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { emitContractSpaceArtefacts } from '../src/emit-contract-space-artefacts';
+import { emitContractSpaceArtifacts } from '../src/emit-contract-space-artifacts';
 import { MigrationToolsError } from '../src/errors';
 import { readContractSpaceHeadRef } from '../src/read-contract-space-head-ref';
 import { APP_SPACE_ID } from '../src/space-layout';
@@ -28,11 +28,11 @@ describe('readContractSpaceHeadRef', () => {
     expect(await readContractSpaceHeadRef(missing, 'cipherstash')).toBeNull();
   });
 
-  it('round-trips with emitContractSpaceArtefacts', async () => {
-    const hash = '0123456789012345678901234567890123456789012345678901234567890123';
+  it('round-trips with emitContractSpaceArtifacts', async () => {
+    const hash = `${'0'.repeat(63)}1`;
     const invariants = ['inv-2', 'inv-1', 'inv-3'];
-    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
-      contract: { foo: 1 },
+    await emitContractSpaceArtifacts(migrationsDir, 'cipherstash', {
+      contract: { storage: { storageHash: hash }, foo: 1 },
       contractDts: '\n',
       headRef: { hash, invariants },
     });
@@ -43,14 +43,15 @@ describe('readContractSpaceHeadRef', () => {
   });
 
   it('round-trips for the app space (uniform with extensions)', async () => {
-    await emitContractSpaceArtefacts(migrationsDir, APP_SPACE_ID, {
-      contract: {},
+    const hash = 'a'.repeat(64);
+    await emitContractSpaceArtifacts(migrationsDir, APP_SPACE_ID, {
+      contract: { storage: { storageHash: hash } },
       contractDts: '\n',
-      headRef: { hash: 'app', invariants: [] },
+      headRef: { hash, invariants: [] },
     });
 
     const result = await readContractSpaceHeadRef(migrationsDir, APP_SPACE_ID);
-    expect(result).toEqual({ hash: 'app', invariants: [] });
+    expect(result).toEqual({ hash, invariants: [] });
   });
 
   it('throws when refs/head.json is missing the invariants array', async () => {

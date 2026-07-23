@@ -11,6 +11,7 @@ import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
 import type { CodecLookup } from './codec-types';
+import type { AuthoringOption } from './option-descriptor';
 import type { PslBlockParam, PslExtensionBlock, PslSpan } from './psl-extension-block';
 import { runtimeError } from './runtime-error';
 
@@ -23,12 +24,34 @@ export type AuthoringArgRef = {
   readonly default?: AuthoringTemplateValue;
 };
 
+/**
+ * Selects among `cases` by the value of the referenced argument: the resolved
+ * value must be one of the case keys, and the node resolves to that case's
+ * recursively resolved template. An absent argument resolves to `undefined`,
+ * which the enclosing object template omits entirely.
+ *
+ * Case coverage is validated against the referenced option argument's
+ * `values` at pack-registration time, so the runtime miss-throw is an
+ * assertion for type-bypassing callers, not a user-facing diagnostic.
+ *
+ * Must not be used in the `codecId`/`nullable`/`id`/`unique` positions of a
+ * preset output: the type-level `ResolveTemplateValue` does not implement
+ * select, and those fields feed TS builder-state inference. See ADR 239.
+ */
+export interface AuthoringSelectRef {
+  readonly kind: 'select';
+  readonly index: number;
+  readonly path?: readonly string[];
+  readonly cases: Readonly<Record<string, AuthoringTemplateValue>>;
+}
+
 export type AuthoringTemplateValue =
   | string
   | number
   | boolean
   | null
   | AuthoringArgRef
+  | AuthoringSelectRef
   | readonly AuthoringTemplateValue[]
   | { readonly [key: string]: AuthoringTemplateValue };
 
@@ -52,6 +75,7 @@ export type AuthoringArgumentDescriptor = AuthoringArgumentDescriptorCommon &
         readonly kind: 'object';
         readonly properties: Record<string, AuthoringArgumentDescriptor>;
       }
+    | AuthoringOption
   );
 
 export interface AuthoringStorageTypeTemplate {
@@ -482,8 +506,39 @@ export function isAuthoringArgRef(value: unknown): value is AuthoringArgRef {
   return true;
 }
 
+function isAuthoringSelectRef(value: unknown): value is AuthoringSelectRef {
+  if (!isAuthoringTemplateRecord(value) || value['kind'] !== 'select') {
+    return false;
+  }
+  const index = value['index'];
+  const path = value['path'];
+  const cases = value['cases'];
+  if (typeof index !== 'number' || !Number.isInteger(index) || index < 0) {
+    return false;
+  }
+  if (path !== undefined && (!Array.isArray(path) || path.some((s) => typeof s !== 'string'))) {
+    return false;
+  }
+  return typeof cases === 'object' && cases !== null && !Array.isArray(cases);
+}
+
 function isAuthoringTemplateRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readTemplateArgumentValue(
+  args: readonly unknown[],
+  index: number,
+  path: readonly string[] | undefined,
+): unknown {
+  let value = args[index];
+  for (const segment of path ?? []) {
+    if (!isAuthoringTemplateRecord(value) || !Object.hasOwn(value, segment)) {
+      return undefined;
+    }
+    value = value[segment];
+  }
+  return value;
 }
 
 export function isAuthoringTypeConstructorDescriptor(
@@ -1008,6 +1063,138 @@ export function assertNoCrossRegistryCollisions(
 
   assertPslBlocksHaveFactories(entityTypeNamespace, pslBlockNamespace);
   assertUniqueModelAttributeNames(collectModelAttributeEntries(modelAttributeNamespace));
+  assertSelectTemplatesMatchOptionArgs(typeNamespace, fieldNamespace, entityTypeNamespace);
+}
+
+function collectDescriptorNodes<D>(
+  namespace: AuthoringNamespaceTree<D>,
+  isLeaf: (value: D | AuthoringNamespaceTree<D>) => value is D,
+  path: readonly string[] = [],
+): [string, D][] {
+  const nodes: [string, D][] = [];
+  for (const [key, value] of Object.entries(namespace)) {
+    const currentPath = [...path, key];
+    if (isLeaf(value)) {
+      nodes.push([currentPath.join('.'), value]);
+      continue;
+    }
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      nodes.push(...collectDescriptorNodes(value, isLeaf, currentPath));
+    }
+  }
+  return nodes;
+}
+
+function collectSelectRefs(value: unknown, found: AuthoringSelectRef[]): void {
+  if (typeof value !== 'object' || value === null) {
+    return;
+  }
+  if (isAuthoringSelectRef(value)) {
+    found.push(value);
+    for (const caseTemplate of Object.values(value.cases)) {
+      collectSelectRefs(caseTemplate, found);
+    }
+    return;
+  }
+  if (isAuthoringArgRef(value)) {
+    collectSelectRefs(value.default, found);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      collectSelectRefs(entry, found);
+    }
+    return;
+  }
+  for (const entry of Object.values(value)) {
+    collectSelectRefs(entry, found);
+  }
+}
+
+function validateSelectRefsAgainstArgs(
+  label: string,
+  helperPath: string,
+  args: readonly AuthoringArgumentDescriptor[] | undefined,
+  templateRoot: unknown,
+): void {
+  const selects: AuthoringSelectRef[] = [];
+  collectSelectRefs(templateRoot, selects);
+
+  for (const select of selects) {
+    const position = `#${select.index + 1}`;
+    let descriptor: AuthoringArgumentDescriptor | undefined = args?.[select.index];
+    if (descriptor === undefined) {
+      throw new Error(
+        `Authoring ${label} helper "${helperPath}" select template references argument ${position}, but the helper declares no argument at that position.`,
+      );
+    }
+    for (const segment of select.path ?? []) {
+      descriptor = descriptor.kind === 'object' ? descriptor.properties[segment] : undefined;
+      if (descriptor === undefined) {
+        throw new Error(
+          `Authoring ${label} helper "${helperPath}" select template references argument ${position} at path "${(select.path ?? []).join('.')}", which does not resolve to a declared argument property.`,
+        );
+      }
+    }
+    if (descriptor.kind !== 'option') {
+      throw new Error(
+        `Authoring ${label} helper "${helperPath}" select template references argument ${position}, which is kind "${descriptor.kind}"; select requires an option argument.`,
+      );
+    }
+
+    const argumentLabel = descriptor.name !== undefined ? `"${descriptor.name}"` : position;
+    const missing = descriptor.values.filter((value) => !Object.hasOwn(select.cases, value));
+    if (missing.length > 0) {
+      throw new Error(
+        `Authoring ${label} helper "${helperPath}" option argument ${argumentLabel} allows [${descriptor.values.join(', ')}] but the select template has no case for: ${missing.join(', ')}.`,
+      );
+    }
+    const values = descriptor.values;
+    const unreachable = Object.keys(select.cases).filter((key) => !values.includes(key));
+    if (unreachable.length > 0) {
+      throw new Error(
+        `Authoring ${label} helper "${helperPath}" select template has case(s) not allowed by option argument ${argumentLabel}: ${unreachable.join(', ')}. Allowed values: [${values.join(', ')}].`,
+      );
+    }
+  }
+}
+
+/**
+ * Every `select` template node must target an option argument whose `values`
+ * exactly cover the node's `cases` — a legal token with no case and a case no
+ * token can reach are both declaration bugs, caught here at pack-registration
+ * time rather than at first resolution.
+ */
+function assertSelectTemplatesMatchOptionArgs(
+  typeNamespace: AuthoringTypeNamespace,
+  fieldNamespace: AuthoringFieldNamespace,
+  entityTypeNamespace: AuthoringEntityTypeNamespace,
+): void {
+  for (const [helperPath, descriptor] of collectDescriptorNodes(
+    fieldNamespace,
+    isAuthoringFieldPresetDescriptor,
+  )) {
+    validateSelectRefsAgainstArgs('field', helperPath, descriptor.args, descriptor.output);
+  }
+  for (const [helperPath, descriptor] of collectDescriptorNodes(
+    typeNamespace,
+    isAuthoringTypeConstructorDescriptor,
+  )) {
+    validateSelectRefsAgainstArgs('type', helperPath, descriptor.args, descriptor.output);
+  }
+  for (const [helperPath, descriptor] of collectDescriptorNodes(
+    entityTypeNamespace,
+    isAuthoringEntityTypeDescriptor,
+  )) {
+    if ('template' in descriptor.output) {
+      validateSelectRefsAgainstArgs(
+        'entityType',
+        helperPath,
+        descriptor.args,
+        descriptor.output.template,
+      );
+    }
+  }
 }
 
 export function resolveAuthoringTemplateValue(
@@ -1018,21 +1205,24 @@ export function resolveAuthoringTemplateValue(
     return undefined;
   }
   if (isAuthoringArgRef(template)) {
-    let value = args[template.index];
-
-    for (const segment of template.path ?? []) {
-      if (!isAuthoringTemplateRecord(value) || !Object.hasOwn(value, segment)) {
-        value = undefined;
-        break;
-      }
-      value = (value as Record<string, unknown>)[segment];
-    }
+    const value = readTemplateArgumentValue(args, template.index, template.path);
 
     if (value === undefined && template.default !== undefined) {
       return resolveAuthoringTemplateValue(template.default, args);
     }
 
     return value;
+  }
+  if (isAuthoringSelectRef(template)) {
+    const value = readTemplateArgumentValue(args, template.index, template.path);
+
+    if (value === undefined) {
+      return undefined;
+    }
+    if (typeof value !== 'string' || !Object.hasOwn(template.cases, value)) {
+      throw new Error(`Authoring template select has no case for value "${String(value)}"`);
+    }
+    return resolveAuthoringTemplateValue(template.cases[value], args);
   }
   if (Array.isArray(template)) {
     return template.map((value) => resolveAuthoringTemplateValue(value, args));
@@ -1109,6 +1299,15 @@ function validateAuthoringArgument(
     return;
   }
 
+  if (descriptor.kind === 'option') {
+    if (typeof value !== 'string' || !descriptor.values.includes(value)) {
+      throw new Error(
+        `Authoring helper argument at ${path} must be one of: ${descriptor.values.join(', ')}`,
+      );
+    }
+    return;
+  }
+
   if (typeof value !== 'number' || Number.isNaN(value)) {
     throw new Error(`Authoring helper argument at ${path} must be a number`);
   }
@@ -1172,11 +1371,13 @@ function resolveAuthoringStorageTypeTemplate(
       `Resolved authoring typeParams must be an object for codec "${template.codecId}", received ${String(typeParams)}`,
     );
   }
+  const normalizedTypeParams =
+    typeParams !== undefined && Object.keys(typeParams).length === 0 ? undefined : typeParams;
 
   return {
     codecId: template.codecId,
     nativeType,
-    ...ifDefined('typeParams', typeParams),
+    ...ifDefined('typeParams', normalizedTypeParams),
   };
 }
 
@@ -1216,8 +1417,11 @@ function resolveExecutionMutationDefaultPhase(
   phase: 'onCreate' | 'onUpdate',
   template: AuthoringTemplateValue,
   args: readonly unknown[],
-): ExecutionMutationDefaultValue {
+): ExecutionMutationDefaultValue | undefined {
   const value = resolveAuthoringTemplateValue(template, args);
+  if (value === undefined) {
+    return undefined;
+  }
   if (!isExecutionMutationDefaultValue(value)) {
     throw new Error(
       `Authoring preset executionDefaults.${phase} did not resolve to a valid generator descriptor (kind: 'generator', id: string).`,
@@ -1229,8 +1433,8 @@ function resolveExecutionMutationDefaultPhase(
 function resolveAuthoringExecutionDefaultsTemplate(
   template: AuthoringExecutionDefaultsTemplate,
   args: readonly unknown[],
-): ExecutionMutationDefaultPhases {
-  return {
+): ExecutionMutationDefaultPhases | undefined {
+  const phases: ExecutionMutationDefaultPhases = {
     ...ifDefined(
       'onCreate',
       template.onCreate !== undefined
@@ -1244,6 +1448,7 @@ function resolveAuthoringExecutionDefaultsTemplate(
         : undefined,
     ),
   };
+  return Object.keys(phases).length === 0 ? undefined : phases;
 }
 
 export function instantiateAuthoringTypeConstructor(

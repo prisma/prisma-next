@@ -27,7 +27,6 @@ function stubDiff(control: 'observed' | 'managed'): SqlSchemaDiffFn {
     issues: [
       {
         path: ['database', 'user', 'column:email'],
-        reason: 'not-found',
         expected: new SqlColumnIR({ name: 'email', nativeType: 'text', nullable: false }),
       },
     ],

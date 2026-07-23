@@ -74,6 +74,21 @@ describe('SQL contract validators', () => {
       expect(() => validateStorage(invalid)).toThrow();
     });
 
+    it('invalid storage error carries CONTRACT.VALIDATION_FAILED', () => {
+      const invalid = {
+        storageHash: 'test',
+        namespaces: {
+          [UNBOUND_NAMESPACE_ID]: {
+            id: UNBOUND_NAMESPACE_ID,
+            entries: { table: 'not-an-object' },
+          },
+        },
+      } as unknown;
+      expect(() => validateStorage(invalid)).toThrowError(
+        expect.objectContaining({ code: 'CONTRACT.VALIDATION_FAILED' }) as unknown as Error,
+      );
+    });
+
     it('throws on invalid table structure', () => {
       const invalid = {
         storageHash: 'test',
@@ -636,104 +651,19 @@ describe('SQL contract validators', () => {
       expect(() => validateSqlContractFully(c)).toThrow('mappings must be removed');
     });
 
-    it('validates FK with per-FK constraint and index fields', () => {
+    it('validates FK with source and target coordinates only', () => {
       const userTable = table({ id: col('int4', 'pg/int4@1') }, { pk: pk('id') });
       const postTable = table(
         { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
         {
           pk: pk('id'),
-          fks: [fk('post', ['userId'], 'user', ['id'], { constraint: true, index: true })],
+          fks: [fk('post', ['userId'], 'user', ['id'])],
         },
       );
       const c = createContract<SqlStorage>({
         storage: unboundTables({ user: userTable, post: postTable }),
       });
       expect(() => validateSqlContractFully(c)).not.toThrow();
-    });
-
-    it('validates FK with constraint disabled', () => {
-      const userTable = table({ id: col('int4', 'pg/int4@1') }, { pk: pk('id') });
-      const postTable = table(
-        { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
-        {
-          pk: pk('id'),
-          fks: [fk('post', ['userId'], 'user', ['id'], { constraint: false, index: true })],
-        },
-      );
-      const c = createContract<SqlStorage>({
-        storage: unboundTables({ user: userTable, post: postTable }),
-      });
-      expect(() => validateSqlContractFully(c)).not.toThrow();
-    });
-
-    it('rejects FK missing constraint field', () => {
-      const rawContract = createContract({
-        storage: unboundTables({
-          user: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-          post: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [
-              {
-                source: {
-                  namespaceId: UNBOUND_NAMESPACE_ID,
-                  tableName: 'post',
-                  columns: ['userId'],
-                },
-                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
-                index: true,
-              },
-            ],
-          },
-        }),
-      });
-      expect(() => validateSqlContractFully(rawContract)).toThrow();
-    });
-
-    it('rejects FK missing index field', () => {
-      const rawContract = createContract({
-        storage: unboundTables({
-          user: {
-            columns: { id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false } },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-          post: {
-            columns: {
-              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-              userId: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [
-              {
-                source: {
-                  namespaceId: UNBOUND_NAMESPACE_ID,
-                  tableName: 'post',
-                  columns: ['userId'],
-                },
-                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
-                constraint: true,
-              },
-            ],
-          },
-        }),
-      });
-      expect(() => validateSqlContractFully(rawContract)).toThrow();
     });
 
     it('validates storage with FK referential actions', () => {
@@ -805,8 +735,6 @@ describe('SQL contract validators', () => {
                         columns: ['id'],
                       },
                       onDelete: 'invalidAction',
-                      constraint: true,
-                      index: true,
                     },
                   ],
                 },
@@ -816,21 +744,6 @@ describe('SQL contract validators', () => {
         },
       } as unknown;
       expect(() => validateStorage(invalid)).toThrow();
-    });
-
-    it('validates FK with both disabled', () => {
-      const userTable = table({ id: col('int4', 'pg/int4@1') }, { pk: pk('id') });
-      const postTable = table(
-        { id: col('int4', 'pg/int4@1'), userId: col('int4', 'pg/int4@1') },
-        {
-          pk: pk('id'),
-          fks: [fk('post', ['userId'], 'user', ['id'], { constraint: false, index: false })],
-        },
-      );
-      const c = createContract<SqlStorage>({
-        storage: unboundTables({ user: userTable, post: postTable }),
-      });
-      expect(() => validateSqlContractFully(c)).not.toThrow();
     });
 
     it('rejects FK whose source coordinates do not match the owning table', () => {
@@ -859,8 +772,6 @@ describe('SQL contract validators', () => {
                   columns: ['userId'],
                 },
                 target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
-                constraint: true,
-                index: true,
               },
             ],
           },
@@ -922,8 +833,6 @@ describe('SQL contract validators', () => {
                           tableName: 'users',
                           columns: ['user_uuid'],
                         },
-                        constraint: true,
-                        index: true,
                       },
                     ],
                   },
@@ -994,8 +903,6 @@ describe('SQL contract validators', () => {
                           tableName: 'users',
                           columns: ['user_uuid'],
                         },
-                        constraint: true,
-                        index: true,
                       },
                     ],
                   },

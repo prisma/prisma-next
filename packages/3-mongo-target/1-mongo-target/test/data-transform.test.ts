@@ -183,7 +183,7 @@ describe('dataTransform', () => {
     expect(op.run[0]!.command.kind).toBe('rawUpdateMany');
   });
 
-  it('propagates placeholder() errors from check.source as structured CliStructuredError (PN-MIG-2001)', () => {
+  it('propagates placeholder() errors from check.source as structured CliStructuredError (MIGRATION.UNFILLED_PLACEHOLDER)', () => {
     let thrown: unknown;
     try {
       dataTransform('backfill-product-status', {
@@ -198,13 +198,12 @@ describe('dataTransform', () => {
 
     expect(CliStructuredError.is(thrown)).toBe(true);
     expect(thrown).toMatchObject({
-      code: '2001',
-      domain: 'MIG',
+      code: 'MIGRATION.UNFILLED_PLACEHOLDER',
       meta: { slot: 'backfill-product-status:check.source' },
     });
   });
 
-  it('propagates placeholder() errors from run as structured CliStructuredError (PN-MIG-2001)', () => {
+  it('propagates placeholder() errors from run as structured CliStructuredError (MIGRATION.UNFILLED_PLACEHOLDER)', () => {
     let thrown: unknown;
     try {
       dataTransform('backfill-product-status', {
@@ -216,8 +215,7 @@ describe('dataTransform', () => {
 
     expect(CliStructuredError.is(thrown)).toBe(true);
     expect(thrown).toMatchObject({
-      code: '2001',
-      domain: 'MIG',
+      code: 'MIGRATION.UNFILLED_PLACEHOLDER',
       meta: { slot: 'backfill-product-status:run' },
     });
   });

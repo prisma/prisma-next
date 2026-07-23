@@ -1,23 +1,27 @@
 import { existsSync } from 'node:fs';
-import { rm } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { contractSnapshotDir } from '@prisma-next/migration-tools/contract-snapshot-store';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
-import type { ContractIR } from '@prisma-next/migration-tools/refs';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { computeRefAdvancementName, executeRefAdvancement } from '../../src/utils/ref-advancement';
+import {
+  type ContractIR,
+  computeRefAdvancementName,
+  executeRefAdvancement,
+} from '../../src/utils/ref-advancement';
 
 const HASH_A = `${'a'.repeat(64)}`;
 const PROFILE_HASH = `${'c'.repeat(64)}`;
 
-function sampleContractIR(): ContractIR {
+function sampleContractIR(storageHash: string = HASH_A): ContractIR {
   return {
     contract: {
       schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
       profileHash: PROFILE_HASH,
-      storage: { storageHash: HASH_A },
+      storage: { storageHash },
       models: {
         User: {
           fields: {
@@ -38,14 +42,6 @@ function sampleContractIR(): ContractIR {
 
 function refPointerPath(refsDir: string, name: string): string {
   return join(refsDir, `${name}.json`);
-}
-
-function snapshotJsonPath(refsDir: string, name: string): string {
-  return join(refsDir, `${name}.contract.json`);
-}
-
-function snapshotDtsPath(refsDir: string, name: string): string {
-  return join(refsDir, `${name}.contract.d.ts`);
 }
 
 describe('computeRefAdvancementName', () => {
@@ -73,48 +69,73 @@ describe('computeRefAdvancementName', () => {
 });
 
 describe('executeRefAdvancement', () => {
+  let migrationsDir: string;
   let refsDir: string;
 
   beforeEach(async () => {
-    refsDir = join(
+    migrationsDir = join(
       tmpdir(),
       `test-ref-advancement-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      'refs',
     );
+    refsDir = join(migrationsDir, 'app', 'refs');
   });
 
   afterEach(async () => {
-    await rm(join(refsDir, '..'), { recursive: true, force: true });
+    await rm(migrationsDir, { recursive: true, force: true });
   });
 
-  it('writes pointer and paired snapshot files and returns the advanced ref', async () => {
+  it('writes the store entry and pointer, returning the advanced ref', async () => {
     expect(existsSync(refsDir)).toBe(false);
 
-    const result = await executeRefAdvancement(refsDir, 'db', HASH_A, sampleContractIR());
+    const result = await executeRefAdvancement(
+      refsDir,
+      migrationsDir,
+      'db',
+      HASH_A,
+      sampleContractIR(),
+    );
 
     expect(result).toEqual({ name: 'db', hash: HASH_A });
     expect(existsSync(refPointerPath(refsDir, 'db'))).toBe(true);
-    expect(existsSync(snapshotJsonPath(refsDir, 'db'))).toBe(true);
-    expect(existsSync(snapshotDtsPath(refsDir, 'db'))).toBe(true);
+    expect(existsSync(join(contractSnapshotDir(migrationsDir, HASH_A), 'contract.json'))).toBe(
+      true,
+    );
+    expect(existsSync(join(contractSnapshotDir(migrationsDir, HASH_A), 'contract.d.ts'))).toBe(
+      true,
+    );
   });
 
-  it('propagates writeRefPaired failures', async () => {
+  it('is a write-if-absent no-op on the store when advancing to the same hash again', async () => {
+    await executeRefAdvancement(refsDir, migrationsDir, 'db', HASH_A, sampleContractIR());
+    const storeJsonPath = join(contractSnapshotDir(migrationsDir, HASH_A), 'contract.json');
+    const firstContent = await readFile(storeJsonPath, 'utf-8');
+
+    await executeRefAdvancement(refsDir, migrationsDir, 'db', HASH_A, sampleContractIR());
+    const secondContent = await readFile(storeJsonPath, 'utf-8');
+
+    expect(secondContent).toBe(firstContent);
+  });
+
+  it('propagates a hash mismatch between the argument and the contract IR from the store write', async () => {
+    const HASH_B = 'b'.repeat(64);
     await expect(
-      executeRefAdvancement(refsDir, 'db', 'not-a-valid-hash', sampleContractIR()),
+      executeRefAdvancement(refsDir, migrationsDir, 'db', HASH_A, sampleContractIR(HASH_B)),
     ).rejects.toSatisfy((error) => {
       expect(MigrationToolsError.is(error)).toBe(true);
-      expect((error as MigrationToolsError).code).toBe('MIGRATION.INVALID_REF_VALUE');
+      expect((error as MigrationToolsError).code).toBe('MIGRATION.CONTRACT_SNAPSHOT_HASH_MISMATCH');
       return true;
     });
+    expect(existsSync(refPointerPath(refsDir, 'db'))).toBe(false);
   });
 
-  it('surfaces MIGRATION.INVALID_REF_NAME for an invalid ref name', async () => {
-    await expect(executeRefAdvancement(refsDir, '', HASH_A, sampleContractIR())).rejects.toSatisfy(
-      (error) => {
-        expect(MigrationToolsError.is(error)).toBe(true);
-        expect((error as MigrationToolsError).code).toBe('MIGRATION.INVALID_REF_NAME');
-        return true;
-      },
-    );
+  it('surfaces MIGRATION.INVALID_REF_NAME for an invalid ref name without writing a store entry', async () => {
+    await expect(
+      executeRefAdvancement(refsDir, migrationsDir, '', HASH_A, sampleContractIR()),
+    ).rejects.toSatisfy((error) => {
+      expect(MigrationToolsError.is(error)).toBe(true);
+      expect((error as MigrationToolsError).code).toBe('MIGRATION.INVALID_REF_NAME');
+      return true;
+    });
+    expect(existsSync(contractSnapshotDir(migrationsDir, HASH_A))).toBe(false);
   });
 });

@@ -66,7 +66,7 @@ import {
 } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { materialiseMigrationPackage } from '@prisma-next/migration-tools/io';
-import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { emitContractSpaceArtifacts } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import { applicationDomainOf, createDevDatabase, timeouts } from '@prisma-next/test-utils';
@@ -264,7 +264,7 @@ async function setupTestProject(args: {
   const migrationsDir = join(projectRoot, 'migrations');
   await mkdir(migrationsDir, { recursive: true });
 
-  await emitContractSpaceArtefacts(migrationsDir, PGVECTOR_SPACE_ID, {
+  await emitContractSpaceArtifacts(migrationsDir, PGVECTOR_SPACE_ID, {
     contract: pgvectorContract,
     contractDts: '// rendered .d.ts for pgvector contract space\nexport interface Contract {}\n',
     headRef: { hash: pgvectorHeadRef.hash, invariants: [...pgvectorHeadRef.invariants] },

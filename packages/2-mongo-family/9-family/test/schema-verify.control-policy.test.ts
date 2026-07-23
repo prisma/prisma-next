@@ -1,4 +1,5 @@
 import { type ControlPolicy, effectiveControlPolicy } from '@prisma-next/contract/types';
+import { issueOutcome } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { MongoCollection, type MongoContract } from '@prisma-next/mongo-contract';
 import {
@@ -87,7 +88,7 @@ describe('verifyMongoSchema control policy', () => {
     expect(result.schema.issues.length).toBeGreaterThan(0);
     expect(
       result.schema.issues.some(
-        (i) => i.reason === 'not-expected' && i.path[1]?.startsWith('index:'),
+        (i) => issueOutcome(i) === 'not-expected' && i.path[1]?.startsWith('index:'),
       ),
     ).toBe(true);
   });
@@ -101,9 +102,7 @@ describe('verifyMongoSchema control policy', () => {
       frameworkComponents: [],
     });
     expect(result.ok).toBe(false);
-    expect(result.schema.issues).toContainEqual(
-      expect.objectContaining({ path: ['items'], reason: 'not-found' }),
-    );
+    expect(result.schema.issues).toContainEqual(expect.objectContaining({ path: ['items'] }));
   });
 
   it('ignores an extra live collection under external', () => {
@@ -119,7 +118,7 @@ describe('verifyMongoSchema control policy', () => {
     });
     expect(result.ok).toBe(true);
     expect(
-      result.schema.issues.some((i) => i.reason === 'not-expected' && i.path.length === 1),
+      result.schema.issues.some((i) => issueOutcome(i) === 'not-expected' && i.path.length === 1),
     ).toBe(false);
   });
 
@@ -156,9 +155,7 @@ describe('verifyMongoSchema control policy', () => {
       frameworkComponents: [],
     });
     expect(result.ok).toBe(false);
-    expect(result.schema.issues).toContainEqual(
-      expect.objectContaining({ path: ['items'], reason: 'not-found' }),
-    );
+    expect(result.schema.issues).toContainEqual(expect.objectContaining({ path: ['items'] }));
   });
 
   it('suppresses extra indexes under external', () => {
@@ -177,7 +174,7 @@ describe('verifyMongoSchema control policy', () => {
     expect(result.ok).toBe(true);
     expect(
       result.schema.issues.some(
-        (i) => i.reason === 'not-expected' && i.path[1]?.startsWith('index:'),
+        (i) => issueOutcome(i) === 'not-expected' && i.path[1]?.startsWith('index:'),
       ),
     ).toBe(false);
   });

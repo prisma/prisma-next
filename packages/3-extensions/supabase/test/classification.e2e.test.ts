@@ -17,9 +17,10 @@
  * verify` via the control client and asserts the per-space plan operations
  * and per-space verify results.
  *
- * Shim strategy: the external table seed SQL lives in `./supabase-bootstrap`
- * and is shared with the walking skeleton in `examples/supabase/test/`
- * via the `@prisma-next/extension-supabase/test/utils` subpath export.
+ * Seed strategy: the external table seed SQL lives in the reference fixture
+ * (`./fixtures/supabase-reference/`, applied via `setUpSupabaseMockSchema`)
+ * and is shared with the sibling integration tests (including the walking
+ * skeleton in ./skeleton.integration.test.ts).
  */
 
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -31,7 +32,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
-import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { emitContractSpaceArtifacts } from '@prisma-next/migration-tools/spaces';
 import { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgres from '@prisma-next/target-postgres/control';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
@@ -44,7 +45,7 @@ import {
 } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import supabasePack from '../src/exports/pack';
-import { bootstrapSupabaseShim } from './supabase-bootstrap';
+import { setUpSupabaseMockSchema } from './fixtures/supabase-reference/set-up-mock-schema';
 
 /**
  * Minimal app contract: a single `public` schema with a `profile` table.
@@ -111,21 +112,21 @@ describe('supabase external-schema classification (db init + db verify)', () => 
       // Without this seed, `db verify` would fail with `declaredMissing`
       // for every auth.*/storage.* table.
       await withClient(connectionString, async (client) => {
-        await bootstrapSupabaseShim(client);
+        await setUpSupabaseMockSchema(client);
       });
 
       // 2. Materialise the supabase extension contract space on disk.
       //
       // The supabase pack is migration-less: it declares only external schema
       // (auth.* / storage.* are Supabase-managed tables). We emit the space
-      // artefacts (contract.json, refs/head.json) so `db init` discovers the
+      // artifacts (contract.json, refs/head.json) so `db init` discovers the
       // extension space. No migration packages are written — the loader treats a
       // zero-package space as all-external and the planner falls through to synth
       // strategy (zero ops).
       const space = supabasePack.contractSpace;
       if (!space) throw new Error('supabasePack must carry a contractSpace');
 
-      await emitContractSpaceArtefacts(migrationsDir, 'supabase', {
+      await emitContractSpaceArtifacts(migrationsDir, 'supabase', {
         contract: space.contractJson,
         contractDts: '// supabase extension contract space\n',
         headRef: { hash: space.headRef.hash, invariants: [...space.headRef.invariants] },

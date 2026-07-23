@@ -21,7 +21,7 @@
  *    the CLI commands use, walking up from the migration file's directory.
  * 4. Probe-instantiates the migration class without a stack so it can read
  *    `targetId` and verify it matches `config.target.targetId`
- *    (`PN-MIG-2006` on mismatch) before any stack-driven adapter
+ *    (`MIGRATION.TARGET_MISMATCH` on mismatch) before any stack-driven adapter
  *    construction runs.
  * 5. Assembles a `ControlStack` from the loaded config descriptors and
  *    constructs the migration with that stack.
@@ -269,7 +269,7 @@ async function orchestrate(
 
   // Pre-scan for malformed `--config` (no value, or value-shaped-as-flag)
   // before delegating to clipanion. The legacy parser surfaced both as
-  // `errorMigrationCliInvalidConfigArg` (`PN-CLI-4012`); pre-scanning
+  // `errorMigrationCliInvalidConfigArg` (`CLI.CONFIG_ARG_MISSING_PATH`); pre-scanning
   // here keeps that contract independent of how clipanion classifies
   // the error internally (it variably throws `UnknownSyntaxError` or
   // accepts the flag-shaped token as the value depending on what other
@@ -337,7 +337,7 @@ async function orchestrate(
  * - `--config <empty>` where the value is the empty string. Shells
  *   expand `--config ""` (or `--config "$UNSET_VAR"`) into a real
  *   empty argv token; treating that as a usage error here surfaces
- *   `PN-CLI-4012` instead of a less actionable loader error on an
+ *   `CLI.CONFIG_ARG_MISSING_PATH` instead of a less actionable loader error on an
  *   empty path.
  * - `--config=` (the equals form with an empty value). Same shape as
  *   the empty-string case above; the user expressed intent to override
@@ -425,7 +425,7 @@ function isUnknownSyntaxError(err: unknown): err is Error {
 /**
  * Best-effort: pull the first input token that doesn't match a known
  * flag. Falls back to the first token when we can't pinpoint it. The
- * returned name is rendered into the user-visible PN-CLI-4013 envelope
+ * returned name is rendered into the user-visible CLI.UNKNOWN_FLAG envelope
  * (`Unknown flag \`<name>\``) and round-tripped via `meta.flag` so
  * agent consumers can render their own "did you mean" suggestions.
  */
@@ -556,7 +556,7 @@ async function runMigration(
   // subclasses are required to accept the no-arg form; the abstract
   // `Migration` constructor declares `stack?` and target subclasses
   // (Postgres, Mongo) propagate that optionality. This makes the
-  // target-mismatch guard fail fast with `PN-MIG-2006` before any
+  // target-mismatch guard fail fast with `MIGRATION.TARGET_MISMATCH` before any
   // stack-driven adapter construction begins, even if the wrong-target
   // adapter's `create` would otherwise succeed and silently misshapen
   // the stored adapter cast.

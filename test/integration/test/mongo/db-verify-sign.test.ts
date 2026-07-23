@@ -8,7 +8,7 @@ import {
   createMongoFamilyInstance,
   mongoFamilyDescriptor,
 } from '@prisma-next/family-mongo/control';
-import { createControlStack } from '@prisma-next/framework-components/control';
+import { createControlStack, issueOutcome } from '@prisma-next/framework-components/control';
 import { MongoCollection, type MongoContract, MongoIndex } from '@prisma-next/mongo-contract';
 import { mongoTargetDescriptor } from '@prisma-next/target-mongo/control';
 import { applicationDomainOf, timeouts } from '@prisma-next/test-utils';
@@ -101,7 +101,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
   }
 
   describe('verify (marker-only)', () => {
-    it('returns PN-RUN-3001 when no marker exists', async () => {
+    it('returns CONTRACT.MARKER_MISSING when no marker exists', async () => {
       const instance = createInstance();
       const result = await instance.verify({
         driver: makeDriver(),
@@ -111,7 +111,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.code).toBe('PN-RUN-3001');
+      expect(result.code).toBe('CONTRACT.MARKER_MISSING');
       expect(result.summary).toContain('missing');
     });
 
@@ -133,7 +133,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       expect(result.summary).toContain('matches');
     });
 
-    it('returns PN-RUN-3002 when storage hash differs', async () => {
+    it('returns CONTRACT.MARKER_MISMATCH when storage hash differs', async () => {
       await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
         storageHash: coreHash('old-hash'),
         profileHash: baseContract.profileHash,
@@ -148,10 +148,10 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.code).toBe('PN-RUN-3002');
+      expect(result.code).toBe('CONTRACT.MARKER_MISMATCH');
     });
 
-    it('returns PN-RUN-3002 when profile hash differs', async () => {
+    it('returns CONTRACT.MARKER_MISMATCH when profile hash differs', async () => {
       await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
         storageHash: baseContract.storage.storageHash,
         profileHash: profileHash('old-profile'),
@@ -166,7 +166,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.code).toBe('PN-RUN-3002');
+      expect(result.code).toBe('CONTRACT.MARKER_MISMATCH');
     });
   });
 
@@ -213,7 +213,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       expect(result.ok).toBe(false);
       expect(
         result.schema.issues.some(
-          (i) => i.reason === 'not-equal' && i.path[1]?.startsWith('index:'),
+          (i) => issueOutcome(i) === 'not-found' && i.path[1]?.startsWith('index:'),
         ),
       ).toBe(true);
     });
@@ -239,7 +239,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       expect(result.ok).toBe(true);
       expect(
         result.schema.issues.some(
-          (i) => i.reason === 'not-expected' && i.path[1]?.startsWith('index:'),
+          (i) => issueOutcome(i) === 'not-expected' && i.path[1]?.startsWith('index:'),
         ),
       ).toBe(false);
     });
@@ -265,7 +265,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
       expect(result.ok).toBe(false);
       expect(
         result.schema.issues.some(
-          (i) => i.reason === 'not-expected' && i.path[1]?.startsWith('index:'),
+          (i) => issueOutcome(i) === 'not-expected' && i.path[1]?.startsWith('index:'),
         ),
       ).toBe(true);
     });
@@ -286,7 +286,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
 
       expect(result.ok).toBe(false);
       expect(
-        result.schema.issues.some((i) => i.reason === 'not-found' && i.path.length === 1),
+        result.schema.issues.some((i) => issueOutcome(i) === 'not-found' && i.path.length === 1),
       ).toBe(true);
     });
   });

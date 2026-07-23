@@ -22,6 +22,7 @@ import {
   SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
+import { ormError } from './orm-errors';
 
 function namespaceCoordinateForSource(source: AnyFromSource): string | undefined {
   return source.kind === 'table-source' ? source.namespaceId : undefined;
@@ -59,6 +60,15 @@ function bindWhereExprNode(
     windowFunc(expr) {
       return bindExpression(contract, expr);
     },
+    functionCall(expr) {
+      return bindExpression(contract, expr);
+    },
+    cast(expr) {
+      return bindExpression(contract, expr);
+    },
+    case(expr) {
+      return bindExpression(contract, expr);
+    },
     jsonObject(expr) {
       return bindExpression(contract, expr);
     },
@@ -79,7 +89,7 @@ function bindWhereExprNode(
     },
     binary(expr) {
       const left = bindExpression(contract, expr.left);
-      const bindingColumn = left.kind === 'column-ref' ? (left as ColumnRef) : undefined;
+      const bindingColumn = left.kind === 'column-ref' ? left : undefined;
 
       return new BinaryExpr(
         expr.op,
@@ -155,7 +165,11 @@ function createParamRef(
   // silently first-matching.
   const resolved = resolveStorageTable(contract.storage, columnRef.table, namespaceId);
   if (resolved === undefined || !resolved.table.columns[columnRef.column]) {
-    throw new Error(`Unknown column "${columnRef.column}" in table "${columnRef.table}"`);
+    throw ormError(
+      'ORM.COLUMN_UNKNOWN',
+      `Unknown column "${columnRef.column}" in table "${columnRef.table}"`,
+      { meta: { tableName: columnRef.table, column: columnRef.column } },
+    );
   }
   const codec = codecRefForStorageColumn(
     contract.storage,
@@ -199,8 +213,7 @@ function bindFromSource(contract: Contract<SqlStorage>, source: AnyFromSource): 
     return source;
   }
   if (source.kind === 'derived-table-source') {
-    const derived = source as DerivedTableSource;
-    return DerivedTableSource.as(derived.alias, bindSelectAst(contract, derived.query));
+    return DerivedTableSource.as(source.alias, bindSelectAst(contract, source.query));
   }
 
   return source;

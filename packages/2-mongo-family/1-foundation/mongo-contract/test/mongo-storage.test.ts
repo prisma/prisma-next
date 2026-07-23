@@ -150,7 +150,7 @@ describe('MongoStorage', () => {
       entries: json.entries as never,
     });
     expect(rehydrated.entries['valueSet']?.['Role']).toBeInstanceOf(MongoValueSet);
-    expect((rehydrated.entries['valueSet']?.['Role'] as MongoValueSet).values).toEqual([
+    expect((rehydrated.entries['valueSet']!['Role'] as MongoValueSet).values).toEqual([
       'admin',
       'reader',
     ]);

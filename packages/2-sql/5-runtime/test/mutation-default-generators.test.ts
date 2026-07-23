@@ -196,7 +196,7 @@ describe('composed runtime mutation default generators', () => {
     );
   });
 
-  it('throws RUNTIME.MISSING_MUTATION_DEFAULT_GENERATOR at context creation when generator id is missing', () => {
+  it('throws RUNTIME.MUTATION_DEFAULT_GENERATOR_MISSING at context creation when generator id is missing', () => {
     expect(() =>
       createExecutionContext({
         contract: {
@@ -217,7 +217,7 @@ describe('composed runtime mutation default generators', () => {
       }),
     ).toThrow(
       expect.objectContaining({
-        code: 'RUNTIME.MISSING_MUTATION_DEFAULT_GENERATOR',
+        code: 'RUNTIME.MUTATION_DEFAULT_GENERATOR_MISSING',
         details: expect.objectContaining({
           ids: ['unknown-generator'],
         }),
@@ -255,7 +255,7 @@ describe('composed runtime mutation default generators', () => {
       }),
     ).toThrow(
       expect.objectContaining({
-        code: 'RUNTIME.MISSING_MUTATION_DEFAULT_GENERATOR',
+        code: 'RUNTIME.MUTATION_DEFAULT_GENERATOR_MISSING',
         details: expect.objectContaining({
           ids: ['uuidv4'],
         }),

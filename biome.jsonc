@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.2/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -14,11 +14,10 @@
       "!**/node_modules",
       "!**/.prisma",
       "!**/*.d.ts",
+      "!**/*.svg",
       "!**/contract.json",
       "!**/migrations/*/*/migration.json",
-      "!**/migrations/*/*/ops.json",
-      "!**/migrations/*/*/end-contract.json",
-      "!**/migrations/*/*/start-contract.json"
+      "!**/migrations/*/*/ops.json"
     ]
   },
   "formatter": {
@@ -28,7 +27,7 @@
     "lineWidth": 100,
     "lineEnding": "lf"
   },
-  "plugins": ["./biome-plugins/no-bare-cast.grit"],
+  "plugins": ["./biome-plugins/no-bare-cast.grit", "./biome-plugins/no-bare-throw.grit"],
   "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "linter": {
     "enabled": true,

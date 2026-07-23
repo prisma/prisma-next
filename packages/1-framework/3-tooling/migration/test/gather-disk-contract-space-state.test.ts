@@ -2,8 +2,15 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { emitContractSpaceArtefacts } from '../src/emit-contract-space-artefacts';
+import { emitContractSpaceArtifacts } from '../src/emit-contract-space-artifacts';
 import { gatherDiskContractSpaceState } from '../src/gather-disk-contract-space-state';
+
+const CIPHER_HASH = 'c'.repeat(64);
+const PGVECTOR_HASH = 'd'.repeat(64);
+
+function makeContract(storageHash: string): unknown {
+  return { storage: { storageHash } };
+}
 
 describe('gatherDiskContractSpaceState', () => {
   let migrationsDir: string;
@@ -27,15 +34,15 @@ describe('gatherDiskContractSpaceState', () => {
   });
 
   it('lists contract-space dirs on disk and reads on-disk head refs for declared spaces', async () => {
-    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
-      contract: { id: 'cipher' },
+    await emitContractSpaceArtifacts(migrationsDir, 'cipherstash', {
+      contract: makeContract(CIPHER_HASH),
       contractDts: '\n',
-      headRef: { hash: 'cipher', invariants: ['cipher:create-v1'] },
+      headRef: { hash: CIPHER_HASH, invariants: ['cipher:create-v1'] },
     });
-    await emitContractSpaceArtefacts(migrationsDir, 'pgvector', {
-      contract: { id: 'pgvector' },
+    await emitContractSpaceArtifacts(migrationsDir, 'pgvector', {
+      contract: makeContract(PGVECTOR_HASH),
       contractDts: '\n',
-      headRef: { hash: 'pgvector', invariants: ['pgvector:install-v1'] },
+      headRef: { hash: PGVECTOR_HASH, invariants: ['pgvector:install-v1'] },
     });
 
     const state = await gatherDiskContractSpaceState({
@@ -45,20 +52,20 @@ describe('gatherDiskContractSpaceState', () => {
 
     expect([...state.spaceDirsOnDisk]).toEqual(['cipherstash', 'pgvector']);
     expect(state.headRefsBySpace.get('cipherstash')).toEqual({
-      hash: 'cipher',
+      hash: CIPHER_HASH,
       invariants: ['cipher:create-v1'],
     });
     expect(state.headRefsBySpace.get('pgvector')).toEqual({
-      hash: 'pgvector',
+      hash: PGVECTOR_HASH,
       invariants: ['pgvector:install-v1'],
     });
   });
 
   it('omits declared spaces with no contract-space dir on disk (verifier reports declaredButUnmigrated)', async () => {
-    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
-      contract: { id: 'cipher' },
+    await emitContractSpaceArtifacts(migrationsDir, 'cipherstash', {
+      contract: makeContract(CIPHER_HASH),
       contractDts: '\n',
-      headRef: { hash: 'cipher', invariants: [] },
+      headRef: { hash: CIPHER_HASH, invariants: [] },
     });
 
     const state = await gatherDiskContractSpaceState({
@@ -81,10 +88,10 @@ describe('gatherDiskContractSpaceState', () => {
   });
 
   it('reports orphan contract-space dirs (on disk but not declared) — caller passes both lists to verifyContractSpaces', async () => {
-    await emitContractSpaceArtefacts(migrationsDir, 'cipherstash', {
-      contract: { id: 'cipher' },
+    await emitContractSpaceArtifacts(migrationsDir, 'cipherstash', {
+      contract: makeContract(CIPHER_HASH),
       contractDts: '\n',
-      headRef: { hash: 'cipher', invariants: [] },
+      headRef: { hash: CIPHER_HASH, invariants: [] },
     });
 
     const state = await gatherDiskContractSpaceState({

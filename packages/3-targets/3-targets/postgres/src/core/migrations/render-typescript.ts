@@ -9,13 +9,19 @@
  * shape is, so future consolidation to a framework-level helper is mechanical.
  */
 
-import type { OpFactoryCall } from '@prisma-next/framework-components/control';
+import {
+  contractSnapshotJsonSpecifier,
+  contractSnapshotTypesSpecifier,
+  type OpFactoryCall,
+} from '@prisma-next/framework-components/control';
 import { detectScaffoldRuntime, shebangLineFor } from '@prisma-next/migration-tools/migration-ts';
 import { type ImportRequirement, renderImports } from '@prisma-next/ts-render';
 
 export interface RenderMigrationMeta {
   readonly from: string | null;
   readonly to: string;
+  /** POSIX-relative path from the migration package dir to `migrations/snapshots`, e.g. '../../snapshots'. */
+  readonly snapshotsImportPath: string;
 }
 
 /**
@@ -86,31 +92,37 @@ function buildImports(calls: ReadonlyArray<OpFactoryCall>, meta: RenderMigration
 
 /**
  * The committed contract-JSON imports the scaffold reads its from/to identity
- * from. `end-contract.json` is always present; `start-contract.json` is added
- * only for a non-baseline migration (`meta.from !== null`). The matching
- * `Contract` type imports (aliased `Start`/`End`) feed the
+ * from, resolved to the deduplicated snapshot store under
+ * `meta.snapshotsImportPath`. The end snapshot is always present; the start
+ * snapshot is added only for a non-baseline migration (`meta.from !== null`).
+ * The matching `Contract` type imports (aliased `Start`/`End`) feed the
  * `Migration<Start, End>` generics. Baseline emits `Migration<never, End>` with
  * no start imports — `never` is the honest "no prior contract" Start.
  */
 function contractImports(meta: RenderMigrationMeta): readonly ImportRequirement[] {
   const reqs: ImportRequirement[] = [
     {
-      moduleSpecifier: './end-contract.json',
+      moduleSpecifier: contractSnapshotJsonSpecifier(meta.snapshotsImportPath, meta.to),
       symbol: 'endContract',
       kind: 'default',
       attributes: { type: 'json' },
     },
-    { moduleSpecifier: './end-contract', symbol: 'Contract', alias: 'End', typeOnly: true },
+    {
+      moduleSpecifier: contractSnapshotTypesSpecifier(meta.snapshotsImportPath, meta.to),
+      symbol: 'Contract',
+      alias: 'End',
+      typeOnly: true,
+    },
   ];
   if (meta.from !== null) {
     reqs.push({
-      moduleSpecifier: './start-contract.json',
+      moduleSpecifier: contractSnapshotJsonSpecifier(meta.snapshotsImportPath, meta.from),
       symbol: 'startContract',
       kind: 'default',
       attributes: { type: 'json' },
     });
     reqs.push({
-      moduleSpecifier: './start-contract',
+      moduleSpecifier: contractSnapshotTypesSpecifier(meta.snapshotsImportPath, meta.from),
       symbol: 'Contract',
       alias: 'Start',
       typeOnly: true,

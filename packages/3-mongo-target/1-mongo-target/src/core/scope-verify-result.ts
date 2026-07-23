@@ -3,6 +3,7 @@ import type {
   SchemaDiffIssue,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
+import { issueOutcome } from '@prisma-next/framework-components/control';
 import { elementCoordinates } from '@prisma-next/framework-components/ir';
 
 /**
@@ -26,7 +27,7 @@ export function entityNamesDeclaredBy(contracts: ReadonlyArray<Contract>): Set<s
  * name, never a deeper index/validator/options auxiliary.
  */
 function extraCollectionName(issue: SchemaDiffIssue): string | undefined {
-  if (issue.reason !== 'not-expected' || issue.path.length !== 1) return undefined;
+  if (issueOutcome(issue) !== 'not-expected' || issue.path.length !== 1) return undefined;
   return issue.path[0];
 }
 
@@ -59,7 +60,7 @@ export function scopeVerifyResultToSpace(
   return {
     ...envelope,
     ok,
-    ...(ok ? {} : { code: result.code ?? 'PN-RUN-3010' }),
+    ...(ok ? {} : { code: result.code ?? 'CONTRACT.MARKER_REQUIRED' }),
     summary: ok ? 'Database schema satisfies contract' : result.summary,
     schema: { ...result.schema, issues },
   };

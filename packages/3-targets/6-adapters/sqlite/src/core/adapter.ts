@@ -5,16 +5,21 @@ import type {
   AggregateExpr,
   AnyExpression,
   AnyFromSource,
+  AnyJsonValueProjection,
   AnyQueryAst,
   BinaryExpr,
+  CaseExpr,
+  CastExpr,
   ColumnRef,
   DeleteAst,
+  FunctionCallExpr,
   InsertAst,
   InsertValue,
   JoinAst,
   JoinOnExpr,
   JsonArrayAggExpr,
   JsonObjectExpr,
+  JsonValueProjectionVisitor,
   ListExpression,
   LiteralExpr,
   LoweredParam,
@@ -36,9 +41,26 @@ import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import type { SqliteDdlNode } from '@prisma-next/target-sqlite/ddl';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
+import { structuredError } from '@prisma-next/utils/structured-error';
 import { createSqliteBuiltinCodecLookup } from './codec-lookup';
 import { SqliteControlAdapter } from './control-adapter';
 import type { SqliteAdapterOptions, SqliteContract, SqliteLoweredStatement } from './types';
+
+function nodeKind(value: unknown): string {
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    typeof value.kind === 'string'
+  ) {
+    return value.kind;
+  }
+  return 'unknown';
+}
+
+function unreachableKind(value: never): string {
+  return nodeKind(value);
+}
 
 const defaultCapabilities = Object.freeze({
   sql: {
@@ -155,7 +177,7 @@ export function renderLoweredSql(
       sql = renderDelete(node, contract);
       break;
     default:
-      throw new Error(`Unsupported AST node kind: ${(node as { kind: string }).kind}`);
+      throw new Error(`Unsupported AST node kind: ${nodeKind(node)}`);
   }
 
   return Object.freeze({ sql, params });
@@ -262,14 +284,26 @@ function renderSource(source: AnyFromSource, contract: SqliteContract): string {
     case 'derived-table-source':
       return `(${renderSelect(node.query, contract)}) AS ${quoteIdentifier(node.alias)}`;
     case 'function-source': {
+      if (node.ordinality) {
+        throw structuredError(
+          'ADAPTER.CAPABILITY_MISSING',
+          'SQLite does not support WITH ORDINALITY on function sources',
+          { meta: { target: 'sqlite', feature: 'function-source-with-ordinality' } },
+        );
+      }
+      if (node.columnAliases !== undefined) {
+        throw structuredError(
+          'ADAPTER.CAPABILITY_MISSING',
+          'SQLite does not support returned-column aliases on function sources',
+          { meta: { target: 'sqlite', feature: 'function-source-column-aliases' } },
+        );
+      }
       const args = node.args.map((arg) => renderExpr(arg, contract)).join(', ');
       const call = `${node.fn}(${args})`;
       return node.alias !== undefined ? `${call} AS ${quoteIdentifier(node.alias)}` : call;
     }
     default:
-      throw new Error(
-        `Unsupported source node kind: ${(node satisfies never as { kind: string }).kind}`,
-      );
+      throw new Error(`Unsupported source node kind: ${unreachableKind(node)}`);
   }
 }
 
@@ -288,6 +322,12 @@ function renderExpr(expr: AnyExpression, contract?: SqliteContract): string {
       return renderAggregateExpr(node, contract);
     case 'window-func':
       return renderWindowFuncExpr(node, contract);
+    case 'function-call':
+      return renderFunctionCallExpr(node, contract);
+    case 'cast':
+      return renderCastExpr(node, contract);
+    case 'case':
+      return renderCaseExpr(node, contract);
     case 'json-object':
       return renderJsonObjectExpr(node, contract);
     case 'json-array-agg':
@@ -326,7 +366,7 @@ function renderExpr(expr: AnyExpression, contract?: SqliteContract): string {
     case 'raw-expr':
       return renderRawExpr(node, contract);
     default:
-      throw new Error(`Unsupported expression node kind: ${(node as { kind: string }).kind}`);
+      throw new Error(`Unsupported expression node kind: ${unreachableKind(node)}`);
   }
 }
 
@@ -390,10 +430,38 @@ function renderSubqueryExpr(expr: SubqueryExpr, contract?: SqliteContract): stri
   return `(${renderSelect(expr.query, contract)})`;
 }
 
+function requiresNullCheckGrouping(kind: AnyExpression['kind']): boolean {
+  switch (kind) {
+    case 'operation':
+    case 'subquery':
+      return true;
+    case 'column-ref':
+    case 'identifier-ref':
+    case 'aggregate':
+    case 'window-func':
+    case 'function-call':
+    case 'cast':
+    case 'case':
+    case 'json-object':
+    case 'json-array-agg':
+    case 'binary':
+    case 'and':
+    case 'or':
+    case 'exists':
+    case 'null-check':
+    case 'not':
+    case 'param-ref':
+    case 'prepared-param-ref':
+    case 'literal':
+    case 'list':
+    case 'raw-expr':
+      return false;
+  }
+}
+
 function renderNullCheck(expr: NullCheckExpr, contract?: SqliteContract): string {
   const rendered = renderExpr(expr.expr, contract);
-  const renderedExpr =
-    expr.expr.kind === 'operation' || expr.expr.kind === 'subquery' ? `(${rendered})` : rendered;
+  const renderedExpr = requiresNullCheckGrouping(expr.expr.kind) ? `(${rendered})` : rendered;
   return expr.isNull ? `${renderedExpr} IS NULL` : `${renderedExpr} IS NOT NULL`;
 }
 
@@ -485,14 +553,44 @@ function renderWindowFuncExpr(expr: WindowFuncExpr, contract?: SqliteContract): 
   return `${fn}(${args}) OVER (${over})`;
 }
 
+function renderFunctionCallExpr(expr: FunctionCallExpr, contract?: SqliteContract): string {
+  const args = expr.args.map((arg) => renderExpr(arg, contract)).join(', ');
+  return `${expr.fn}(${args})`;
+}
+
+function renderCastExpr(expr: CastExpr, contract?: SqliteContract): string {
+  return `CAST(${renderExpr(expr.expr, contract)} AS ${expr.targetType})`;
+}
+
+function renderCaseExpr(expr: CaseExpr, contract?: SqliteContract): string {
+  const branches = expr.branches
+    .map(
+      (branch) =>
+        `WHEN ${renderExpr(branch.condition, contract)} THEN ${renderExpr(branch.value, contract)}`,
+    )
+    .join(' ');
+  const elseClause =
+    expr.elseExpr === undefined ? '' : ` ELSE ${renderExpr(expr.elseExpr, contract)}`;
+  return `CASE ${branches}${elseClause} END`;
+}
+
+function renderJsonValueProjection(
+  projection: AnyJsonValueProjection,
+  contract?: SqliteContract,
+): string {
+  const visitor: JsonValueProjectionVisitor<string> = {
+    codec: ({ value }) => renderExpr(value, contract),
+    native: ({ value }) => renderExpr(value, contract),
+    document: ({ value }) => renderExpr(value, contract),
+  };
+  return projection.accept(visitor);
+}
+
 function renderJsonObjectExpr(expr: JsonObjectExpr, contract?: SqliteContract): string {
   const args = expr.entries
     .flatMap((entry): [string, string] => {
       const key = `'${escapeLiteral(entry.key)}'`;
-      if (entry.value.kind === 'literal') {
-        return [key, renderLiteral(entry.value)];
-      }
-      return [key, renderExpr(entry.value, contract)];
+      return [key, renderJsonValueProjection(entry.value, contract)];
     })
     .join(', ');
   return `json_object(${args})`;
@@ -509,7 +607,7 @@ function renderJsonArrayAggExpr(expr: JsonArrayAggExpr, contract?: SqliteContrac
     expr.orderBy && expr.orderBy.length > 0
       ? ` ORDER BY ${renderOrderByItems(expr.orderBy, contract)}`
       : '';
-  const aggregated = `json_group_array(${renderExpr(expr.expr, contract)}${aggregateOrderBy})`;
+  const aggregated = `json_group_array(${renderJsonValueProjection(expr.expr, contract)}${aggregateOrderBy})`;
   if (expr.onEmpty === 'emptyArray') {
     return `coalesce(${aggregated}, '[]')`;
   }
@@ -545,18 +643,18 @@ function renderInsertValue(value: InsertValue): string {
     case 'default-value':
       throw new Error('SQLite does not support DEFAULT as a value in INSERT ... VALUES');
     default:
-      throw new Error(`Unsupported value node in INSERT: ${(value as { kind: string }).kind}`);
+      throw new Error(`Unsupported value node in INSERT: ${unreachableKind(value)}`);
   }
 }
 
 function renderInsert(ast: InsertAst, contract: SqliteContract): string {
   const table = qualifyTableFromNamespaceCoordinate(ast.table, contract);
   const rows = ast.rows;
-  if (rows.length === 0) {
+  const firstRow = rows[0];
+  if (firstRow === undefined) {
     throw new Error('INSERT requires at least one row');
   }
 
-  const firstRow = rows[0] as Readonly<Record<string, InsertValue>>;
   const columnOrder = Object.keys(firstRow);
 
   let insertClause: string;
@@ -599,7 +697,7 @@ function renderInsert(ast: InsertAst, contract: SqliteContract): string {
         break;
       }
       default:
-        throw new Error(`Unsupported onConflict action: ${(action as { kind: string }).kind}`);
+        throw new Error(`Unsupported onConflict action: ${unreachableKind(action)}`);
     }
   }
 

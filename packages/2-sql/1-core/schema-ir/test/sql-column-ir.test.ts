@@ -167,4 +167,25 @@ describe('SqlColumnIR', () => {
       expect(column.resolvedDefault).toEqual({ kind: 'literal', value: 'x' });
     });
   });
+
+  describe('identity columns (introspected, no raw default)', () => {
+    it('yields a default child node from resolvedDefault alone, with no raw default', () => {
+      // A `GENERATED ... AS IDENTITY` column has no `column_default` at
+      // all — the postgres control adapter sets `resolvedDefault` directly
+      // to `autoincrement()` without a raw expression to parse, so
+      // `children()` must still produce a default node without a `default`
+      // (raw) field.
+      const column = new SqlColumnIR({
+        name: 'id',
+        nativeType: 'int4',
+        nullable: false,
+        resolvedDefault: { kind: 'function', expression: 'autoincrement()' },
+      });
+      expect(column.children()).toEqual([
+        new SqlColumnDefaultIR({
+          resolved: { kind: 'function', expression: 'autoincrement()' },
+        }),
+      ]);
+    });
+  });
 });

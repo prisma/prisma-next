@@ -325,6 +325,10 @@ function parsePslAuthoringArgumentValue(
       return parseStringArrayLiteral(rawValue);
     case 'object':
       return parsePslObjectLiteral(rawValue);
+    case 'option': {
+      const trimmed = rawValue.trim();
+      return /^[A-Za-z_][A-Za-z0-9_]*$/.test(trimmed) ? trimmed : INVALID_AUTHORING_ARGUMENT;
+    }
     default: {
       const _exhaustive: never = descriptor;
       void _exhaustive;

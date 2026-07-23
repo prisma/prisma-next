@@ -15,6 +15,7 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import { ormError } from './orm-errors';
 import { buildOrmQueryPlan, deriveParamsFromAst } from './query-plan-meta';
 import { tableSourceForContract } from './storage-resolution';
 import type { AggregateSelector } from './types';
@@ -33,7 +34,13 @@ function toAggregateProjection(
   }
 
   if (!selector.column) {
-    throw new Error(`Aggregate selector "${selector.fn}" requires a field`);
+    throw ormError(
+      'ORM.AGGREGATE_SELECTOR_INVALID',
+      `Aggregate selector "${selector.fn}" requires a field`,
+      {
+        meta: { fn: selector.fn },
+      },
+    );
   }
 
   const expr = new AggregateExpr(selector.fn, ColumnRef.of(tableName, selector.column));
@@ -58,33 +65,61 @@ function toAggregateProjection(
 function validateGroupedComparable(value: AnyExpression): AnyExpression {
   switch (value.kind) {
     case 'param-ref':
-      throw new Error('ParamRef is not supported in grouped having expressions');
+      throw ormError(
+        'ORM.HAVING_EXPRESSION_UNSUPPORTED',
+        'ParamRef is not supported in grouped having expressions',
+        { meta: { kind: value.kind } },
+      );
     case 'literal':
     case 'column-ref':
     case 'identifier-ref':
     case 'aggregate':
     case 'operation':
       return value;
+    case 'function-call':
+    case 'cast':
+    case 'case':
+      throw ormError(
+        'ORM.HAVING_EXPRESSION_UNSUPPORTED',
+        `Unsupported comparable kind in grouped having: "${value.kind}"`,
+        { meta: { kind: value.kind } },
+      );
     case 'list':
       if (value.values.some((entry) => entry.kind === 'param-ref')) {
-        throw new Error('ParamRef is not supported in grouped having expressions');
+        throw ormError(
+          'ORM.HAVING_EXPRESSION_UNSUPPORTED',
+          'ParamRef is not supported in grouped having expressions',
+          { meta: { kind: 'list' } },
+        );
       }
       return value;
     default:
-      throw new Error(`Unsupported comparable kind in grouped having: "${value.kind}"`);
+      throw ormError(
+        'ORM.HAVING_EXPRESSION_UNSUPPORTED',
+        `Unsupported comparable kind in grouped having: "${value.kind}"`,
+        { meta: { kind: value.kind } },
+      );
   }
 }
 
 function validateGroupedMetricExpr(expr: AnyExpression): AggregateExpr {
   if (expr.kind !== 'aggregate') {
-    throw new Error('groupBy().having() only supports aggregate metric expressions');
+    throw ormError(
+      'ORM.HAVING_EXPRESSION_UNSUPPORTED',
+      'groupBy().having() only supports aggregate metric expressions',
+      { meta: { kind: expr.kind } },
+    );
   }
 
   return expr;
 }
 
 function rejectHavingExpr(expr: { kind: string }): never {
-  throw new Error(`Unsupported grouped having expression kind "${expr.kind}"`);
+  throw ormError(
+    'ORM.HAVING_EXPRESSION_UNSUPPORTED',
+    `Unsupported grouped having expression kind "${expr.kind}"`,
+    { meta: { kind: expr.kind } },
+  );
 }
 
 function validateGroupedHavingExpr(expr: AnyExpression): AnyExpression {
@@ -95,14 +130,25 @@ function validateGroupedHavingExpr(expr: AnyExpression): AnyExpression {
     operation: rejectHavingExpr,
     aggregate: rejectHavingExpr,
     windowFunc: rejectHavingExpr,
+    functionCall: rejectHavingExpr,
+    cast: rejectHavingExpr,
+    case: rejectHavingExpr,
     jsonObject: rejectHavingExpr,
     jsonArrayAgg: rejectHavingExpr,
     literal: rejectHavingExpr,
     param() {
-      throw new Error('ParamRef is not supported in grouped having expressions');
+      throw ormError(
+        'ORM.HAVING_EXPRESSION_UNSUPPORTED',
+        'ParamRef is not supported in grouped having expressions',
+        { meta: { kind: 'param-ref' } },
+      );
     },
     preparedParam() {
-      throw new Error('PreparedParamRef is not supported in grouped having expressions');
+      throw ormError(
+        'ORM.HAVING_EXPRESSION_UNSUPPORTED',
+        'PreparedParamRef is not supported in grouped having expressions',
+        { meta: { kind: 'prepared-param-ref' } },
+      );
     },
     list: rejectHavingExpr,
     and(expr) {
@@ -111,9 +157,7 @@ function validateGroupedHavingExpr(expr: AnyExpression): AnyExpression {
     or(expr) {
       return OrExpr.of(expr.exprs.map((child) => validateGroupedHavingExpr(child)));
     },
-    exists(expr) {
-      throw new Error(`Unsupported grouped having expression kind "${expr.kind}"`);
-    },
+    exists: rejectHavingExpr,
     nullCheck(expr) {
       return new NullCheckExpr(validateGroupedMetricExpr(expr.expr), expr.isNull);
     },
@@ -140,7 +184,11 @@ export function compileAggregate(
 ): SqlQueryPlan<Record<string, unknown>> {
   const entries = Object.entries(aggregateSpec);
   if (entries.length === 0) {
-    throw new Error('aggregate() requires at least one aggregation selector');
+    throw ormError(
+      'ORM.AGGREGATE_SELECTOR_MISSING',
+      'aggregate() requires at least one aggregation selector',
+      { meta: { method: 'aggregate', namespaceId, tableName } },
+    );
   }
 
   const projection: ProjectionItem[] = entries.map(([alias, selector]) => {
@@ -169,12 +217,18 @@ export function compileGroupedAggregate(
   havingExpr: AnyExpression | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
   if (groupByColumns.length === 0) {
-    throw new Error('groupBy() requires at least one field');
+    throw ormError('ORM.GROUP_BY_FIELD_MISSING', 'groupBy() requires at least one field', {
+      meta: { namespaceId, tableName },
+    });
   }
 
   const entries = Object.entries(aggregateSpec);
   if (entries.length === 0) {
-    throw new Error('groupBy().aggregate() requires at least one aggregation selector');
+    throw ormError(
+      'ORM.AGGREGATE_SELECTOR_MISSING',
+      'groupBy().aggregate() requires at least one aggregation selector',
+      { meta: { method: 'groupBy.aggregate', namespaceId, tableName } },
+    );
   }
 
   const projection: ProjectionItem[] = [

@@ -91,7 +91,7 @@ describe('migration plan → emit end-to-end', () => {
         ops,
       );
 
-      const pkg = await readMigrationPackage(packageDir);
+      const pkg = await readMigrationPackage(packageDir, { migrationsDir });
       expect(pkg.metadata.from).toBeNull();
       expect(pkg.metadata.to).toBe('initial-hash');
       expect(pkg.metadata.migrationHash).toBe(metadata.migrationHash);
@@ -136,7 +136,7 @@ describe('migration plan → emit end-to-end', () => {
           ops2,
         );
 
-        const { packages } = await readMigrationsDir(migrationsDir);
+        const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
         expect(packages).toHaveLength(2);
 
         const graph = reconstructGraph(packages);
@@ -172,7 +172,7 @@ describe('migration plan → emit end-to-end', () => {
       );
 
       // Read migrations and check leaf
-      const { packages } = await readMigrationsDir(migrationsDir);
+      const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
       const graph = reconstructGraph(packages);
       const leaf = findLeaf(graph);
 
@@ -203,9 +203,11 @@ describe('migration plan → emit end-to-end', () => {
       await writeFile(join(packageDir, 'migration.json'), JSON.stringify(invalidMetadata));
       await writeFile(join(packageDir, 'ops.json'), '[]');
 
-      await expect(readMigrationPackage(packageDir)).rejects.toMatchObject({
-        code: 'MIGRATION.INVALID_MANIFEST',
-      });
+      await expect(readMigrationPackage(packageDir, { migrationsDir: root })).rejects.toMatchObject(
+        {
+          code: 'MIGRATION.INVALID_MANIFEST',
+        },
+      );
     });
   });
 });

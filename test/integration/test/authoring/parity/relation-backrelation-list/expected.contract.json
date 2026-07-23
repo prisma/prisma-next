@@ -117,8 +117,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "onDelete": "cascade",
                   "onUpdate": "cascade",
                   "source": {
@@ -133,7 +131,12 @@
                   }
                 }
               ],
-              "indexes": [],
+              "indexes": [
+                {
+                  "columns": ["userId"],
+                  "name": "post_userId_idx"
+                }
+              ],
               "primaryKey": {
                 "columns": ["id"]
               },
@@ -159,7 +162,7 @@
         "id": "public"
       }
     },
-    "storageHash": "11e844388b69302d5585119cbc12c029b3aeccd9eb3f8965a33a7cae1b562902"
+    "storageHash": "f859ffe2108c1a6316790f52926fc4a3c6bc2a2ec939213efd72df1acd4452fa"
   },
   "capabilities": {
     "postgres": {

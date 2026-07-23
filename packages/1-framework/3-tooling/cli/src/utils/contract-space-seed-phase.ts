@@ -2,7 +2,7 @@ import { materialiseExtensionMigrationPackageIfMissing } from '@prisma-next/migr
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import type { MigrationOps } from '@prisma-next/migration-tools/package';
 import {
-  emitContractSpaceArtefacts,
+  emitContractSpaceArtifacts,
   planAllSpaces,
   readContractSpaceHeadRef,
   type SpacePlanOutput,
@@ -53,7 +53,7 @@ export interface ContractSpaceSeedPhaseInputs {
  * - `action: 'unchanged'` — the on-disk head already matched the
  *   descriptor and no new migration packages needed to be written.
  *
- * Either way, the artefacts (`contract.json`, `contract.d.ts`,
+ * Either way, the artifacts (`contract.json`, `contract.d.ts`,
  * `refs/head.json`) are re-emitted: the framework owns those files and
  * makes the re-emit observably idempotent at the byte level.
  */
@@ -75,9 +75,11 @@ export interface ContractSpaceSeedPhaseResult {
  * For every extension that exposes a `contractSpace`:
  *
  * 1. Read the on-disk head ref (returns `null` on first emit).
- * 2. Re-emit `contract.json` / `contract.d.ts` / `refs/head.json`
- *    unconditionally via {@link emitContractSpaceArtefacts}. The
- *    framework owns these files; re-emit is the contract.
+ * 2. Write the head contract into the migrations-root snapshot store
+ *    (write-if-absent, keyed by hash) and unconditionally re-emit
+ *    `refs/head.json`, via {@link emitContractSpaceArtifacts}. The
+ *    framework owns `refs/head.json`; re-emit is the contract for that
+ *    file. The snapshot itself is only written once per distinct hash.
  * 3. Materialise any descriptor-shipped migration packages not yet on
  *    disk via {@link materialiseExtensionMigrationPackageIfMissing}.
  *    Existing packages are left untouched (by-existence skip).
@@ -144,7 +146,7 @@ export async function runContractSpaceSeedPhase(
     const onDiskHeadRef = await readContractSpaceHeadRef(inputs.migrationsDir, space.spaceId);
     const priorHash = onDiskHeadRef?.hash ?? null;
 
-    await emitContractSpaceArtefacts(inputs.migrationsDir, space.spaceId, {
+    await emitContractSpaceArtifacts(inputs.migrationsDir, space.spaceId, {
       contract: descriptor.contractJson,
       contractDts: buildPlaceholderContractDts(space.spaceId),
       headRef: { hash: descriptor.headRef.hash, invariants: descriptor.headRef.invariants },

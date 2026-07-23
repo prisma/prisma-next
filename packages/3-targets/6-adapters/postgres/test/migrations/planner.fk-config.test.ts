@@ -18,10 +18,16 @@ import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
+// FK1: `constraint`/`index` are authoring-time booleans materialized once at
+// `contract emit` (`buildSqlContractFromDefinition`) — a persisted contract
+// never carries them. These fixtures build a contract directly (bypassing
+// authoring), so each case constructs the *already-materialized* shape a
+// real emitted contract would have: a dropped constraint means no
+// `foreignKeys[]` entry at all, and a backing index (if any) is its own
+// named `indexes[]` entry, independent of whether the FK entry exists.
 function createFkTestContract(fkConfig: {
-  constraint: boolean;
-  index: boolean;
-  includeUserIndex?: boolean;
+  includeFk: boolean;
+  includeIndex: boolean;
 }): Contract<SqlStorage> {
   return {
     target: 'postgres',
@@ -52,23 +58,25 @@ function createFkTestContract(fkConfig: {
                 },
                 primaryKey: { columns: ['id'] },
                 uniques: [],
-                indexes: (fkConfig.includeUserIndex ?? true) ? [{ columns: ['userId'] }] : [],
-                foreignKeys: [
-                  {
-                    source: {
-                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                      tableName: 'post',
-                      columns: ['userId'],
-                    },
-                    target: {
-                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                      tableName: 'user',
-                      columns: ['id'],
-                    },
-                    constraint: fkConfig.constraint,
-                    index: fkConfig.index,
-                  },
-                ],
+                indexes: fkConfig.includeIndex
+                  ? [{ columns: ['userId'], name: 'post_userId_idx' }]
+                  : [],
+                foreignKeys: fkConfig.includeFk
+                  ? [
+                      {
+                        source: {
+                          namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                          tableName: 'post',
+                          columns: ['userId'],
+                        },
+                        target: {
+                          namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
+                          tableName: 'user',
+                          columns: ['id'],
+                        },
+                      },
+                    ]
+                  : [],
               },
             },
           },
@@ -99,13 +107,13 @@ const MIGRATION_PLAN_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'],
 } as const;
 
-describe('PostgresMigrationPlanner - per-FK config combinations', () => {
+describe('PostgresMigrationPlanner - materialized FK/index combinations', () => {
   const planner = createPostgresMigrationPlanner(
     new PostgresControlAdapter(createPostgresBuiltinCodecLookup()),
   );
 
-  it('emits both FK constraints and FK indexes when constraint=true, index=true', async () => {
-    const contract = createFkTestContract({ constraint: true, index: true });
+  it('plans both the FK constraint and its backing index when both are present in the contract', async () => {
+    const contract = createFkTestContract({ includeFk: true, includeIndex: true });
     const result = planner.plan({
       contract,
       schema: emptySchema,
@@ -113,6 +121,7 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -123,8 +132,8 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
     expect(operationIds).toContain('index.post.post_userId_idx');
   });
 
-  it('emits FK constraint and user-declared index when constraint=true, index=false (user-declared index survives)', async () => {
-    const contract = createFkTestContract({ constraint: true, index: false });
+  it('plans the FK constraint alone when the contract carries no backing index', async () => {
+    const contract = createFkTestContract({ includeFk: true, includeIndex: false });
     const result = planner.plan({
       contract,
       schema: emptySchema,
@@ -132,6 +141,7 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -139,12 +149,11 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
 
     const operationIds = (await Promise.all(result.plan.operations)).map((op) => op.id);
     expect(operationIds).toContain('foreignKey.post.post_userId_fkey');
-    // User-declared index is always emitted regardless of FK index flag
-    expect(operationIds).toContain('index.post.post_userId_idx');
+    expect(operationIds).not.toContain('index.post.post_userId_idx');
   });
 
-  it('omits FK constraints but emits FK indexes when constraint=false, index=true', async () => {
-    const contract = createFkTestContract({ constraint: false, index: true });
+  it('plans the backing index alone when the contract carries no FK constraint entry', async () => {
+    const contract = createFkTestContract({ includeFk: false, includeIndex: true });
     const result = planner.plan({
       contract,
       schema: emptySchema,
@@ -152,6 +161,7 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -162,8 +172,8 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
     expect(operationIds).toContain('index.post.post_userId_idx');
   });
 
-  it('omits FK constraints but user-declared index survives when constraint=false, index=false', async () => {
-    const contract = createFkTestContract({ constraint: false, index: false });
+  it('plans neither when the contract carries no FK constraint entry and no index', async () => {
+    const contract = createFkTestContract({ includeFk: false, includeIndex: false });
     const result = planner.plan({
       contract,
       schema: emptySchema,
@@ -171,6 +181,7 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -178,57 +189,6 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
 
     const operationIds = (await Promise.all(result.plan.operations)).map((op) => op.id);
     expect(operationIds).not.toContain('foreignKey.post.post_userId_fkey');
-    // User-declared index is always emitted regardless of FK index flag
-    expect(operationIds).toContain('index.post.post_userId_idx');
-  });
-
-  it('auto-creates FK-backing index when index=true and no user-declared index exists', async () => {
-    const contract = createFkTestContract({
-      constraint: true,
-      index: true,
-      includeUserIndex: false,
-    });
-
-    const result = planner.plan({
-      contract,
-      schema: emptySchema,
-      policy: INIT_ADDITIVE_POLICY,
-      fromContract: null,
-      frameworkComponents: [],
-      spaceId: APP_SPACE_ID,
-    });
-
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') throw new Error('Expected success');
-
-    const operationIds = (await Promise.all(result.plan.operations)).map((op) => op.id);
-    expect(operationIds).toContain('foreignKey.post.post_userId_fkey');
-    // FK-backing index auto-created since no user-declared index covers it
-    expect(operationIds).toContain('index.post.post_userId_idx');
-  });
-
-  it('does not auto-create FK-backing index when index=false and no user-declared index exists', async () => {
-    const contract = createFkTestContract({
-      constraint: true,
-      index: false,
-      includeUserIndex: false,
-    });
-
-    const result = planner.plan({
-      contract,
-      schema: emptySchema,
-      policy: INIT_ADDITIVE_POLICY,
-      fromContract: null,
-      frameworkComponents: [],
-      spaceId: APP_SPACE_ID,
-    });
-
-    expect(result.kind).toBe('success');
-    if (result.kind !== 'success') throw new Error('Expected success');
-
-    const operationIds = (await Promise.all(result.plan.operations)).map((op) => op.id);
-    expect(operationIds).toContain('foreignKey.post.post_userId_fkey');
-    // No index: no user-declared and FK index=false
     expect(operationIds).not.toContain('index.post.post_userId_idx');
   });
 
@@ -252,6 +212,7 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
       fromContract,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -322,30 +283,18 @@ function createWorkflowStateContract(options: {
                       tableName: 'teams',
                       columns: ['id'],
                     },
-                    constraint: true,
-                    index: false,
                   },
                 ],
               },
               workflow_states: {
                 columns: workflowStateColumns,
                 uniques: [],
-                indexes: [],
+                // FK1: the first FK below is `constraint: false` — logical
+                // relation only, no physical constraint — so it contributes
+                // no `foreignKeys[]` entry, just its `index: true` backing
+                // index, declared here directly.
+                indexes: [{ columns: ['workflow_id'], name: 'workflow_states_workflow_id_idx' }],
                 foreignKeys: [
-                  {
-                    source: {
-                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                      tableName: 'workflow_states',
-                      columns: ['workflow_id'],
-                    },
-                    target: {
-                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                      tableName: 'workflows',
-                      columns: ['id'],
-                    },
-                    constraint: false,
-                    index: true,
-                  },
                   {
                     source: {
                       namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
@@ -359,8 +308,6 @@ function createWorkflowStateContract(options: {
                     },
                     name: 'workflow_states_workflow_team_id_fkey',
                     onDelete: 'cascade',
-                    constraint: true,
-                    index: false,
                   },
                 ],
               },

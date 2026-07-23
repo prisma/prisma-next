@@ -1,3 +1,4 @@
+import { InternalError } from '@prisma-next/utils/internal-error';
 import type { TokenKind } from '../tokenizer';
 import type { GreenElement, GreenNode } from './green';
 import { greenNode, greenToken } from './green';
@@ -13,7 +14,7 @@ export class GreenNodeBuilder {
   token(kind: TokenKind, text: string): void {
     const current = this.#stack.at(-1);
     if (!current) {
-      throw new Error('GreenNodeBuilder: token() called with no open node');
+      throw new InternalError('GreenNodeBuilder: token() called with no open node');
     }
     current.children.push(greenToken(kind, text));
   }
@@ -21,7 +22,7 @@ export class GreenNodeBuilder {
   finishNode(): GreenNode {
     const completed = this.#stack.pop();
     if (!completed) {
-      throw new Error('GreenNodeBuilder: finishNode() called with no open node');
+      throw new InternalError('GreenNodeBuilder: finishNode() called with no open node');
     }
     const node = greenNode(completed.kind, completed.children);
     const parent = this.#stack.at(-1);

@@ -302,7 +302,7 @@ const TML_2486_seam = (cell: CellId, project: JourneyProject, result: StepResult
       expect(
         r.stdout,
         'TML-2486 still broken: mongo error must mention undefined fields or missing collections',
-      ).toMatch(/undefined|PN-CLI-4999|createCollection|PN-RUN-3020|missing_table/);
+      ).toMatch(/undefined|CLI.UNEXPECTED|createCollection|MIGRATION.RUNNER_FAILED|missing_table/);
     },
     whenFixed: (r) => {
       expect(r.exitCode, formatStepDiagnostic('migration apply', project, r)).toBe(0);

@@ -600,7 +600,7 @@ function assertMutationDefaultGeneratorsAvailable(
   const ids = Array.from(missing);
   const idList = ids.map((id) => `'${id}'`).join(', ');
   throw runtimeError(
-    'RUNTIME.MISSING_MUTATION_DEFAULT_GENERATOR',
+    'RUNTIME.MUTATION_DEFAULT_GENERATOR_MISSING',
     `Contract requires mutation default generator(s) ${idList}, but no runtime component provides them.`,
     { ids },
   );

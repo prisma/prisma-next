@@ -107,7 +107,7 @@ async function checkFromDisk(inputs: {
     deserializeContract: identityDeserialize,
   });
   const spaces = await enumerateCheckSpaces(aggregate, inputs.migrationsDir);
-  const outcome = runMigrationCheck({
+  const outcome = await runMigrationCheck({
     spaces,
     ...(inputs.spaceFilter !== undefined ? { spaceFilter: inputs.spaceFilter } : {}),
   });
@@ -138,7 +138,9 @@ describe('migration check — multi-space policy core', () => {
 
     const { result } = await checkFromDisk({ migrationsDir: migrationsRoot });
     expect(result?.ok).toBe(false);
-    const danglingRefFailures = result?.failures.filter((f) => f.code === 'PN-MIG-CHECK-004');
+    const danglingRefFailures = result?.failures.filter(
+      (f) => f.code === 'MIGRATION.CHECK_DANGLING_REF',
+    );
     expect(danglingRefFailures).toHaveLength(1);
     expect(danglingRefFailures?.[0]?.where).toContain('postgis');
     expect(danglingRefFailures?.[0]?.where).toContain('broken');
@@ -184,7 +186,9 @@ describe('migration check — multi-space policy core', () => {
 
     const { result } = await checkFromDisk({ migrationsDir: migrationsRoot });
     expect(result?.ok).toBe(false);
-    const unreachable = result?.failures.filter((f) => f.code === 'PN-MIG-CHECK-003');
+    const unreachable = result?.failures.filter(
+      (f) => f.code === 'MIGRATION.CHECK_UNREACHABLE_MIGRATION',
+    );
     expect(unreachable).toHaveLength(1);
     expect(unreachable?.[0]?.where).toContain('postgis');
   });
@@ -215,7 +219,9 @@ describe('migration check — --space narrowing', () => {
       spaceFilter: 'postgis',
     });
     expect(result?.ok).toBe(false);
-    const danglingRefFailures = result?.failures.filter((f) => f.code === 'PN-MIG-CHECK-004');
+    const danglingRefFailures = result?.failures.filter(
+      (f) => f.code === 'MIGRATION.CHECK_DANGLING_REF',
+    );
     expect(danglingRefFailures).toHaveLength(1);
     expect(danglingRefFailures?.[0]?.where).toContain('postgis');
   });
@@ -242,7 +248,9 @@ describe('migration check — --space narrowing', () => {
       spaceFilter: 'app',
     });
     expect(result?.ok).toBe(false);
-    const danglingRefFailures = result?.failures.filter((f) => f.code === 'PN-MIG-CHECK-004');
+    const danglingRefFailures = result?.failures.filter(
+      (f) => f.code === 'MIGRATION.CHECK_DANGLING_REF',
+    );
     expect(danglingRefFailures).toHaveLength(1);
     expect(danglingRefFailures?.[0]?.where).toContain('app');
     expect(danglingRefFailures?.[0]?.where).not.toContain('postgis');
@@ -262,7 +270,7 @@ describe('migration check — --space narrowing', () => {
       deserializeContract: identityDeserialize,
     });
     const spaces = await enumerateCheckSpaces(aggregate, migrationsRoot);
-    const outcome = runMigrationCheck({ spaces, spaceFilter: '../escape' });
+    const outcome = await runMigrationCheck({ spaces, spaceFilter: '../escape' });
     expect(outcome.ok).toBe(false);
     if (outcome.ok) throw new Error('unreachable');
     const envelope = outcome.failure.toEnvelope();
@@ -284,7 +292,7 @@ describe('migration check — --space narrowing', () => {
       deserializeContract: identityDeserialize,
     });
     const spaces = await enumerateCheckSpaces(aggregate, migrationsRoot);
-    const outcome = runMigrationCheck({ spaces, spaceFilter: 'nope' });
+    const outcome = await runMigrationCheck({ spaces, spaceFilter: 'nope' });
     expect(outcome.ok).toBe(false);
     if (outcome.ok) throw new Error('unreachable');
     const envelope = outcome.failure.toEnvelope();
@@ -310,7 +318,7 @@ describe('migration check — migrationCheckResultSchema validation', () => {
       deserializeContract: identityDeserialize,
     });
     const spaces = await enumerateCheckSpaces(aggregate, migrationsRoot);
-    const outcome = runMigrationCheck({ spaces });
+    const outcome = await runMigrationCheck({ spaces });
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) throw new Error('unreachable');
 
@@ -341,7 +349,7 @@ describe('migration check — migrationCheckResultSchema validation', () => {
       deserializeContract: identityDeserialize,
     });
     const spaces = await enumerateCheckSpaces(aggregate, migrationsRoot);
-    const outcome = runMigrationCheck({ spaces });
+    const outcome = await runMigrationCheck({ spaces });
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) throw new Error('unreachable');
 
@@ -352,6 +360,6 @@ describe('migration check — migrationCheckResultSchema validation', () => {
 
     const failure = result.failures[0]!;
     expect(failure.space).toBe('postgis');
-    expect(failure.code).toBe('PN-MIG-CHECK-004');
+    expect(failure.code).toBe('MIGRATION.CHECK_DANGLING_REF');
   });
 });

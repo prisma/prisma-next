@@ -122,7 +122,7 @@ describe('loadConfigForFile', () => {
 
       await expect(loadConfigForFile(schemaPath)).rejects.toMatchObject({
         name: 'CliStructuredError',
-        code: '4009',
+        code: 'CONFIG.VALIDATION_FAILED',
       });
     },
     timeouts.typeScriptCompilation,
@@ -136,7 +136,7 @@ describe('loadConfigForFile', () => {
 
       await expect(loadConfigForFile(schemaPath)).rejects.toMatchObject({
         name: 'CliStructuredError',
-        code: '4001',
+        code: 'CONFIG.FILE_NOT_FOUND',
       });
     },
     timeouts.typeScriptCompilation,
@@ -196,33 +196,33 @@ describe('loadConfig', () => {
   );
 
   it(
-    'maps a missing config file to a structured config-file-not-found error (4001)',
+    'maps a missing config file to a structured config-file-not-found error (CONFIG.FILE_NOT_FOUND)',
     async () => {
       const configPath = join(tempDir, 'nonexistent.config.ts');
 
       await expect(loadConfig(configPath)).rejects.toMatchObject({
         name: 'CliStructuredError',
-        code: '4001',
+        code: 'CONFIG.FILE_NOT_FOUND',
       });
     },
     timeouts.typeScriptCompilation,
   );
 
   it(
-    'maps a missing config to 4001 when discovery from the cwd finds nothing',
+    'maps a missing config to CONFIG.FILE_NOT_FOUND when discovery from the cwd finds nothing',
     async () => {
       process.chdir(tempDir);
 
       await expect(loadConfig()).rejects.toMatchObject({
         name: 'CliStructuredError',
-        code: '4001',
+        code: 'CONFIG.FILE_NOT_FOUND',
       });
     },
     timeouts.typeScriptCompilation,
   );
 
   it(
-    'maps a 4001 when c12 resolves to a different file than the requested path',
+    'maps a CONFIG.FILE_NOT_FOUND when c12 resolves to a different file than the requested path',
     async () => {
       writeFileSync(join(tempDir, 'custom.config.ts'), VALID_CONFIG_SOURCE);
       process.chdir(tempDir);
@@ -230,7 +230,7 @@ describe('loadConfig', () => {
       const requestedPath = join(tempDir, 'custom.config');
       await expect(loadConfig('custom.config')).rejects.toMatchObject({
         name: 'CliStructuredError',
-        code: '4001',
+        code: 'CONFIG.FILE_NOT_FOUND',
         where: { path: requestedPath },
       });
     },
@@ -238,14 +238,14 @@ describe('loadConfig', () => {
   );
 
   it(
-    'maps an empty-object config to 4001, reporting the discovered file path',
+    'maps an empty-object config to CONFIG.FILE_NOT_FOUND, reporting the discovered file path',
     async () => {
       writeFileSync(join(tempDir, 'prisma-next.config.ts'), EMPTY_CONFIG_SOURCE);
       process.chdir(tempDir);
 
       await expect(loadConfig()).rejects.toMatchObject({
         name: 'CliStructuredError',
-        code: '4001',
+        code: 'CONFIG.FILE_NOT_FOUND',
         where: { path: join(tempDir, 'prisma-next.config.ts') },
       });
     },
@@ -253,14 +253,14 @@ describe('loadConfig', () => {
   );
 
   it(
-    'maps an invalid config shape to a structured config-validation error (4009)',
+    'maps an invalid config shape to a structured config-validation error (CONFIG.VALIDATION_FAILED)',
     async () => {
       writeFileSync(join(tempDir, 'prisma-next.config.ts'), INVALID_CONFIG_SOURCE);
       process.chdir(tempDir);
 
       await expect(loadConfig()).rejects.toMatchObject({
         name: 'CliStructuredError',
-        code: '4009',
+        code: 'CONFIG.VALIDATION_FAILED',
       });
     },
     timeouts.typeScriptCompilation,
@@ -278,7 +278,7 @@ describe('loadConfig', () => {
 
       await expect(loadConfig()).rejects.toMatchObject({
         name: 'CliStructuredError',
-        code: '4009',
+        code: 'CONFIG.VALIDATION_FAILED',
         why: 'Config.contract.source.inputs must not include emitted artifact paths derived from contract.output',
       });
     },
@@ -297,7 +297,7 @@ describe('loadConfig', () => {
 
       await expect(loadConfig()).rejects.toMatchObject({
         name: 'CliStructuredError',
-        code: '4009',
+        code: 'CONFIG.VALIDATION_FAILED',
         why: 'Contract output path must end with .json',
       });
     },
@@ -305,14 +305,14 @@ describe('loadConfig', () => {
   );
 
   it(
-    'wraps a c12 compilation failure in a structured unexpected error (4999)',
+    'wraps a c12 compilation failure in a structured unexpected error (CLI.UNEXPECTED)',
     async () => {
       const configPath = join(tempDir, 'prisma-next.config.ts');
       writeFileSync(configPath, 'export default { invalid syntax }', 'utf-8');
 
       await expect(loadConfig(configPath)).rejects.toMatchObject({
         name: 'CliStructuredError',
-        code: '4999',
+        code: 'CLI.UNEXPECTED',
       });
     },
     timeouts.typeScriptCompilation,

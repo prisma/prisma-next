@@ -20,8 +20,8 @@ export const PLAYGROUND_DIR = join(packageRoot, '.playground');
  * stage the schema into `.playground/` before generating the config.
  *
  * The config mirrors the canonical postgres + PSL recipe. The language server
- * only reads `contract.source.inputs` (it never invokes `load`), so the full
- * postgres pipeline is wired for fidelity but not exercised for diagnostics.
+ * never invokes `load`, but it does exercise the pipeline for interpreter
+ * diagnostics via the provider's `interpret` capability over cached artifacts.
  */
 export async function generateDefaultPostgresConfig(absoluteSchemaPath: string): Promise<string> {
   await mkdir(PLAYGROUND_DIR, { recursive: true });

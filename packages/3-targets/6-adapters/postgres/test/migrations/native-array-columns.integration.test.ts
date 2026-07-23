@@ -105,6 +105,7 @@ describe.sequential('native array columns DDL', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     expect(planResult.kind).toBe('success');
     if (planResult.kind !== 'success') throw new Error('planner failed');
@@ -154,6 +155,7 @@ describe.sequential('native array columns DDL', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     if (planResult.kind !== 'success') throw new Error('planner failed');
 
@@ -200,6 +202,7 @@ describe.sequential('native array columns DDL', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     if (planResult.kind !== 'success') throw new Error('planner failed');
 
@@ -249,6 +252,7 @@ describe.sequential('native array columns DDL', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     if (planResult.kind !== 'success') throw new Error('planner failed');
 
@@ -291,6 +295,7 @@ describe.sequential('native array columns DDL', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     if (planResult.kind !== 'success') throw new Error('planner failed');
 
@@ -343,6 +348,7 @@ describe.sequential('native array columns DDL', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     if (planResult.kind !== 'success') throw new Error('planner failed');
 
@@ -382,6 +388,7 @@ describe.sequential('native array columns DDL', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     if (planResult.kind !== 'success') throw new Error('planner failed');
 

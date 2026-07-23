@@ -87,6 +87,14 @@ describe('contract definition lowering runtime checks', () => {
         },
       }),
     ).toThrow('Field "External.vector" references unknown storage type "Embedding1536"');
+
+    expect(() =>
+      buildDefinition({
+        models: {
+          External,
+        },
+      }),
+    ).toThrow(expect.objectContaining({ code: 'CONTRACT.TYPE_UNKNOWN' }));
   });
 
   it('rejects scalar fields that never resolve to a storage descriptor', () => {
@@ -164,6 +172,14 @@ describe('contract definition lowering runtime checks', () => {
         },
       }),
     ).toThrow('Model "EmptyIdentity" defines an empty identity. Add at least one field.');
+
+    expect(() =>
+      buildDefinition({
+        models: {
+          EmptyIdentity,
+        },
+      }),
+    ).toThrow(expect.objectContaining({ code: 'CONTRACT.IDENTITY_INVALID' }));
   });
 
   it('rejects empty unique constraints', () => {
@@ -187,6 +203,14 @@ describe('contract definition lowering runtime checks', () => {
         },
       }),
     ).toThrow('Model "EmptyUnique" defines an empty unique constraint. Add at least one field.');
+
+    expect(() =>
+      buildDefinition({
+        models: {
+          EmptyUnique,
+        },
+      }),
+    ).toThrow(expect.objectContaining({ code: 'CONTRACT.CONSTRAINT_INVALID' }));
   });
 
   it('uses an id field as the ownership anchor when no explicit identity exists', () => {
@@ -319,6 +343,14 @@ describe('contract definition lowering runtime checks', () => {
         },
       }),
     ).toThrow('Relation "Post.tags" references unknown through model "PostTag"');
+
+    expect(() =>
+      buildDefinition({
+        models: {
+          MissingBelongsToTarget,
+        },
+      }),
+    ).toThrow(expect.objectContaining({ code: 'CONTRACT.MODEL_UNKNOWN' }));
   });
 
   it('rejects malformed foreign keys before they become contract nodes', () => {
@@ -395,6 +427,15 @@ describe('contract definition lowering runtime checks', () => {
         },
       }),
     ).toThrow('Unknown field "UnknownLocalField.missing" in contract definition');
+
+    expect(() =>
+      buildDefinition({
+        models: {
+          User,
+          UnknownLocalField,
+        },
+      }),
+    ).toThrow(expect.objectContaining({ code: 'CONTRACT.FIELD_UNKNOWN' }));
   });
 
   it('lowers optional unique, index, and foreign-key metadata when present', () => {

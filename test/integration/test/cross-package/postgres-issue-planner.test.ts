@@ -192,14 +192,16 @@ describe('planIssues', () => {
       expect(calls[2]).toMatchObject({ factoryName: 'setNotNull' });
     });
 
-    it('DataTransformCall.toOp() throws PN-MIG-2001', () => {
+    it('DataTransformCall.toOp() throws MIGRATION.UNFILLED_PLACEHOLDER', () => {
       const result = planAgainst(contractWithStatus(), actualWithoutStatus());
 
       expect(result.ok).toBe(true);
       if (!result.ok) throw new Error('expected ok');
       const dtCall = result.value.calls[1]!;
       expect(dtCall.factoryName).toBe('dataTransform');
-      expect(() => dtCall.toOp()).toThrow(expect.objectContaining({ code: '2001', domain: 'MIG' }));
+      expect(() => dtCall.toOp()).toThrow(
+        expect.objectContaining({ code: 'MIGRATION.UNFILLED_PLACEHOLDER' }),
+      );
     });
   });
 
@@ -613,8 +615,9 @@ describe('planIssues', () => {
       if (!result.ok) throw new Error('expected ok');
 
       const ts = renderCallsToTypeScript(result.value.calls, {
-        from: 'aaa',
-        to: 'bbb',
+        from: 'a'.repeat(64),
+        to: 'b'.repeat(64),
+        snapshotsImportPath: '../../snapshots',
       });
 
       expect(ts).toContain('export default class M extends Migration');
@@ -673,6 +676,7 @@ describe('planIssues', () => {
         fromContract: null,
         frameworkComponents: [],
         spaceId: 'app',
+        snapshotsImportPath: '../../snapshots',
       });
       if (result.kind !== 'success') throw new Error('expected planner success');
       return await Promise.all(result.plan.operations);

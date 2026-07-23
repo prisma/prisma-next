@@ -228,6 +228,7 @@ describe('MongoMigrationRunner - closed validators', () => {
       policy: wideningPolicy,
       fromContract: null,
       frameworkComponents: [],
+      snapshotsImportPath: '../../snapshots',
     });
     expect(planResult.kind).toBe('success');
     if (planResult.kind !== 'success') throw new Error('Planner failed');

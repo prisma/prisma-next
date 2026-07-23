@@ -13,7 +13,7 @@ function makeResult(overrides: {
 }): VerifyDatabaseSchemaResult {
   const defaultIssues: readonly SchemaDiffIssue[] = overrides.ok
     ? []
-    : [{ path: [overrides.spaceId], reason: 'not-found' }];
+    : [{ path: [overrides.spaceId] }];
   const result: VerifyDatabaseSchemaResult = {
     ok: overrides.ok,
     summary: overrides.summary,
@@ -25,7 +25,7 @@ function makeResult(overrides: {
     timings: { total: 0 },
   };
   if (!overrides.ok) {
-    return { ...result, code: 'PN-RUN-3010' };
+    return { ...result, code: 'CONTRACT.MARKER_REQUIRED' };
   }
   return result;
 }
@@ -95,7 +95,7 @@ describe('combineVerifyResults', () => {
     expect(combined.result).toMatchObject({
       ok: false,
       summary: 'Database schema does not satisfy contract (1 failure)',
-      code: 'PN-RUN-3010',
+      code: 'CONTRACT.MARKER_REQUIRED',
     });
     expect(combined.result.schema.issues).toHaveLength(1);
   });
@@ -109,10 +109,7 @@ describe('combineVerifyResults', () => {
           spaceId: 'cipher',
           ok: false,
           summary: 'Schema verification found 2 issue(s)',
-          issues: [
-            { path: ['a'], reason: 'not-found' },
-            { path: ['b'], reason: 'not-found' },
-          ],
+          issues: [{ path: ['a'] }, { path: ['b'] }],
         }),
       ],
     ]);
@@ -137,7 +134,7 @@ describe('combineVerifyResults', () => {
 
     expect(combined.result.ok).toBe(false);
     expect(combined.result.summary).toContain('1 unclaimed element');
-    expect(combined.result.code).toBe('PN-RUN-3010');
+    expect(combined.result.code).toBe('CONTRACT.MARKER_REQUIRED');
     expect(combined.unclaimed).toEqual(['legacy_events']);
   });
 
@@ -194,7 +191,7 @@ describe('combineVerifyResults', () => {
     expect(combined.result.schema.issues).toHaveLength(2);
   });
 
-  it('uses the default `PN-RUN-3010` code when a failing app result carries no code', () => {
+  it('uses the default `CONTRACT.MARKER_REQUIRED` code when a failing app result carries no code', () => {
     const failingWithoutCode: VerifyDatabaseSchemaResult = makeResult({
       spaceId: 'app',
       ok: false,
@@ -208,18 +205,16 @@ describe('combineVerifyResults', () => {
 
     expect(combined.result).toMatchObject({
       ok: false,
-      code: 'PN-RUN-3010',
+      code: 'CONTRACT.MARKER_REQUIRED',
     });
   });
 
   it('concatenates issues from all spaces into the combined result', () => {
     const appDiffIssue: SchemaDiffIssue = {
       path: ['public', 'profiles', 'policy_app_abc'],
-      reason: 'not-found',
     };
     const extDiffIssue: SchemaDiffIssue = {
       path: ['public', 'audit_log', 'policy_cipher_def'],
-      reason: 'not-expected',
     };
 
     const perSpace = new Map<string, VerifyDatabaseSchemaResult>([

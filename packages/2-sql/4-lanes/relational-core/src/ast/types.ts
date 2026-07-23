@@ -1,7 +1,10 @@
 import type { ParamSpec } from '@prisma-next/operations';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
+
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { CodecRef } from './codec-types';
+import { structuredError } from '@prisma-next/utils/structured-error';
+import { type CodecRef, frozenCodecRef } from './codec-types';
+import type { AnyJsonValueProjection } from './json-value-projection';
 
 export type Direction = 'asc' | 'desc';
 
@@ -50,6 +53,9 @@ export interface ExprVisitor<R> {
   operation(expr: OperationExpr): R;
   aggregate(expr: AggregateExpr): R;
   windowFunc(expr: WindowFuncExpr): R;
+  functionCall(expr: FunctionCallExpr): R;
+  cast(expr: CastExpr): R;
+  case(expr: CaseExpr): R;
   jsonObject(expr: JsonObjectExpr): R;
   jsonArrayAgg(expr: JsonArrayAggExpr): R;
   binary(expr: BinaryExpr): R;
@@ -64,6 +70,31 @@ export interface ExprVisitor<R> {
   list(expr: ListExpression): R;
   rawExpr(expr: RawExpr): R;
 }
+
+const toAnyExpressionVisitor: ExprVisitor<AnyExpression> = {
+  columnRef: (expr) => expr,
+  identifierRef: (expr) => expr,
+  subquery: (expr) => expr,
+  operation: (expr) => expr,
+  aggregate: (expr) => expr,
+  windowFunc: (expr) => expr,
+  functionCall: (expr) => expr,
+  cast: (expr) => expr,
+  case: (expr) => expr,
+  jsonObject: (expr) => expr,
+  jsonArrayAgg: (expr) => expr,
+  binary: (expr) => expr,
+  and: (expr) => expr,
+  or: (expr) => expr,
+  exists: (expr) => expr,
+  nullCheck: (expr) => expr,
+  not: (expr) => expr,
+  literal: (expr) => expr,
+  param: (expr) => expr,
+  preparedParam: (expr) => expr,
+  list: (expr) => expr,
+  rawExpr: (expr) => expr,
+};
 
 export interface ExpressionFolder<T> {
   empty: T;
@@ -85,7 +116,7 @@ export type JoinOnExpr = EqColJoinOn | AnyExpression;
 export type WhereArg = AnyExpression | ToWhereExpr;
 export type JsonObjectEntry = {
   readonly key: string;
-  readonly value: ProjectionExpr;
+  readonly value: AnyJsonValueProjection;
 };
 
 function frozenArrayCopy<T>(values: readonly T[]): ReadonlyArray<T> {
@@ -100,18 +131,6 @@ function frozenOptionalRecordCopy<T extends Record<string, unknown>>(
 
 function frozenRecordCopy<T>(record: Readonly<Record<string, T>>): Readonly<Record<string, T>> {
   return Object.freeze({ ...record });
-}
-
-function frozenCodecRef(codec: CodecRef): CodecRef {
-  const typeParams =
-    codec.typeParams === undefined
-      ? undefined
-      : (structuredClone(codec.typeParams) as CodecRef['typeParams']);
-  const base = {
-    codecId: codec.codecId,
-    ...ifDefined('typeParams', typeParams),
-  };
-  return Object.freeze(codec.many ? { ...base, many: true } : base);
 }
 
 function freezeRows(
@@ -242,7 +261,7 @@ function rewriteUpdateSet(
 ): Record<string, AnyExpression> {
   const result: Record<string, AnyExpression> = {};
   for (const [key, value] of Object.entries(set)) {
-    result[key] = value.rewrite(rewriter as ExpressionRewriter);
+    result[key] = value.rewrite(rewriter);
   }
   return result;
 }
@@ -250,9 +269,13 @@ function rewriteUpdateSet(
 function rewriteLimitOffset<T extends number | AnyExpression | undefined>(
   value: T,
   rewriter: AstRewriter,
-): T {
+): T;
+function rewriteLimitOffset(
+  value: number | AnyExpression | undefined,
+  rewriter: AstRewriter,
+): number | AnyExpression | undefined {
   if (value === undefined || typeof value === 'number') return value;
-  return value.rewrite(rewriter) as T;
+  return value.rewrite(rewriter);
 }
 
 function rewriteOnConflict(onConflict: InsertOnConflict, rewriter: AstRewriter): InsertOnConflict {
@@ -306,12 +329,16 @@ abstract class Expression extends AstNode implements ExpressionSource {
     throw new Error(`${this.constructor.name} does not expose a base column reference`);
   }
 
+  #asAnyExpression(): AnyExpression {
+    return this.accept(toAnyExpressionVisitor);
+  }
+
   toExpr(): AnyExpression {
-    return this as unknown as AnyExpression;
+    return this.#asAnyExpression();
   }
 
   not(): NotExpr {
-    return new NotExpr(this as unknown as AnyExpression);
+    return new NotExpr(this.#asAnyExpression());
   }
 }
 
@@ -380,28 +407,65 @@ export class DerivedTableSource extends FromSource {
   }
 }
 
+export interface FunctionSourceAlias {
+  readonly alias: string;
+  readonly columnAliases?: ReadonlyArray<string>;
+}
+
 export class FunctionSource extends FromSource {
   readonly kind = 'function-source' as const;
   readonly fn: string;
   readonly args: ReadonlyArray<AnyExpression>;
   readonly alias: string | undefined;
+  readonly columnAliases: ReadonlyArray<string> | undefined;
+  readonly ordinality: boolean;
 
-  protected constructor(fn: string, args: ReadonlyArray<AnyExpression>, alias?: string) {
+  protected constructor(
+    fn: string,
+    args: ReadonlyArray<AnyExpression>,
+    alias?: FunctionSourceAlias,
+    ordinality = false,
+  ) {
     super();
+    if (alias?.columnAliases?.length === 0) {
+      throw structuredError('SQL.AST_INVALID', 'FunctionSource column aliases must not be empty', {
+        meta: { kind: 'function-source', field: 'columnAliases' },
+      });
+    }
     this.fn = fn;
     this.args = frozenArrayCopy(args);
-    this.alias = alias;
+    this.alias = alias?.alias;
+    this.columnAliases =
+      alias?.columnAliases === undefined ? undefined : frozenArrayCopy(alias.columnAliases);
+    this.ordinality = ordinality;
     this.freeze();
   }
 
-  static of(fn: string, args: ReadonlyArray<AnyExpression>, alias?: string): FunctionSource {
+  static of(
+    fn: string,
+    args: ReadonlyArray<AnyExpression>,
+    alias?: FunctionSourceAlias,
+  ): FunctionSource {
     return new FunctionSource(fn, args, alias);
+  }
+
+  #aliasOptions(): FunctionSourceAlias | undefined {
+    if (this.alias === undefined) return undefined;
+    return {
+      alias: this.alias,
+      ...ifDefined('columnAliases', this.columnAliases),
+    };
+  }
+
+  withOrdinality(): FunctionSource {
+    if (this.ordinality) return this;
+    return new FunctionSource(this.fn, this.args, this.#aliasOptions(), true);
   }
 
   override rewrite(rewriter: AstRewriter): AnyFromSource {
     const rewrittenArgs = this.args.map((arg) => rewriteComparable(arg, rewriter));
     if (rewrittenArgs.every((arg, i) => arg === this.args[i])) return this;
-    return new FunctionSource(this.fn, rewrittenArgs, this.alias);
+    return new FunctionSource(this.fn, rewrittenArgs, this.#aliasOptions(), this.ordinality);
   }
 
   override toFromSource(): AnyFromSource {
@@ -648,9 +712,7 @@ export class OperationExpr extends Expression {
     return new OperationExpr({
       method: this.method,
       self: this.self.rewrite(rewriter),
-      args: this.args.map((arg) => rewriteComparable(arg, rewriter)) as ReadonlyArray<
-        AnyExpression | ParamRef | LiteralExpr
-      >,
+      args: this.args.map((arg) => rewriteComparable(arg, rewriter)),
       returns: this.returns,
       lowering: this.lowering,
     });
@@ -825,6 +887,129 @@ export class WindowFuncExpr extends Expression {
   }
 }
 
+export class FunctionCallExpr extends Expression {
+  readonly kind = 'function-call' as const;
+  readonly fn: string;
+  readonly args: ReadonlyArray<AnyExpression>;
+
+  constructor(fn: string, args: ReadonlyArray<AnyExpression>) {
+    super();
+    this.fn = fn;
+    this.args = frozenArrayCopy(args);
+    this.freeze();
+  }
+
+  static of(fn: string, args: ReadonlyArray<AnyExpression>): FunctionCallExpr {
+    return new FunctionCallExpr(fn, args);
+  }
+
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.functionCall(this);
+  }
+
+  override rewrite(rewriter: ExpressionRewriter): AnyExpression {
+    return new FunctionCallExpr(
+      this.fn,
+      this.args.map((arg) => arg.rewrite(rewriter)),
+    );
+  }
+
+  override fold<T>(folder: ExpressionFolder<T>): T {
+    return combineAll(
+      folder,
+      this.args.map((arg) => () => arg.fold(folder)),
+    );
+  }
+}
+
+export class CastExpr extends Expression {
+  readonly kind = 'cast' as const;
+  readonly expr: AnyExpression;
+  readonly targetType: string;
+
+  constructor(expr: AnyExpression, targetType: string) {
+    super();
+    this.expr = expr;
+    this.targetType = targetType;
+    this.freeze();
+  }
+
+  static as(expr: AnyExpression, targetType: string): CastExpr {
+    return new CastExpr(expr, targetType);
+  }
+
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.cast(this);
+  }
+
+  override rewrite(rewriter: ExpressionRewriter): AnyExpression {
+    return new CastExpr(this.expr.rewrite(rewriter), this.targetType);
+  }
+
+  override fold<T>(folder: ExpressionFolder<T>): T {
+    return this.expr.fold(folder);
+  }
+}
+
+export interface CaseBranch {
+  readonly condition: AnyExpression;
+  readonly value: AnyExpression;
+}
+
+export class CaseExpr extends Expression {
+  readonly kind = 'case' as const;
+  readonly branches: ReadonlyArray<Readonly<CaseBranch>>;
+  readonly elseExpr: AnyExpression | undefined;
+
+  constructor(branches: ReadonlyArray<CaseBranch>, elseExpr?: AnyExpression) {
+    super();
+    if (branches.length === 0) {
+      throw structuredError('SQL.AST_INVALID', 'CaseExpr requires at least one branch', {
+        meta: { kind: 'case', field: 'branches' },
+      });
+    }
+    this.branches = Object.freeze(
+      branches.map((branch) =>
+        Object.freeze({
+          condition: branch.condition,
+          value: branch.value,
+        }),
+      ),
+    );
+    this.elseExpr = elseExpr;
+    this.freeze();
+  }
+
+  static of(branches: ReadonlyArray<CaseBranch>, elseExpr?: AnyExpression): CaseExpr {
+    return new CaseExpr(branches, elseExpr);
+  }
+
+  override accept<R>(visitor: ExprVisitor<R>): R {
+    return visitor.case(this);
+  }
+
+  override rewrite(rewriter: ExpressionRewriter): AnyExpression {
+    return new CaseExpr(
+      this.branches.map((branch) => ({
+        condition: branch.condition.rewrite(rewriter),
+        value: branch.value.rewrite(rewriter),
+      })),
+      this.elseExpr?.rewrite(rewriter),
+    );
+  }
+
+  override fold<T>(folder: ExpressionFolder<T>): T {
+    const elseExpr = this.elseExpr;
+    return combineAll(folder, [
+      ...this.branches.flatMap((branch) => [
+        () => branch.condition.fold(folder),
+        () => branch.value.fold(folder),
+      ]),
+      ...(elseExpr === undefined ? [] : [() => elseExpr.fold(folder)]),
+    ]);
+  }
+}
+
 export class JsonObjectExpr extends Expression {
   readonly kind = 'json-object' as const;
   readonly entries: ReadonlyArray<JsonObjectEntry>;
@@ -835,7 +1020,7 @@ export class JsonObjectExpr extends Expression {
     this.freeze();
   }
 
-  static entry(key: string, value: ProjectionExpr): JsonObjectEntry {
+  static entry(key: string, value: AnyJsonValueProjection): JsonObjectEntry {
     return {
       key,
       value,
@@ -854,12 +1039,7 @@ export class JsonObjectExpr extends Expression {
     return new JsonObjectExpr(
       this.entries.map((entry) => ({
         key: entry.key,
-        value:
-          entry.value.kind === 'literal'
-            ? rewriter.literal
-              ? rewriter.literal(entry.value)
-              : entry.value
-            : entry.value.rewrite(rewriter),
+        value: entry.value.rewrite(rewriter),
       })),
     );
   }
@@ -867,14 +1047,7 @@ export class JsonObjectExpr extends Expression {
   override fold<T>(folder: ExpressionFolder<T>): T {
     return combineAll(
       folder,
-      this.entries.map(
-        (entry) => () =>
-          entry.value.kind === 'literal'
-            ? folder.literal
-              ? folder.literal(entry.value)
-              : folder.empty
-            : entry.value.fold(folder),
-      ),
+      this.entries.map((entry) => () => entry.value.fold(folder)),
     );
   }
 }
@@ -915,12 +1088,12 @@ export class OrderByItem extends AstNode {
 
 export class JsonArrayAggExpr extends Expression {
   readonly kind = 'json-array-agg' as const;
-  readonly expr: AnyExpression;
+  readonly expr: AnyJsonValueProjection;
   readonly onEmpty: 'null' | 'emptyArray';
   readonly orderBy: ReadonlyArray<OrderByItem> | undefined;
 
   constructor(
-    expr: AnyExpression,
+    expr: AnyJsonValueProjection,
     onEmpty: 'null' | 'emptyArray' = 'null',
     orderBy?: ReadonlyArray<OrderByItem>,
   ) {
@@ -932,7 +1105,7 @@ export class JsonArrayAggExpr extends Expression {
   }
 
   static of(
-    expr: AnyExpression,
+    expr: AnyJsonValueProjection,
     onEmpty: 'null' | 'emptyArray' = 'null',
     orderBy?: ReadonlyArray<OrderByItem>,
   ): JsonArrayAggExpr {
@@ -1304,9 +1477,9 @@ export class ProjectionItem extends AstNode {
   readonly alias: string;
   readonly expr: ProjectionExpr;
   /**
-   * Codec identity for the projected cell. Decode-side dispatch resolves the per-instance codec through `contractCodecs.forCodecRef(codec)` — content-keyed memoisation collapses repeated lookups for the same logical column onto one shared {@link Codec}.
+   * Codec identity for any known projected result, whether read directly from a contract column or forwarded through a query wrapper. Decode-side dispatch resolves the per-instance codec through `contractCodecs.forCodecRef(codec)` — content-keyed memoisation collapses repeated lookups for the same logical result onto one shared {@link Codec}.
    *
-   * Stays `undefined` for non-column-bound projections (computed expressions, subqueries, raw aliases) whose decoded type the runtime cannot infer from a single contract column.
+   * Stays `undefined` only when the projected result's codec is unknown, such as computed expressions, subqueries, or raw aliases whose decoded type the runtime cannot infer.
    */
   readonly codec: CodecRef | undefined;
 
@@ -1991,6 +2164,9 @@ export type AnyExpression =
   | OperationExpr
   | AggregateExpr
   | WindowFuncExpr
+  | FunctionCallExpr
+  | CastExpr
+  | CaseExpr
   | JsonObjectExpr
   | JsonArrayAggExpr
   | ListExpression
@@ -2027,7 +2203,8 @@ export function isQueryAst(value: unknown): value is AnyQueryAst {
     typeof value === 'object' &&
     value !== null &&
     'kind' in value &&
-    queryAstKinds.has((value as { kind: string }).kind)
+    typeof value.kind === 'string' &&
+    queryAstKinds.has(value.kind)
   );
 }
 
@@ -2036,7 +2213,8 @@ export function isWhereExpr(value: unknown): value is AnyExpression {
     typeof value === 'object' &&
     value !== null &&
     'kind' in value &&
-    whereExprKinds.has((value as { kind: string }).kind)
+    typeof value.kind === 'string' &&
+    whereExprKinds.has(value.kind)
   );
 }
 

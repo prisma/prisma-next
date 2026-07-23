@@ -96,12 +96,12 @@ describe('readMarker', () => {
 
     await expect(controlAdapter.readMarker(driver, APP)).rejects.toSatisfy((err: unknown) => {
       expect(CliStructuredError.is(err)).toBe(true);
-      expect((err as CliStructuredError).toEnvelope().code).toBe('PN-RUN-3005');
+      expect((err as CliStructuredError).toEnvelope().code).toBe('CONTRACT.MARKER_ROW_CORRUPT');
       return true;
     });
   });
 
-  it('throws PN-RUN-3005 when invariants is present but not an array (storage corruption)', async () => {
+  it('throws CONTRACT.MARKER_ROW_CORRUPT when invariants is present but not an array (storage corruption)', async () => {
     await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
       _id: APP,
       space: APP,
@@ -112,7 +112,7 @@ describe('readMarker', () => {
     });
 
     await expect(controlAdapter.readMarker(driver, APP)).rejects.toSatisfy((err: unknown) => {
-      expect((err as CliStructuredError).toEnvelope().code).toBe('PN-RUN-3005');
+      expect((err as CliStructuredError).toEnvelope().code).toBe('CONTRACT.MARKER_ROW_CORRUPT');
       return true;
     });
   });

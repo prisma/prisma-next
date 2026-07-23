@@ -1,16 +1,19 @@
-import { readFile } from 'node:fs/promises';
 import { loadConfig } from '@prisma-next/config-loader';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
+import {
+  contractSnapshotDir,
+  readContractSnapshotJson,
+} from '@prisma-next/migration-tools/contract-snapshot-store';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { findLatestMigration, isGraphNode } from '@prisma-next/migration-tools/migration-graph';
 import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import type { RefEntry } from '@prisma-next/migration-tools/refs';
 import {
-  deleteRefPaired,
+  deleteRef,
   readRefs,
   validateRefName,
   validateRefValue,
-  writeRefPaired,
+  writeRef,
 } from '@prisma-next/migration-tools/refs';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
@@ -34,7 +37,6 @@ import {
 import { buildReadAggregate } from '../utils/contract-space-aggregate-loader';
 import { formatCommandHelp } from '../utils/formatters/help';
 import { parseGlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
-import { readContractIR } from '../utils/ref-advancement';
 import { handleResult } from '../utils/result-handler';
 import { createTerminalUI } from '../utils/terminal-ui';
 
@@ -114,26 +116,29 @@ export async function executeRefSetCommand(
       return notOk(errorRefSetBundleNotFound(resolvedHash));
     }
 
-    const contractJsonPath = join(matchingBundle.dirPath, 'end-contract.json');
-    let contractJson: Record<string, unknown>;
+    const contractJsonPath = join(
+      contractSnapshotDir(migrationsDir, resolvedHash),
+      'contract.json',
+    );
     try {
-      const raw = await readFile(contractJsonPath, 'utf-8');
-      contractJson = JSON.parse(raw) as Record<string, unknown>;
+      await readContractSnapshotJson(migrationsDir, resolvedHash);
     } catch (readError) {
-      if (readError instanceof Error && (readError as NodeJS.ErrnoException).code === 'ENOENT') {
+      if (
+        MigrationToolsError.is(readError) &&
+        readError.code === 'MIGRATION.CONTRACT_SNAPSHOT_MISSING'
+      ) {
         return notOk(
           errorFileNotFound(contractJsonPath, {
-            why: `Migration bundle for hash ${resolvedHash} is missing its end-contract snapshot at ${contractJsonPath}`,
-            fix: 'Run `pnpm fixtures:check`, or re-emit the migration so its end-contract.json is restored.',
+            why: `Migration bundle for hash ${resolvedHash} is missing its contract snapshot at ${contractJsonPath}`,
+            fix: 'Restore migrations/snapshots/ from version control, or re-run the command that produced this migration to regenerate its snapshot.',
           }),
         );
       }
       throw readError;
     }
 
-    const contractIR = await readContractIR(contractJson, contractJsonPath);
     const entry: RefEntry = { hash: resolvedHash, invariants: [] };
-    await writeRefPaired(refsDir, name, entry, contractIR);
+    await writeRef(refsDir, name, entry);
     return ok({ ok: true as const, ref: name, hash: resolvedHash, invariants: [] });
   } catch (error) {
     if (error instanceof CliStructuredError) return notOk(error);
@@ -148,7 +153,7 @@ export async function executeRefDeleteCommand(
   try {
     const config = await loadConfig(options.config);
     const { refsDir } = resolveMigrationPaths(options.config, config);
-    await deleteRefPaired(refsDir, name);
+    await deleteRef(refsDir, name);
     return ok({ ok: true as const, ref: name, deleted: true as const });
   } catch (error) {
     if (error instanceof CliStructuredError) return notOk(error);

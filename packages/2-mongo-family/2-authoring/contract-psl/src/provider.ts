@@ -6,6 +6,7 @@ import { withSeedDiagnostics } from '@prisma-next/psl-parser/interpret';
 import type { ParseDiagnostic, SourceFile } from '@prisma-next/psl-parser/syntax';
 import { parse } from '@prisma-next/psl-parser/syntax';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import { notOk } from '@prisma-next/utils/result';
 
 import { interpretPslDocumentToMongoContract } from './interpreter';
@@ -48,7 +49,7 @@ export function mongoContract(schemaPath: string, options?: MongoContractOptions
     async load(context) {
       const [absoluteSchemaPath] = context.resolvedInputs;
       if (absoluteSchemaPath === undefined) {
-        throw new Error(
+        throw new InternalError(
           'mongoContract: context.resolvedInputs is empty. The CLI config loader should populate it positional-matched with source.inputs.',
         );
       }

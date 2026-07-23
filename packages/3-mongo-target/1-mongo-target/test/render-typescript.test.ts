@@ -9,9 +9,13 @@ import {
 } from '../src/core/op-factory-call';
 import { renderCallsToTypeScript } from '../src/core/render-typescript';
 
+const SNAPSHOTS_IMPORT_PATH = '../../snapshots';
+const FROM_HEX = 'a'.repeat(64);
+const TO_HEX = 'b'.repeat(64);
 const META = {
-  from: '0000000000000000000000000000000000000000000000000000000000000000',
-  to: '1111111111111111111111111111111111111111111111111111111111111111',
+  from: FROM_HEX,
+  to: TO_HEX,
+  snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
 } as const;
 
 const renderTypeScript = (
@@ -38,16 +42,20 @@ describe('renderCallsToTypeScript', () => {
   it('emits the contract-JSON imports + fields and the Migration<Start, End> header (with-start)', () => {
     const calls = [new CreateIndexCall('users', [{ field: 'email', direction: 1 }])];
 
-    const output = renderTypeScript(calls, { from: 'aaa', to: 'bbb' });
+    const output = renderTypeScript(calls, META);
 
     expect(output).toContain(
-      'import endContract from \'./end-contract.json\' with { type: "json" };',
+      `import endContract from '${SNAPSHOTS_IMPORT_PATH}/${TO_HEX}/contract.json' with { type: "json" };`,
     );
     expect(output).toContain(
-      'import startContract from \'./start-contract.json\' with { type: "json" };',
+      `import startContract from '${SNAPSHOTS_IMPORT_PATH}/${FROM_HEX}/contract.json' with { type: "json" };`,
     );
-    expect(output).toContain("import type { Contract as End } from './end-contract';");
-    expect(output).toContain("import type { Contract as Start } from './start-contract';");
+    expect(output).toContain(
+      `import type { Contract as End } from '${SNAPSHOTS_IMPORT_PATH}/${TO_HEX}/contract';`,
+    );
+    expect(output).toContain(
+      `import type { Contract as Start } from '${SNAPSHOTS_IMPORT_PATH}/${FROM_HEX}/contract';`,
+    );
     expect(output).toContain('class M extends Migration<Start, End> {');
     expect(output).toContain('override readonly startContractJson = startContract;');
     expect(output).toContain('override readonly endContractJson = endContract;');
@@ -56,12 +64,33 @@ describe('renderCallsToTypeScript', () => {
   it('does NOT emit a describe() method (the base derives it from the contract JSON)', () => {
     const calls = [new DropCollectionCall('users')];
 
-    const output = renderTypeScript(calls, { from: 'aaa', to: 'bbb' });
+    const output = renderTypeScript(calls, META);
 
     expect(output).not.toContain('describe()');
     // The hash values are no longer literal-embedded — they come from the JSON.
-    expect(output).not.toContain('aaa');
-    expect(output).not.toContain('bbb');
+    expect(output).not.toContain(META.from);
+    expect(output).not.toContain(META.to);
+  });
+
+  it('renders a compilable merged import block when from === to (E4)', () => {
+    const calls = [new DropCollectionCall('users')];
+
+    const output = renderTypeScript(calls, {
+      from: META.to,
+      to: META.to,
+      snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
+    });
+
+    expect(output).toContain(
+      `import endContract from '${SNAPSHOTS_IMPORT_PATH}/${TO_HEX}/contract.json' with { type: "json" };`,
+    );
+    expect(output).toContain(
+      `import startContract from '${SNAPSHOTS_IMPORT_PATH}/${TO_HEX}/contract.json' with { type: "json" };`,
+    );
+    expect(output).toContain(
+      `import type { Contract as End, Contract as Start } from '${SNAPSHOTS_IMPORT_PATH}/${TO_HEX}/contract';`,
+    );
+    expect(output).toContain('class M extends Migration<Start, End> {');
   });
 
   it('prepends a node shebang as the first line under the default test env', () => {
@@ -218,17 +247,20 @@ describe('renderCallsToTypeScript', () => {
 
     const output = renderTypeScript(calls, {
       from: null,
-      to: 'def',
+      to: META.to,
+      snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
     });
 
     expect(output).toContain('class M extends Migration<never, End> {');
     expect(output).toContain('override readonly endContractJson = endContract;');
     expect(output).toContain(
-      'import endContract from \'./end-contract.json\' with { type: "json" };',
+      `import endContract from '${SNAPSHOTS_IMPORT_PATH}/${TO_HEX}/contract.json' with { type: "json" };`,
     );
-    expect(output).toContain("import type { Contract as End } from './end-contract';");
+    expect(output).toContain(
+      `import type { Contract as End } from '${SNAPSHOTS_IMPORT_PATH}/${TO_HEX}/contract';`,
+    );
     // No start contract for a baseline.
-    expect(output).not.toContain('start-contract');
+    expect(output).not.toContain('startContract');
     expect(output).not.toContain('startContractJson');
     expect(output).not.toContain('describe()');
   });
@@ -258,7 +290,12 @@ describe('renderCallsToTypeScript', () => {
 
   it('quotes __proto__ key in rendered object literals', () => {
     const opts = Object.create(null) as Record<string, unknown>;
-    opts['__proto__'] = 'poisoned';
+    Object.defineProperty(opts, '__proto__', {
+      value: 'poisoned',
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
     const calls = [
       new CollModCall('test', opts as CollModOptions, {
         id: 'test',

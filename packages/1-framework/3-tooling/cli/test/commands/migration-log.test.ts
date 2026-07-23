@@ -78,7 +78,7 @@ describe('executeMigrationLogCommand', () => {
     );
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.failure.code).toBe('4005');
+    expect(result.failure.code).toBe('CONFIG.DB_CONNECTION_REQUIRED');
     expect(result.failure.meta?.['missingFlags']).toEqual(['--db']);
   });
 
@@ -94,7 +94,7 @@ describe('executeMigrationLogCommand', () => {
     );
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.failure.code).toBe('4005');
+    expect(result.failure.code).toBe('CONFIG.DB_CONNECTION_REQUIRED');
     expect(result.failure.meta?.['missingFlags']).toEqual([]);
   });
 

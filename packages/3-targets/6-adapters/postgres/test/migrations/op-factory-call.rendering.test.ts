@@ -39,7 +39,14 @@ import {
 import { renderCallsToTypeScript } from '@prisma-next/target-postgres/render-typescript';
 import { describe, expect, it } from 'vitest';
 
-const META = { from: 'from', to: 'to' } as const;
+const SNAPSHOTS_IMPORT_PATH = '../../snapshots';
+const FROM_HEX = 'c'.repeat(64);
+const TO_HEX = 'd'.repeat(64);
+const META = {
+  from: FROM_HEX,
+  to: TO_HEX,
+  snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
+} as const;
 
 describe('Postgres call classes - renderTypeScript + importRequirements', () => {
   it('emits this.dropTable({...}) and contributes no imports', () => {
@@ -80,7 +87,7 @@ describe('Postgres call classes - renderTypeScript + importRequirements', () => 
     );
   });
 
-  it('DataTransformCall renders slots as placeholder closures and imports placeholder + endContract', () => {
+  it('DataTransformCall renders slots as placeholder closures and imports only the placeholder facade symbol', () => {
     const call = new DataTransformCall('Backfill', 'check', 'run');
 
     expect(call.renderTypeScript()).toBe(
@@ -93,12 +100,6 @@ describe('Postgres call classes - renderTypeScript + importRequirements', () => 
     );
     expect(call.importRequirements()).toEqual([
       { moduleSpecifier: '@prisma-next/postgres/migration', symbol: 'placeholder' },
-      {
-        moduleSpecifier: './end-contract.json',
-        symbol: 'endContract',
-        kind: 'default',
-        attributes: { type: 'json' },
-      },
     ]);
   });
 });
@@ -394,8 +395,14 @@ describe('renderCallsToTypeScript', () => {
       "import { Migration, MigrationCLI, placeholder } from '@prisma-next/postgres/migration';",
     );
     expect(source).toContain(
-      'import endContract from \'./end-contract.json\' with { type: "json" };',
+      `import endContract from '${SNAPSHOTS_IMPORT_PATH}/${TO_HEX}/contract.json' with { type: "json" };`,
     );
+    const endContractImportLines = source
+      .split('\n')
+      .filter((line) => line.startsWith('import') && line.includes('endContract'));
+    expect(endContractImportLines).toEqual([
+      `import endContract from '${SNAPSHOTS_IMPORT_PATH}/${TO_HEX}/contract.json' with { type: "json" };`,
+    ]);
     expect(source).toContain(
       [
         '      this.dataTransform(endContract, "Backfill user emails", {',
@@ -407,15 +414,12 @@ describe('renderCallsToTypeScript', () => {
   });
 
   it('derives describe() from contract JSON instead of embedding from/to hashes', () => {
-    const source = renderCallsToTypeScript([], {
-      from: 'from-hash-stub',
-      to: 'to-hash-stub',
-    });
+    const source = renderCallsToTypeScript([], META);
     // New shape: from/to are derived by the base from the imported contract JSON
     // (no describe() block, no hash literals).
     expect(source).not.toContain('describe()');
-    expect(source).not.toContain('from-hash-stub');
-    expect(source).not.toContain('to-hash-stub');
+    expect(source).not.toContain(META.from);
+    expect(source).not.toContain(META.to);
     expect(source).toContain('export default class M extends Migration<Start, End> {');
     expect(source).toContain('override readonly startContractJson = startContract;');
     expect(source).toContain('override readonly endContractJson = endContract;');

@@ -81,13 +81,25 @@ describe('ParamRef codec — AST rewriter propagation', () => {
     expect(projection?.codec).toEqual(userEmailCodec);
   });
 
-  it('ParamRef deep-clones codec.typeParams so caller mutations after construction do not leak in', () => {
-    const mutableTypeParams: { length: number } = { length: 1536 };
+  it('ParamRef deep-clones and freezes nested codec.typeParams', () => {
+    const mutableTypeParams = {
+      dimensions: 1536,
+      options: { labels: ['dense', 'cosine'] },
+    };
     const ref = ParamRef.of([0], {
       codec: { codecId: 'pg/vector@1', typeParams: mutableTypeParams },
     });
-    mutableTypeParams.length = 99;
-    expect((ref.codec?.typeParams as { length: number }).length).toBe(1536);
+    mutableTypeParams.dimensions = 99;
+    mutableTypeParams.options.labels.push('mutated');
+
+    const storedTypeParams = ref.codec!.typeParams as typeof mutableTypeParams;
+    expect(storedTypeParams).toEqual({
+      dimensions: 1536,
+      options: { labels: ['dense', 'cosine'] },
+    });
+    expect(Object.isFrozen(storedTypeParams)).toBe(true);
+    expect(Object.isFrozen(storedTypeParams.options)).toBe(true);
+    expect(Object.isFrozen(storedTypeParams.options.labels)).toBe(true);
   });
 
   it('ProjectionItem deep-clones codec.typeParams so caller mutations after construction do not leak in', () => {
@@ -97,7 +109,34 @@ describe('ParamRef codec — AST rewriter propagation', () => {
       typeParams: mutableTypeParams,
     });
     mutableTypeParams.length = 99;
-    expect((item.codec?.typeParams as { length: number }).length).toBe(1536);
+    expect((item.codec!.typeParams as { length: number }).length).toBe(1536);
+  });
+
+  it.each([
+    {
+      codec: { codecId: 'pg/vector@1' },
+      expectedMany: undefined,
+      hasMany: false,
+    },
+    {
+      codec: { codecId: 'pg/vector@1', many: false },
+      expectedMany: false,
+      hasMany: true,
+    },
+    {
+      codec: { codecId: 'pg/vector@1', many: true },
+      expectedMany: true,
+      hasMany: true,
+    },
+  ] satisfies ReadonlyArray<{
+    codec: CodecRef;
+    expectedMany: boolean | undefined;
+    hasMany: boolean;
+  }>)('ProjectionItem preserves codec many=$expectedMany', ({ codec, expectedMany, hasMany }) => {
+    const item = ProjectionItem.of('embedding', ColumnRef.of('doc', 'embedding'), codec);
+
+    expect(item.codec!.many).toBe(expectedMany);
+    expect(Object.hasOwn(item.codec!, 'many')).toBe(hasMany);
   });
 
   it('ProjectionItem.withCodec replaces the stamped CodecRef', () => {

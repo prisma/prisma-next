@@ -1,6 +1,9 @@
 export {
+  errorContractSnapshotHashMismatch,
+  errorContractSnapshotMissing,
   errorDescriptorHeadHashMismatch,
   errorInvalidJson,
+  errorInvalidRefName,
   errorNoInvariantPath,
   errorUnknownInvariant,
   MigrationToolsError,

@@ -52,7 +52,7 @@ function mapDbInitFailure(failure: DbInitFailure): CliStructuredError {
     return errorMigrationPlanningFailed({ conflicts: failure.conflicts ?? [] });
   }
 
-  if (failure.code === 'MARKER_ORIGIN_MISMATCH') {
+  if (failure.code === 'MIGRATION.MARKER_ORIGIN_MISMATCH') {
     const mismatchParts: string[] = [];
     if (
       failure.marker?.storageHash !== failure.destination?.storageHash &&
@@ -79,7 +79,7 @@ function mapDbInitFailure(failure: DbInitFailure): CliStructuredError {
         why: 'Database has an existing signature (marker) that does not match the target contract',
         fix: 'If bootstrapping, drop/reset the database then re-run `prisma-next db init`; otherwise reconcile schema/marker using your migration workflow',
         meta: {
-          code: 'MARKER_ORIGIN_MISMATCH',
+          code: 'MIGRATION.MARKER_ORIGIN_MISMATCH',
           ...ifDefined('markerStorageHash', failure.marker?.storageHash),
           ...ifDefined('destinationStorageHash', failure.destination?.storageHash),
           ...ifDefined('markerProfileHash', failure.marker?.profileHash),
@@ -95,7 +95,7 @@ function mapDbInitFailure(failure: DbInitFailure): CliStructuredError {
         ? failure.meta['runnerErrorCode']
         : undefined;
     const fix =
-      runnerCode === 'LEGACY_MARKER_SHAPE'
+      runnerCode === 'MIGRATION.LEGACY_MARKER_SHAPE'
         ? 'Legacy marker-table shape detected. Drop `prisma_contract.marker` (Postgres) or `_prisma_marker` (SQLite) and re-run `prisma-next db init` to recreate it with the current per-space schema.'
         : 'Fix the schema mismatch (db init is additive-only), or drop/reset the database and re-run `prisma-next db init`';
     return errorRunnerFailed(failure.summary, {
@@ -176,6 +176,7 @@ async function executeDbInitCommand(
           ...ifDefined('advanceRef', options.advanceRef),
           ...ifDefined('db', options.db),
           refsDir,
+          migrationsDir,
           contractIR,
           mode: result.value.mode,
           hash: advancementHash,

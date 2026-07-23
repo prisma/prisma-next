@@ -5,10 +5,10 @@
  *   1. A synthetic app contract built in-test with the TS builder declares
  *      `Profile.userId → auth.users.id` (via `belongsTo(AuthUser, …)` +
  *      `constraints.foreignKey(cols.userId, AuthUser.refs.id, { onDelete: 'cascade' })`).
- *   2. The supabase extension space artefacts are materialised on disk so the
+ *   2. The supabase extension space artifacts are materialised on disk so the
  *      aggregate loader can compose them.
  *   3. PGlite is seeded with the external `auth.*` / `storage.*` tables via
- *      `bootstrapSupabaseShim`.
+ *      `setUpSupabaseMockSchema`.
  *   4. The CLI's `dbInit` (apply mode) runs through the aggregate planner and
  *      emits `ALTER TABLE … ADD CONSTRAINT … REFERENCES "auth"."users"("id")`.
  *   5. `pg_constraint` is queried cross-joining `pg_namespace` + `pg_class` to
@@ -25,7 +25,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { createControlClient } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
-import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { emitContractSpaceArtifacts } from '@prisma-next/migration-tools/spaces';
 import { defineContract, field, model, rel } from '@prisma-next/postgres/contract-builder';
 import postgres from '@prisma-next/target-postgres/control';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
@@ -33,7 +33,7 @@ import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AuthUser } from '../src/exports/contract';
 import supabasePack from '../src/exports/pack';
-import { bootstrapSupabaseShim } from './supabase-bootstrap';
+import { setUpSupabaseMockSchema } from './fixtures/supabase-reference/set-up-mock-schema';
 
 // ---------------------------------------------------------------------------
 // Synthetic app contract — Profile model with cross-space FK to auth.users.id
@@ -105,10 +105,10 @@ describe('AC7 — cross-contract FK: public.profile.user_id → auth.users.id', 
       // Without this, `db verify` would fail with `declaredMissing` for every
       // `auth.*` / `storage.*` table.
       await withClient(connectionString, async (client) => {
-        await bootstrapSupabaseShim(client);
+        await setUpSupabaseMockSchema(client);
       });
 
-      // Step 2 — Materialise the supabase extension space artefacts on disk.
+      // Step 2 — Materialise the supabase extension space artifacts on disk.
       //
       // The supabase pack ships zero migration packages — it declares only external
       // schema. We write `contract.json` + `refs/head.json` so the aggregate loader
@@ -117,7 +117,7 @@ describe('AC7 — cross-contract FK: public.profile.user_id → auth.users.id', 
       if (!supabaseSpace) {
         throw new Error('supabasePack must declare a contractSpace');
       }
-      await emitContractSpaceArtefacts(migrationsDir, 'supabase', {
+      await emitContractSpaceArtifacts(migrationsDir, 'supabase', {
         contract: supabaseSpace.contractJson,
         contractDts: '// supabase extension contract space\n',
         headRef: {
@@ -126,13 +126,13 @@ describe('AC7 — cross-contract FK: public.profile.user_id → auth.users.id', 
         },
       });
 
-      // Step 3 — Materialise the app contract space artefacts on disk.
+      // Step 3 — Materialise the app contract space artifacts on disk.
       //
       // `dbInit` reads the app's `refs/head.json` to determine whether the
       // schema has already been initialised. For a first-run test we write the
-      // app space artefacts so the loader treats it as a fresh db-init.
+      // app space artifacts so the loader treats it as a fresh db-init.
       const appStorageHash = String(appContract.storage.storageHash);
-      await emitContractSpaceArtefacts(migrationsDir, 'app', {
+      await emitContractSpaceArtifacts(migrationsDir, 'app', {
         contract: appContractJson,
         contractDts: '// synthetic app contract\n',
         headRef: { hash: appStorageHash, invariants: [] },

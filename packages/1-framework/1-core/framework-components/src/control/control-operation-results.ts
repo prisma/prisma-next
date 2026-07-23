@@ -1,9 +1,9 @@
 import type { SchemaDiffIssue } from './schema-diff';
 
-export const VERIFY_CODE_MARKER_MISSING = 'PN-RUN-3001';
-export const VERIFY_CODE_HASH_MISMATCH = 'PN-RUN-3002';
-export const VERIFY_CODE_TARGET_MISMATCH = 'PN-RUN-3003';
-export const VERIFY_CODE_SCHEMA_FAILURE = 'PN-RUN-3010';
+export const VERIFY_CODE_MARKER_MISSING = 'CONTRACT.MARKER_MISSING';
+export const VERIFY_CODE_HASH_MISMATCH = 'CONTRACT.MARKER_MISMATCH';
+export const VERIFY_CODE_TARGET_MISMATCH = 'CONTRACT.TARGET_MISMATCH';
+export const VERIFY_CODE_SCHEMA_FAILURE = 'CONTRACT.SCHEMA_VERIFICATION_FAILED';
 
 export interface OperationContext {
   readonly contractPath?: string;
@@ -37,20 +37,6 @@ export interface VerifyDatabaseResult {
     readonly total: number;
   };
 }
-
-/**
- * The three ways an actual state can fail an expectation: it contains a node
- * that was not expected, lacks a node that was expected, or holds a node that
- * is not equal to the expected one. Expected is the desired side and actual the
- * current side of whatever comparison produced the issue — contract-vs-database,
- * or contract-vs-contract in an offline plan — so the vocabulary is
- * comparison-relative and never ambiguous about a base.
- *
- * The failure reason is a structural characteristic carried as a declared
- * field: consumers filter on `reason`, never by enumerating kind strings or
- * family-invented node codes.
- */
-export type ExpectationFailureReason = 'not-expected' | 'not-found' | 'not-equal';
 
 /**
  * The issue-based schema-verify result. `ok` derives from the FAILURE list

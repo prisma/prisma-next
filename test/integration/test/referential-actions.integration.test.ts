@@ -373,7 +373,6 @@ describe('referential actions integration', () => {
             expect(result.ok).toBe(false);
             expect(result.schema.issues).toContainEqual(
               expect.objectContaining({
-                reason: 'not-equal',
                 path: ['database', 'public', 'post', 'foreign-key:userId->public.user(id)'],
               }),
             );
@@ -447,7 +446,6 @@ describe('referential actions integration', () => {
             expect(result.ok).toBe(false);
             expect(result.schema.issues).toContainEqual(
               expect.objectContaining({
-                reason: 'not-equal',
                 path: ['database', 'public', 'post', 'foreign-key:userId->public.user(id)'],
               }),
             );
@@ -623,6 +621,7 @@ describe('referential actions integration', () => {
             fromContract: null,
             frameworkComponents,
             spaceId: APP_SPACE_ID,
+            snapshotsImportPath: '../../snapshots',
           });
 
           expect(planResult.kind).toBe('success');

@@ -75,7 +75,7 @@ describe('migrate — pending migration resolution', {
       slug: 'initial',
     });
 
-    const { packages } = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
     const attested = packages;
     const graph = reconstructGraph(attested);
     const leaf = findLeaf(graph);
@@ -110,7 +110,7 @@ describe('migrate — pending migration resolution', {
       slug: 'add_post',
     });
 
-    const { packages } = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
     const attested = packages;
     const graph = reconstructGraph(attested);
     const leaf = findLeaf(graph);
@@ -147,7 +147,7 @@ describe('migrate — pending migration resolution', {
       slug: 'add_post',
     });
 
-    const { packages } = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
     const attested = packages;
     const graph = reconstructGraph(attested);
 
@@ -169,7 +169,7 @@ describe('migrate — pending migration resolution', {
       slug: 'initial',
     });
 
-    const { packages } = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
     const attested = packages;
     const graph = reconstructGraph(attested);
     const leaf = findLeaf(graph);
@@ -191,7 +191,7 @@ describe('migrate — pending migration resolution', {
       slug: 'initial',
     });
 
-    const { packages } = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
     const attested = packages;
     const graph = reconstructGraph(attested);
     const leaf = findLeaf(graph);
@@ -234,7 +234,7 @@ describe('migrate — pending migration resolution', {
     await writeFile(join(invalidDir, 'migration.json'), invalidJson);
     await writeFile(join(invalidDir, 'ops.json'), '[]');
 
-    const { packages, problems } = await readMigrationsDir(migrationsDir);
+    const { packages, problems } = await readMigrationsDir(migrationsDir, { migrationsDir });
     expect(packages).toHaveLength(1);
     expect(problems).toContainEqual(
       expect.objectContaining({
@@ -265,7 +265,7 @@ describe('migrate — pending migration resolution', {
       slug: 'add_post',
     });
 
-    const { packages } = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
     const attested = packages;
     const graph = reconstructGraph(attested);
     const leaf = findLeaf(graph);
@@ -296,7 +296,7 @@ describe('migrate — pending migration resolution', {
       slug: 'second',
     });
 
-    const { packages } = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
     const attested = packages;
     const graph = reconstructGraph(attested);
     const leaf = findLeaf(graph);

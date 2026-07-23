@@ -14,6 +14,7 @@ import {
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type Type, type } from 'arktype';
+import { contractError } from './contract-errors';
 import { composeSqlEntityKinds } from './entity-kinds';
 
 export {
@@ -376,16 +377,28 @@ const SqlContractSchema = createSqlContractSchema(DEFAULT_SQL_KINDS);
 export function validateStorage(value: unknown): void {
   const result = StorageSchema(value);
   if (result instanceof type.errors) {
-    const messages = result.map((p: { message: string }) => p.message).join('; ');
-    throw new Error(`Storage validation failed: ${messages}`);
+    const errors = result.map((p: { message: string }) => p.message);
+    throw contractError(
+      'CONTRACT.VALIDATION_FAILED',
+      `Storage validation failed: ${errors.join('; ')}`,
+      {
+        meta: { errors },
+      },
+    );
   }
 }
 
 export function validateModel(value: unknown): unknown {
   const result = ModelSchema(value);
   if (result instanceof type.errors) {
-    const messages = result.map((p: { message: string }) => p.message).join('; ');
-    throw new Error(`Model validation failed: ${messages}`);
+    const errors = result.map((p: { message: string }) => p.message);
+    throw contractError(
+      'CONTRACT.VALIDATION_FAILED',
+      `Model validation failed: ${errors.join('; ')}`,
+      {
+        meta: { errors },
+      },
+    );
   }
   return result;
 }
@@ -546,8 +559,6 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
         target: fk.target,
         onDelete: fk.onDelete ?? null,
         onUpdate: fk.onUpdate ?? null,
-        constraint: fk.constraint,
-        index: fk.index,
       });
       if (seenForeignKeyDefinitions.has(signature)) {
         errors.push(

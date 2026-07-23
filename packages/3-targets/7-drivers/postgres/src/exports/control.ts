@@ -27,7 +27,9 @@ export class PostgresControlDriver implements SqlControlDriverInstance<'postgres
   }
 
   async close(): Promise<void> {
-    await this.client.end();
+    // On a dropped connection end() itself can reject; the caller already has
+    // the real failure.
+    await this.client.end().catch(() => {});
   }
 }
 
@@ -39,6 +41,10 @@ const postgresDriverDescriptor: ControlDriverDescriptor<'sql', 'postgres', Postg
     ...postgresDriverDescriptorMeta,
     async create(url: string): Promise<PostgresControlDriver> {
       const client = new Client({ connectionString: url });
+      // Connection-level events become unhandled errors with no listener;
+      // query/connect failures still reject their own promises, so nothing
+      // real is masked.
+      client.on('error', () => {});
       try {
         await client.connect();
         return new PostgresControlDriver(client);

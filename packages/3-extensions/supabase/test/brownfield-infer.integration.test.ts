@@ -2,7 +2,7 @@
  * Integration test — brownfield inference: the headline "adopt an existing
  * Supabase project" scenario. `contract infer` (with the Supabase pack in
  * the stack) runs against a live database that already has the full
- * Supabase reference schema (auth/storage/roles, via `bootstrapSupabaseShim`)
+ * Supabase reference schema (auth/storage/roles, via `setUpSupabaseMockSchema`)
  * plus a couple of ordinary app tables in `public` — one of which has a
  * foreign key into `auth.users`, exercising the same cross-space rewrite
  * `infer-cross-space-fk.integration.test.ts` covers in isolation.
@@ -33,7 +33,7 @@ import postgres from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import supabasePack from '../src/exports/pack';
-import { bootstrapSupabaseShim } from './supabase-bootstrap';
+import { setUpSupabaseMockSchema } from './fixtures/supabase-reference/set-up-mock-schema';
 
 /** Schemas that must never appear as an unqualified `<schema>.` reference. */
 const NEVER_LEAKED_SCHEMAS = [
@@ -82,7 +82,7 @@ describe('contract infer — brownfield: app tables alongside the full Supabase 
       const { connectionString } = database;
 
       await withClient(connectionString, async (client) => {
-        await bootstrapSupabaseShim(client);
+        await setUpSupabaseMockSchema(client);
         await client.query(`
           CREATE TABLE public.list (
             id    uuid NOT NULL PRIMARY KEY,

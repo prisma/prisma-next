@@ -370,7 +370,7 @@ describe('SqlContractSerializer structural validation', () => {
     });
   });
 
-  it('validates FK entries with explicit constraint/index', () => {
+  it('validates FK entries with source/target coordinates only', () => {
     const input = validSqlContractJson({
       storage: storageWithNamespacedTables({
         storageHash: 'test',
@@ -398,8 +398,6 @@ describe('SqlContractSerializer structural validation', () => {
                   columns: ['userId'],
                 },
                 target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
-                constraint: true,
-                index: true,
               },
             ],
           },
@@ -408,49 +406,7 @@ describe('SqlContractSerializer structural validation', () => {
     });
     const contract = validateSqlContractFully<Contract<SqlStorage>>(input);
     const fk = unboundTables(contract.storage)['post']?.foreignKeys[0];
-    expect(fk?.constraint).toBe(true);
-    expect(fk?.index).toBe(true);
-  });
-
-  it('preserves explicit per-FK constraint/index fields', () => {
-    const input = validSqlContractJson({
-      storage: storageWithNamespacedTables({
-        storageHash: 'test',
-        tables: {
-          user: {
-            columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
-          },
-          post: {
-            columns: {
-              id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-              userId: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
-            },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [
-              {
-                source: {
-                  namespaceId: UNBOUND_NAMESPACE_ID,
-                  tableName: 'post',
-                  columns: ['userId'],
-                },
-                target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
-                constraint: false,
-                index: true,
-              },
-            ],
-          },
-        },
-      }),
-    });
-    const contract = validateSqlContractFully<Contract<SqlStorage>>(input);
-    const fk = unboundTables(contract.storage)['post']?.foreignKeys[0];
-    expect(fk?.constraint).toBe(false);
-    expect(fk?.index).toBe(true);
+    expect(fk?.source.columns).toEqual(['userId']);
+    expect(fk?.target.columns).toEqual(['id']);
   });
 });

@@ -18,6 +18,7 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import type { SimplifyDeep } from '@prisma-next/utils/simplify-deep';
 import type { Simplify } from '@prisma-next/utils/types';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
@@ -79,6 +80,7 @@ import {
   hasNestedMutationCallbacks,
   withMutationScope,
 } from './mutation-executor';
+import { ormError } from './orm-errors';
 import {
   compileAggregate,
   compileDeleteCount,
@@ -528,24 +530,30 @@ export class Collection<
 
       if (isIncludeScalar(refined)) {
         if (isToOneCardinality(relation.cardinality)) {
-          throw new Error(
+          throw ormError(
+            'ORM.INCLUDE_UNSUPPORTED',
             `include('${relationName}') scalar aggregations are only supported for to-many relations`,
+            { meta: { relation: relationName, kind: 'scalar' } },
           );
         }
         scalarSelector = refined;
         nestedState = refined.state;
       } else if (isIncludeCombine(refined)) {
         if (isToOneCardinality(relation.cardinality)) {
-          throw new Error(
+          throw ormError(
+            'ORM.INCLUDE_UNSUPPORTED',
             `include('${relationName}') combine() is only supported for to-many relations`,
+            { meta: { relation: relationName, kind: 'combine' } },
           );
         }
         combineBranches = refined.branches;
       } else if (isCollectionStateCarrier(refined)) {
         nestedState = refined.state;
       } else {
-        throw new Error(
+        throw ormError(
+          'ORM.INCLUDE_INVALID',
           `include('${relationName}') refinement must return a collection, include scalar selector, or combine() descriptor`,
+          { meta: { relation: relationName } },
         );
       }
     }
@@ -856,7 +864,9 @@ export class Collection<
         continue;
       }
 
-      throw new Error(`include().combine() branch "${name}" is invalid`);
+      throw ormError('ORM.INCLUDE_INVALID', `include().combine() branch "${name}" is invalid`, {
+        meta: { branch: name },
+      });
     }
 
     return createIncludeCombine<{
@@ -1135,12 +1145,22 @@ export class Collection<
     );
     const entries = Object.entries(aggregateSpec);
     if (entries.length === 0) {
-      throw new Error('aggregate() requires at least one aggregation selector');
+      throw ormError(
+        'ORM.AGGREGATE_SELECTOR_MISSING',
+        'aggregate() requires at least one aggregation selector',
+        { meta: { method: 'aggregate', model: this.modelName } },
+      );
     }
 
     for (const [alias, selector] of entries) {
       if (!isAggregateSelector(selector)) {
-        throw new Error(`aggregate() selector "${alias}" is invalid`);
+        throw ormError(
+          'ORM.AGGREGATE_SELECTOR_INVALID',
+          `aggregate() selector "${alias}" is invalid`,
+          {
+            meta: { method: 'aggregate', model: this.modelName, alias },
+          },
+        );
       }
     }
 
@@ -1256,7 +1276,11 @@ export class Collection<
       );
       const reloaded = await this.#reloadMutationRowByPrimaryKey(pkCriterion);
       if (!reloaded) {
-        throw new Error(`create() for model "${this.modelName}" did not return a row`);
+        throw ormError(
+          'ORM.MUTATION_ROW_MISSING',
+          `create() for model "${this.modelName}" did not return a row`,
+          { meta: { operation: 'create', model: this.modelName } },
+        );
       }
       return reloaded;
     }
@@ -1275,7 +1299,11 @@ export class Collection<
       return created;
     }
 
-    throw new Error(`create() for model "${this.modelName}" did not return a row`);
+    throw ormError(
+      'ORM.MUTATION_ROW_MISSING',
+      `create() for model "${this.modelName}" did not return a row`,
+      { meta: { operation: 'create', model: this.modelName } },
+    );
   }
 
   /**
@@ -1391,8 +1419,17 @@ export class Collection<
   #assertNotMtiVariant(method: string): void {
     const mtiCtx = this.#resolveMtiCreateContext();
     if (mtiCtx) {
-      throw new Error(
+      throw ormError(
+        'ORM.OPERATION_UNSUPPORTED',
         `${method} is not supported for MTI variant "${this.state.variantName}" on model "${this.modelName}". Use createAll() instead.`,
+        {
+          meta: {
+            method,
+            model: this.modelName,
+            variant: this.state.variantName,
+            reason: 'mti-variant',
+          },
+        },
       );
     }
   }
@@ -1476,7 +1513,18 @@ export class Collection<
           ).toArray();
           const baseCreated = baseResult[0];
           if (!baseCreated) {
-            throw new Error(`MTI base INSERT for model "${modelName}" did not return a row`);
+            throw ormError(
+              'ORM.MUTATION_ROW_MISSING',
+              `MTI base INSERT for model "${modelName}" did not return a row`,
+              {
+                meta: {
+                  operation: 'create',
+                  model: modelName,
+                  table: tableName,
+                  phase: 'mti-base',
+                },
+              },
+            );
           }
 
           const pkValue = baseCreated[pkColumn];
@@ -1495,8 +1543,17 @@ export class Collection<
           ).toArray();
           const variantCreated = variantResult[0];
           if (!variantCreated) {
-            throw new Error(
+            throw ormError(
+              'ORM.MUTATION_ROW_MISSING',
               `MTI variant INSERT for model "${modelName}" into "${variant.table}" did not return a row`,
+              {
+                meta: {
+                  operation: 'create',
+                  model: modelName,
+                  table: variant.table,
+                  phase: 'mti-variant',
+                },
+              },
             );
           }
 
@@ -1694,7 +1751,11 @@ export class Collection<
       >(input.conflictOn),
     );
     if (conflictColumns.length === 0) {
-      throw new Error(`upsert() for model "${this.modelName}" requires conflict columns`);
+      throw ormError(
+        'ORM.ARGUMENT_INVALID',
+        `upsert() for model "${this.modelName}" requires conflict columns`,
+        { meta: { method: 'upsert', model: this.modelName } },
+      );
     }
 
     const { selectedForQuery: selectedForUpsert, hiddenColumns } = this.#augmentMutationSelection();
@@ -1723,6 +1784,7 @@ export class Collection<
       hiddenColumns,
       mapRow: (mapped) =>
         blindCast<Row, 'mapped upsert storage row matches the collection generic row'>(mapped),
+      operation: 'upsert',
       onMissingRowMessage: `upsert() for model "${this.modelName}" did not return a row`,
     });
     if (row) {
@@ -1740,7 +1802,11 @@ export class Collection<
       }
     }
 
-    throw new Error(`upsert() for model "${this.modelName}" did not return a row`);
+    throw ormError(
+      'ORM.MUTATION_ROW_MISSING',
+      `upsert() for model "${this.modelName}" did not return a row`,
+      { meta: { operation: 'upsert', model: this.modelName } },
+    );
   }
 
   /**
@@ -1973,13 +2039,14 @@ export class Collection<
       ...emptyState(),
       filters: this.state.filters,
       selectedFields: [primaryKeyColumn],
+      variantName: this.state.variantName,
     };
     const countCompiled = compileSelect(
       this.contract,
       this.namespaceId,
       this.tableName,
       countState,
-      undefined,
+      this.modelName,
     );
     const matchingRows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
@@ -1993,6 +2060,8 @@ export class Collection<
         this.tableName,
         mappedData,
         this.state.filters,
+        this.state.variantName,
+        this.modelName,
       ),
       annotationsMap,
     );
@@ -2141,6 +2210,8 @@ export class Collection<
             collection.namespaceId,
             collection.tableName,
             collection.state.filters,
+            collection.state.variantName,
+            collection.modelName,
           ),
           annotationsMap,
         );
@@ -2182,13 +2253,14 @@ export class Collection<
       ...emptyState(),
       filters: this.state.filters,
       selectedFields: [primaryKeyColumn],
+      variantName: this.state.variantName,
     };
     const countCompiled = compileSelect(
       this.contract,
       this.namespaceId,
       this.tableName,
       countState,
-      undefined,
+      this.modelName,
     );
     const matchingRows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
@@ -2196,7 +2268,14 @@ export class Collection<
     ).toArray();
 
     const compiled = mergeAnnotations(
-      compileDeleteCount(this.contract, this.namespaceId, this.tableName, this.state.filters),
+      compileDeleteCount(
+        this.contract,
+        this.namespaceId,
+        this.tableName,
+        this.state.filters,
+        this.state.variantName,
+        this.modelName,
+      ),
       annotationsMap,
     );
     await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
@@ -2213,8 +2292,10 @@ export class Collection<
 
     for (const columnName of conflictColumns) {
       if (!(columnName in createValues)) {
-        throw new Error(
+        throw ormError(
+          'ORM.ARGUMENT_INVALID',
           `upsert() for model "${this.modelName}" requires create value for conflict column "${columnName}"`,
+          { meta: { method: 'upsert', model: this.modelName, column: columnName } },
         );
       }
 
@@ -2246,8 +2327,10 @@ export class Collection<
         this.tableName,
       );
       if (identityColumns.length === 0) {
-        throw new Error(
+        throw ormError(
+          'ORM.ROW_IDENTITY_MISSING',
           `Cannot load includes for the mutation result on model "${this.modelName}": table "${this.tableName}" has no primary key or unique constraint to key the include read-back on.`,
+          { meta: { model: this.modelName, table: this.tableName } },
         );
       }
       return { selectedForQuery: identityColumns, hiddenColumns: [] };
@@ -2262,8 +2345,10 @@ export class Collection<
       this.tableName,
     );
     if (identityColumns.length === 0) {
-      throw new Error(
+      throw ormError(
+        'ORM.ROW_IDENTITY_MISSING',
         `update()/delete() on model "${this.modelName}" requires the table to have a primary key or unique constraint`,
+        { meta: { model: this.modelName, table: this.tableName } },
       );
     }
     const firstRow = await this.#clone({
@@ -2282,7 +2367,7 @@ export class Collection<
         'selected collection rows are model-field records used for identity lookup'
       >(firstRow)[fieldName];
       if (value === undefined) {
-        throw new Error(
+        throw new InternalError(
           `Missing identity field "${fieldName}" while resolving single-row scope for model "${this.modelName}"`,
         );
       }
@@ -2319,7 +2404,7 @@ export class Collection<
       >(criterion),
     );
     if (!whereExpr) {
-      throw new Error(
+      throw new InternalError(
         `Failed to build ${criterionLabel} filter for mutation result on model "${this.modelName}"`,
       );
     }
@@ -2348,7 +2433,11 @@ export class Collection<
       return;
     }
 
-    throw new Error(`${action} is only available inside include() refinement callbacks`);
+    throw ormError(
+      'ORM.INCLUDE_INVALID',
+      `${action} is only available inside include() refinement callbacks`,
+      { meta: { action } },
+    );
   }
 
   #clone<NextState extends CollectionTypeState = State>(

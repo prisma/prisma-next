@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'ea9e5b95b94f3d46d47d844c49de223e91a838de6c7a07105b0d2b292ee9aeb4'>;
+  StorageHashBase<'772a97fc75d5937717bf728ce122c529b50322863634c9eb52ff5b4859b89777'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
@@ -317,8 +317,6 @@ type ContractBase = Omit<
                     readonly tableName: 'tasks';
                     readonly columns: readonly ['id'];
                   };
-                  readonly constraint: true;
-                  readonly index: false;
                 },
               ];
             };
@@ -342,7 +340,12 @@ type ContractBase = Omit<
               };
               primaryKey: { readonly columns: readonly ['id'] };
               uniques: readonly [];
-              indexes: readonly [];
+              indexes: readonly [
+                {
+                  readonly columns: readonly ['feature_assignee_person_id'];
+                  readonly name: 'features_feature_assignee_person_id_idx';
+                },
+              ];
               foreignKeys: readonly [
                 {
                   readonly source: {
@@ -355,8 +358,6 @@ type ContractBase = Omit<
                     readonly tableName: 'people';
                     readonly columns: readonly ['id'];
                   };
-                  readonly constraint: true;
-                  readonly index: true;
                 },
                 {
                   readonly source: {
@@ -369,8 +370,6 @@ type ContractBase = Omit<
                     readonly tableName: 'tasks';
                     readonly columns: readonly ['id'];
                   };
-                  readonly constraint: true;
-                  readonly index: false;
                 },
               ];
             };
@@ -442,7 +441,12 @@ type ContractBase = Omit<
               };
               primaryKey: { readonly columns: readonly ['id'] };
               uniques: readonly [];
-              indexes: readonly [];
+              indexes: readonly [
+                {
+                  readonly columns: readonly ['task_id'];
+                  readonly name: 'task_comments_task_id_idx';
+                },
+              ];
               foreignKeys: readonly [
                 {
                   readonly source: {
@@ -455,8 +459,6 @@ type ContractBase = Omit<
                     readonly tableName: 'tasks';
                     readonly columns: readonly ['id'];
                   };
-                  readonly constraint: true;
-                  readonly index: true;
                 },
               ];
             };
@@ -504,7 +506,16 @@ type ContractBase = Omit<
               };
               primaryKey: { readonly columns: readonly ['id'] };
               uniques: readonly [];
-              indexes: readonly [];
+              indexes: readonly [
+                {
+                  readonly columns: readonly ['project_id'];
+                  readonly name: 'tasks_project_id_idx';
+                },
+                {
+                  readonly columns: readonly ['reporter_id'];
+                  readonly name: 'tasks_reporter_id_idx';
+                },
+              ];
               foreignKeys: readonly [
                 {
                   readonly source: {
@@ -517,8 +528,6 @@ type ContractBase = Omit<
                     readonly tableName: 'projects_tbl';
                     readonly columns: readonly ['id'];
                   };
-                  readonly constraint: true;
-                  readonly index: true;
                 },
                 {
                   readonly source: {
@@ -531,8 +540,6 @@ type ContractBase = Omit<
                     readonly tableName: 'people';
                     readonly columns: readonly ['id'];
                   };
-                  readonly constraint: true;
-                  readonly index: true;
                 },
               ];
             };
@@ -560,7 +567,9 @@ type ContractBase = Omit<
               };
               primaryKey: { readonly columns: readonly ['id'] };
               uniques: readonly [];
-              indexes: readonly [];
+              indexes: readonly [
+                { readonly columns: readonly ['owner_id']; readonly name: 'tickets_owner_id_idx' },
+              ];
               foreignKeys: readonly [
                 {
                   readonly source: {
@@ -573,8 +582,6 @@ type ContractBase = Omit<
                     readonly tableName: 'users';
                     readonly columns: readonly ['id'];
                   };
-                  readonly constraint: true;
-                  readonly index: true;
                 },
               ];
             };
@@ -622,7 +629,12 @@ type ContractBase = Omit<
               };
               primaryKey: { readonly columns: readonly ['id'] };
               uniques: readonly [];
-              indexes: readonly [];
+              indexes: readonly [
+                {
+                  readonly columns: readonly ['account_id'];
+                  readonly name: 'users_account_id_idx';
+                },
+              ];
               foreignKeys: readonly [
                 {
                   readonly source: {
@@ -635,8 +647,6 @@ type ContractBase = Omit<
                     readonly tableName: 'accounts';
                     readonly columns: readonly ['id'];
                   };
-                  readonly constraint: true;
-                  readonly index: true;
                 },
               ];
             };

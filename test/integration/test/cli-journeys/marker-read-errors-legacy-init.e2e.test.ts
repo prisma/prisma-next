@@ -45,7 +45,7 @@ withTempDir(({ createTempDir }) => {
     const db = useDevDatabase();
 
     it(
-      'returns PN-RUN-3020 when legacy marker table lacks space column on db init',
+      'returns MIGRATION.RUNNER_FAILED when legacy marker table lacks space column on db init',
       async () => {
         const ctx = setupJourney({ connectionString: db.connectionString, createTempDir });
 
@@ -57,11 +57,11 @@ withTempDir(({ createTempDir }) => {
         expect(initFail.exitCode).not.toBe(0);
 
         const envelope = extractJson(initFail.stdout);
-        expect(envelope['code']).toBe('PN-RUN-3020');
+        expect(envelope['code']).toBe('MIGRATION.RUNNER_FAILED');
         expect(String(envelope['fix'])).toContain('Legacy marker-table shape detected');
         expect(String(envelope['fix'])).toContain('prisma_contract.marker');
         expect(String(envelope['fix'])).toContain('prisma-next db init');
-        expect(envelope['code']).not.toBe('PN-RUN-3006');
+        expect(envelope['code']).not.toBe('CONTRACT.MARKER_READ_FAILED');
       },
       timeouts.spinUpPpgDev,
     );

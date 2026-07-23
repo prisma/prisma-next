@@ -4,11 +4,12 @@ import type {
   SignDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
+import { readContractSnapshotJson } from '@prisma-next/migration-tools/contract-snapshot-store';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { parseContractRef } from '@prisma-next/migration-tools/ref-resolution';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { join, relative, resolve } from 'pathe';
+import { relative, resolve } from 'pathe';
 import { createControlClient } from '../control-api/client';
 import { ContractValidationError } from '../control-api/errors';
 import {
@@ -113,9 +114,10 @@ async function executeDbSignCommand(
       const targetHash = refResult.value.hash;
       const matchingBundle = bundles.find((p) => p.metadata.to === targetHash);
       if (matchingBundle) {
-        const endContractPath = join(matchingBundle.dirPath, 'end-contract.json');
-        const raw = await readFile(endContractPath, 'utf-8');
-        contractJson = JSON.parse(raw) as Record<string, unknown>;
+        contractJson = (await readContractSnapshotJson(migrationsDir, targetHash)) as Record<
+          string,
+          unknown
+        >;
       } else {
         const defaultRaw = await readFile(contractPathAbsolute, 'utf-8');
         const defaultContract = JSON.parse(defaultRaw) as Record<string, unknown>;

@@ -1,9 +1,13 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import {
+  contractSnapshotDir,
+  readContractSnapshotDts,
+  readContractSnapshotJson,
+} from '@prisma-next/migration-tools/contract-snapshot-store';
+import {
   listContractSpaceDirectories,
-  readContractSpaceContract,
   readContractSpaceHeadRef,
 } from '@prisma-next/migration-tools/spaces';
 import { join } from 'pathe';
@@ -16,7 +20,7 @@ import { runContractSpaceSeedPhase } from '../../src/utils/contract-space-seed-p
  * property that they accept a Mongo-shaped contract cleanly.
  *
  * The seed phase canonicalises any `unknown` contract value to JSON
- * via `emitContractSpaceArtefacts`, and the `.d.ts` it emits is a
+ * via `emitContractSpaceArtifacts`, and the `.d.ts` it emits is a
  * framework-wide placeholder stub (a typed `.d.ts` renderer for
  * extension contracts is a separately-tracked concern). The
  * Mongo-shape input here is structural; no Mongo-family runtime
@@ -29,12 +33,14 @@ import { runContractSpaceSeedPhase } from '../../src/utils/contract-space-seed-p
  * is caught here.
  *
  * Coverage:
- * - A Mongo aggregate with one extension descriptor produces the three
- *   on-disk artefacts (`contract.json`, `contract.d.ts`, `refs/head.json`).
- * - `readContractSpaceContract`, `readContractSpaceHeadRef`,
- *   `listContractSpaceDirectories` round-trip the written values.
+ * - A Mongo aggregate with one extension descriptor writes the head
+ *   contract into the migrations-root snapshot store (`snapshots/<hex>/`)
+ *   plus `refs/head.json` — no per-space `contract.json` / `contract.d.ts`.
+ * - `readContractSnapshotJson`, `readContractSnapshotDts`,
+ *   `readContractSpaceHeadRef`, `listContractSpaceDirectories` round-trip
+ *   the written values.
  * - Re-running the seed phase with no contract change produces
- *   byte-identical artefacts.
+ *   byte-identical artifacts.
  */
 
 const EXT_SPACE = 'cipherstash';
@@ -99,7 +105,7 @@ function buildMongoExtensionContract(): MongoShapedExtensionContract {
           },
         },
       },
-      storageHash: coreHash('mongo-ext-contract'),
+      storageHash: coreHash('e'.repeat(64)),
     },
     capabilities: {},
     extensionPacks: {},
@@ -150,18 +156,23 @@ describe('runContractSpaceSeedPhase (Mongo-shaped contract)', () => {
     const dirs = await listContractSpaceDirectories(migrationsDir);
     expect(dirs).toContain(EXT_SPACE);
 
-    // contract.json: canonicalised value round-trips back to the
-    // structural shape we handed in (storage, models, ...). The deep
-    // equality bound enforces that canonicalisation preserves every
-    // Mongo-specific field — a future canonicaliser that drops or
-    // reshapes Mongo storage would turn this test red.
-    const loadedContract = await readContractSpaceContract(migrationsDir, EXT_SPACE);
+    // The space directory carries only refs/ — no per-space contract.json
+    // / contract.d.ts siblings.
+    await expect(stat(join(migrationsDir, EXT_SPACE, 'contract.json'))).rejects.toThrow();
+    await expect(stat(join(migrationsDir, EXT_SPACE, 'contract.d.ts'))).rejects.toThrow();
+
+    // Store entry: canonicalised value round-trips back to the structural
+    // shape we handed in (storage, models, ...). The deep equality bound
+    // enforces that canonicalisation preserves every Mongo-specific field
+    // — a future canonicaliser that drops or reshapes Mongo storage would
+    // turn this test red.
+    const loadedContract = await readContractSnapshotJson(migrationsDir, headHash);
     expect(loadedContract).toEqual(contract);
 
     // contract.d.ts: framework-wide placeholder stub. Asserts the
     // property a future typed-`.d.ts` renderer would change
     // deliberately.
-    const dtsRaw = await readFile(join(migrationsDir, EXT_SPACE, 'contract.d.ts'), 'utf-8');
+    const dtsRaw = await readContractSnapshotDts(migrationsDir, headHash);
     expect(dtsRaw).toContain('export {};');
     expect(dtsRaw).toContain(EXT_SPACE);
     expect(dtsRaw).not.toContain('@ts-nocheck');
@@ -176,7 +187,7 @@ describe('runContractSpaceSeedPhase (Mongo-shaped contract)', () => {
     });
   });
 
-  it('re-emits byte-identical artefacts on a no-op re-seed', async () => {
+  it('re-emits byte-identical artifacts on a no-op re-seed', async () => {
     const contract = buildMongoExtensionContract();
     const headHash = contract.storage.storageHash;
     const invariants = ['inv:a', 'inv:b'] as const;
@@ -197,15 +208,16 @@ describe('runContractSpaceSeedPhase (Mongo-shaped contract)', () => {
 
     await runContractSpaceSeedPhase(seedInput);
 
-    const firstContract = await readFile(join(migrationsDir, EXT_SPACE, 'contract.json'));
-    const firstDts = await readFile(join(migrationsDir, EXT_SPACE, 'contract.d.ts'));
+    const snapshotDir = contractSnapshotDir(migrationsDir, headHash);
+    const firstContract = await readFile(join(snapshotDir, 'contract.json'));
+    const firstDts = await readFile(join(snapshotDir, 'contract.d.ts'));
     const firstHead = await readFile(join(migrationsDir, EXT_SPACE, 'refs', 'head.json'));
 
     const second = await runContractSpaceSeedPhase(seedInput);
     expect(second.seeded[0]!.action).toBe('unchanged');
 
-    expect(await readFile(join(migrationsDir, EXT_SPACE, 'contract.json'))).toEqual(firstContract);
-    expect(await readFile(join(migrationsDir, EXT_SPACE, 'contract.d.ts'))).toEqual(firstDts);
+    expect(await readFile(join(snapshotDir, 'contract.json'))).toEqual(firstContract);
+    expect(await readFile(join(snapshotDir, 'contract.d.ts'))).toEqual(firstDts);
     expect(await readFile(join(migrationsDir, EXT_SPACE, 'refs', 'head.json'))).toEqual(firstHead);
   });
 });

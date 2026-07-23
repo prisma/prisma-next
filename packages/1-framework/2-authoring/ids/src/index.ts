@@ -1,6 +1,7 @@
 import type { ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { contractError } from './contract-errors';
 import { type BuiltinGeneratorId, builtinGeneratorIds } from './generator-ids';
 import type { IdGeneratorOptionsById } from './generators';
 
@@ -31,7 +32,11 @@ function resolveNanoidColumnDescriptor(
   }
 
   if (typeof rawSize !== 'number' || !Number.isInteger(rawSize) || rawSize < 2 || rawSize > 255) {
-    throw new Error('nanoid size must be an integer between 2 and 255');
+    throw contractError(
+      'CONTRACT.ARGUMENT_INVALID',
+      'nanoid size must be an integer between 2 and 255',
+      { meta: { helperPath: 'nanoid', paramName: 'size', received: rawSize } },
+    );
   }
 
   return {

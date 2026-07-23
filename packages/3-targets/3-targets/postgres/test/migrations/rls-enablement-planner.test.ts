@@ -159,6 +159,7 @@ function plan(
     fromContract: null,
     frameworkComponents: [],
     spaceId: APP_SPACE_ID,
+    snapshotsImportPath: '../../snapshots',
   });
 }
 

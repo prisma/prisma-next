@@ -1,11 +1,12 @@
 import { execFile } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import type { MigrateResult } from '@prisma-next/cli/commands/migrate';
 import { createMigrateCommand } from '@prisma-next/cli/commands/migrate';
 import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-plan';
+import { contractSnapshotDir } from '@prisma-next/migration-tools/contract-snapshot-store';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -98,28 +99,33 @@ function refPointerPath(refsDir: string, name: string): string {
   return join(refsDir, `${name}.json`);
 }
 
-function snapshotJsonPath(refsDir: string, name: string): string {
-  return join(refsDir, `${name}.contract.json`);
+function migrationsDirFromRefsDir(refsDir: string): string {
+  return dirname(dirname(refsDir));
 }
 
-function snapshotDtsPath(refsDir: string, name: string): string {
-  return join(refsDir, `${name}.contract.d.ts`);
+function refPointerHash(refsDir: string, name: string): string | undefined {
+  const pointerPath = refPointerPath(refsDir, name);
+  if (!existsSync(pointerPath)) return undefined;
+  return (JSON.parse(readFileSync(pointerPath, 'utf-8')) as { hash: string }).hash;
 }
 
+function storeContractJsonPath(refsDir: string, name: string): string {
+  const hash = refPointerHash(refsDir, name);
+  if (hash === undefined) throw new Error(`ref "${name}" has no pointer`);
+  return join(contractSnapshotDir(migrationsDirFromRefsDir(refsDir), hash), 'contract.json');
+}
+
+// A ref now consists of just its pointer file; the contract bytes resolve
+// through the content-addressed store keyed by the pointer's hash.
 function refFilesExist(refsDir: string, name: string): boolean {
-  return (
-    existsSync(refPointerPath(refsDir, name)) &&
-    existsSync(snapshotJsonPath(refsDir, name)) &&
-    existsSync(snapshotDtsPath(refsDir, name))
-  );
+  const hash = refPointerHash(refsDir, name);
+  if (hash === undefined) return false;
+  const storeDir = contractSnapshotDir(migrationsDirFromRefsDir(refsDir), hash);
+  return existsSync(join(storeDir, 'contract.json')) && existsSync(join(storeDir, 'contract.d.ts'));
 }
 
 function refFilesAbsent(refsDir: string, name: string): boolean {
-  return (
-    !existsSync(refPointerPath(refsDir, name)) &&
-    !existsSync(snapshotJsonPath(refsDir, name)) &&
-    !existsSync(snapshotDtsPath(refsDir, name))
-  );
+  return !existsSync(refPointerPath(refsDir, name));
 }
 
 function noRefFilesUnder(refsDir: string): boolean {
@@ -130,7 +136,13 @@ function noRefFilesUnder(refsDir: string): boolean {
 async function seedPlannedMigration(
   createTempDir: () => string,
   connectionString: string,
-): Promise<{ testDir: string; configPath: string; migrationDir: string; contractPath?: string }> {
+): Promise<{
+  testDir: string;
+  configPath: string;
+  migrationDir: string;
+  toHash: string;
+  contractPath?: string;
+}> {
   const { testDir, configPath, contractPath } = setupTestDirectoryFromFixtures(
     createTempDir,
     fixtureSubdir,
@@ -140,7 +152,10 @@ async function seedPlannedMigration(
   await emitContract(testDir, configPath);
   await runMigrationPlan(testDir, ['--config', configPath, '--name', 'initial', '--no-color']);
   const migrationDir = getLatestMigrationDir(testDir)!;
-  return { testDir, configPath, migrationDir, contractPath };
+  const manifest = JSON.parse(
+    readFileSync(join(testDir, 'migrations', 'app', migrationDir, 'migration.json'), 'utf-8'),
+  ) as { to: string };
+  return { testDir, configPath, migrationDir, toHash: manifest.to, contractPath };
 }
 
 withTempDir(({ createTempDir }) => {
@@ -225,20 +240,17 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'advances an explicit ref with --to using the bundle end-contract snapshot',
+      'advances an explicit ref with --to using the bundle contract snapshot',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
-          const { testDir, configPath, migrationDir } = await seedPlannedMigration(
+          const { testDir, configPath, migrationDir, toHash } = await seedPlannedMigration(
             createTempDir,
             connectionString,
           );
           const refsDir = appRefsDir(testDir);
           const bundleEndContract = join(
-            testDir,
-            'migrations',
-            'app',
-            migrationDir,
-            'end-contract.json',
+            contractSnapshotDir(join(testDir, 'migrations'), toHash),
+            'contract.json',
           );
 
           await runMigrate(testDir, ['--config', configPath, '--no-color']);
@@ -255,9 +267,9 @@ withTempDir(({ createTempDir }) => {
           ]);
 
           expect(refFilesExist(refsDir, 'staging')).toBe(true);
-          expect(JSON.parse(readFileSync(snapshotJsonPath(refsDir, 'staging'), 'utf-8'))).toEqual(
-            JSON.parse(readFileSync(bundleEndContract, 'utf-8')),
-          );
+          expect(
+            JSON.parse(readFileSync(storeContractJsonPath(refsDir, 'staging'), 'utf-8')),
+          ).toEqual(JSON.parse(readFileSync(bundleEndContract, 'utf-8')));
         });
       },
       timeouts.spinUpPpgDev,
@@ -387,7 +399,10 @@ withTempDir(({ createTempDir }) => {
             '--no-color',
           ]);
           const firstPointer = readFileSync(refPointerPath(refsDir, 'staging'), 'utf-8');
-          const firstSnapshot = readFileSync(snapshotJsonPath(refsDir, 'staging'), 'utf-8');
+          const firstStoreContract = readFileSync(
+            storeContractJsonPath(refsDir, 'staging'),
+            'utf-8',
+          );
 
           await runMigrate(testDir, [
             '--config',
@@ -398,7 +413,9 @@ withTempDir(({ createTempDir }) => {
           ]);
 
           expect(readFileSync(refPointerPath(refsDir, 'staging'), 'utf-8')).toBe(firstPointer);
-          expect(readFileSync(snapshotJsonPath(refsDir, 'staging'), 'utf-8')).toBe(firstSnapshot);
+          expect(readFileSync(storeContractJsonPath(refsDir, 'staging'), 'utf-8')).toBe(
+            firstStoreContract,
+          );
         });
       },
       timeouts.spinUpPpgDev,

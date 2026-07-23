@@ -94,7 +94,7 @@ describe('contract emit command', () => {
     );
     expect(getExitCode()).toBe(2);
     const combined = consoleOutput.join('\n');
-    expect(combined).toContain('PN-CLI-4015');
+    expect(combined).toContain('CLI.OUTPUT_FORMAT_CONFLICT');
     expect(combined).not.toContain('at resolveOutputFormat');
   });
 

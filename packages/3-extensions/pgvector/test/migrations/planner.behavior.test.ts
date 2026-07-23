@@ -72,6 +72,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result).toMatchObject({
@@ -112,6 +113,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -162,6 +164,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result).toMatchObject({
@@ -454,8 +457,6 @@ describe('NOT NULL column without default uses temporary default', () => {
               tableName: 'org',
               columns: ['id'],
             },
-            constraint: true,
-            index: true,
           },
         ],
       },
@@ -602,7 +603,10 @@ function createTestContract(
       },
       primaryKey: { columns: ['id'] },
       uniques: [],
-      indexes: [],
+      // FK1: the backing index for the default (`index: true`) FK below is a
+      // discrete, named entity materialized at contract emit — declared here
+      // directly rather than relying on planner-time synthesis.
+      indexes: [{ columns: ['userId'], name: 'post_userId_idx' }],
       foreignKeys: [
         {
           source: {
@@ -611,8 +615,6 @@ function createTestContract(
             columns: ['userId'],
           },
           target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
-          constraint: true,
-          index: true,
         },
       ],
     },
@@ -775,6 +777,7 @@ async function planUserTableOperations(
     fromContract: null,
     frameworkComponents: options?.frameworkComponents ?? [],
     spaceId: APP_SPACE_ID,
+    snapshotsImportPath: '../../snapshots',
   });
   if (result.kind !== 'success') throw new Error('expected planner success');
   return Promise.all(result.plan.operations) as Promise<

@@ -437,30 +437,42 @@ export async function runMigrationCheck(
   return runCommand(createMigrationCheckCommand(), ctx, extraArgs);
 }
 
-// The generator emits `import endContract from './end-contract.json' with { type: "json" };`
-// (double-quoted attribute value via JSON.stringify). Match either quote style
-// so the helper is robust to formatting.
+// The generator emits `import endContract from '<specifier>' with { type: "json" };`
+// (double-quoted attribute value via JSON.stringify), where `<specifier>` is
+// the contract snapshot store path (e.g. `../../snapshots/<hex>/contract.json`).
+// Capture the specifier so the injected block re-imports the same store entry
+// regardless of the migration package's depth. Match either quote style so
+// the helper is robust to formatting.
 const END_CONTRACT_JSON_IMPORT_RE =
-  /import endContract from '\.\/end-contract\.json' with \{ type: ["']json["'] \};\r?\n/;
+  /import endContract from '([^']+)' with \{ type: ["']json["'] \};\r?\n/;
 
 // The generator's class header carries the `<Start, End>` / `<never, End>`
 // generics (post TML-2892). Match the header up to the opening brace.
 const MIGRATION_CLASS_HEADER_RE = /export default class M extends Migration(?:<[^>]*>)? \{/;
 
 /**
- * Planner scaffolds import raw `end-contract.json` as `endContract` and derive
- * their from/to from it via the `Migration` base. This helper rewrites the
- * scaffold for the journey test's runtime apply: it drops the raw-JSON import,
- * deserializes the contract (runtime SQL qualification needs a hydrated Postgres
- * schema namespace with `qualifyTable`), and wires a `db = sql(...)` the
- * filled-in dataTransform closures use. The deserialized contract is bound back
- * to `endContract`, so the scaffold's `endContractJson = endContract` field
- * still resolves (and the base still derives `describe()` from its
- * `storage.storageHash`).
+ * Planner scaffolds import the end contract from its `migrations/snapshots/<hex>/contract.json`
+ * store entry as `endContract` and derive their from/to from it via the
+ * `Migration` base. This helper rewrites the scaffold for the journey test's
+ * runtime apply: it drops the raw-JSON import, deserializes the contract
+ * (runtime SQL qualification needs a hydrated Postgres schema namespace with
+ * `qualifyTable`), and wires a `db = sql(...)` the filled-in dataTransform
+ * closures use. The deserialized contract is bound back to `endContract`, so
+ * the scaffold's `endContractJson = endContract` field still resolves (and
+ * the base still derives `describe()` from its `storage.storageHash`).
  */
 export function injectMigrationSqlDbSetup(scaffold: string): string {
+  const match = END_CONTRACT_JSON_IMPORT_RE.exec(scaffold);
+  const endContractSpecifier = match?.[1];
+  if (endContractSpecifier === undefined) {
+    throw new Error(
+      'injectMigrationSqlDbSetup: scaffold does not contain the expected ' +
+        '`import endContract from \'<specifier>\' with { type: "json" };` line — ' +
+        'the CLI-emitted scaffold shape changed.',
+    );
+  }
   const block = [
-    `import endContractJson from './end-contract.json' with { type: 'json' };`,
+    `import endContractJson from '${endContractSpecifier}' with { type: 'json' };`,
     `import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';`,
     `import postgresAdapter from '@prisma-next/adapter-postgres/runtime';`,
     `import { sql } from '@prisma-next/sql-builder/runtime';`,

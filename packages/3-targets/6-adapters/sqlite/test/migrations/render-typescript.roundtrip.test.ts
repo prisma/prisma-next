@@ -10,11 +10,11 @@
  */
 
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
-import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, storageHashHex } from '@prisma-next/framework-components/control';
 import { col, primaryKey } from '@prisma-next/sql-relational-core/contract-free';
 import {
   AddColumnCall,
@@ -90,10 +90,13 @@ function rewriteImports(tsSource: string): string {
 }
 
 /**
- * Write the committed contract fixtures the rendered scaffold imports —
- * `{start,end}-contract.json` (carrying `storage.storageHash`, which the base's
- * derived `describe()` reads) and the matching `{start,end}-contract.ts` type
- * modules. The JSON hashes match `meta` so the derived describe() is consistent.
+ * Write the deduplicated snapshot-store fixtures the rendered scaffold
+ * imports — `snapshots/<hex>/contract.json` (carrying `storage.storageHash`,
+ * which the base's derived `describe()` reads) and the matching
+ * `snapshots/<hex>/contract.ts` type module for each of `meta.to` and (when
+ * non-null) `meta.from`. The JSON hashes match `meta` so the derived
+ * describe() is consistent. `SNAPSHOTS_IMPORT_PATH` matches the
+ * `snapshotsImportPath` passed to the migration under test.
  */
 async function writeContractFixtures(
   dir: string,
@@ -101,23 +104,25 @@ async function writeContractFixtures(
 ): Promise<void> {
   const contractType =
     'export type Contract = { readonly storage: { readonly storageHash: string } };\n';
-  await writeFile(
-    join(dir, 'end-contract.json'),
-    JSON.stringify({ storage: { storageHash: meta.to } }, null, 2),
-  );
-  await writeFile(join(dir, 'end-contract.ts'), contractType);
-  if (meta.from !== null) {
+  const writeSnapshot = async (storageHash: string) => {
+    const snapshotDir = join(dir, SNAPSHOTS_IMPORT_PATH, storageHashHex(storageHash));
+    await mkdir(snapshotDir, { recursive: true });
     await writeFile(
-      join(dir, 'start-contract.json'),
-      JSON.stringify({ storage: { storageHash: meta.from } }, null, 2),
+      join(snapshotDir, 'contract.json'),
+      JSON.stringify({ storage: { storageHash } }, null, 2),
     );
-    await writeFile(join(dir, 'start-contract.ts'), contractType);
+    await writeFile(join(snapshotDir, 'contract.ts'), contractType);
+  };
+  await writeSnapshot(meta.to);
+  if (meta.from !== null) {
+    await writeSnapshot(meta.from);
   }
 }
 
+const SNAPSHOTS_IMPORT_PATH = './snapshots';
 const META = {
-  from: '0000000000000000000000000000000000000000000000000000000000000000',
-  to: '1111111111111111111111111111111111111111111111111111111111111111',
+  from: '0'.repeat(64),
+  to: '1'.repeat(64),
 } as const;
 
 describe('TypeScriptRenderableSqliteMigration round-trip', () => {
@@ -162,7 +167,12 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
       new CreateIndexCall('user', 'user_email_idx', ['email']),
       new DropTableCall('stale'),
     ];
-    const migration = new TypeScriptRenderableSqliteMigration(calls, META, APP_SPACE_ID);
+    const migration = new TypeScriptRenderableSqliteMigration(
+      calls,
+      META,
+      APP_SPACE_ID,
+      SNAPSHOTS_IMPORT_PATH,
+    );
 
     const tsSource = rewriteImports(migration.renderTypeScript());
     await writeFile(join(tmpDir, 'migration.ts'), tsSource);
@@ -184,7 +194,12 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
   it('renders an empty calls list whose executed scaffold emits []', {
     timeout: timeouts.coldTransformImport,
   }, async () => {
-    const migration = new TypeScriptRenderableSqliteMigration([], META, APP_SPACE_ID);
+    const migration = new TypeScriptRenderableSqliteMigration(
+      [],
+      META,
+      APP_SPACE_ID,
+      SNAPSHOTS_IMPORT_PATH,
+    );
 
     const tsSource = rewriteImports(migration.renderTypeScript());
     await writeFile(join(tmpDir, 'migration.ts'), tsSource);
@@ -212,7 +227,12 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
       meta: { note: 'preserved' },
     };
     const calls = [new RawSqlCall(op)];
-    const migration = new TypeScriptRenderableSqliteMigration(calls, META, APP_SPACE_ID);
+    const migration = new TypeScriptRenderableSqliteMigration(
+      calls,
+      META,
+      APP_SPACE_ID,
+      SNAPSHOTS_IMPORT_PATH,
+    );
 
     const tsSource = rewriteImports(migration.renderTypeScript());
     await writeFile(join(tmpDir, 'migration.ts'), tsSource);
@@ -254,7 +274,12 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
         operationClass: 'widening',
       }),
     ];
-    const migration = new TypeScriptRenderableSqliteMigration(calls, META, APP_SPACE_ID);
+    const migration = new TypeScriptRenderableSqliteMigration(
+      calls,
+      META,
+      APP_SPACE_ID,
+      SNAPSHOTS_IMPORT_PATH,
+    );
 
     const tsSource = rewriteImports(migration.renderTypeScript());
     await writeFile(join(tmpDir, 'migration.ts'), tsSource);

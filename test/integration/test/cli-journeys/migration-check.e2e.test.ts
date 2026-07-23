@@ -13,6 +13,7 @@
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { contractSnapshotDir } from '@prisma-next/migration-tools/contract-snapshot-store';
 import { join } from 'pathe';
 import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
@@ -36,6 +37,10 @@ function findLatestMigrationDir(ctx: JourneyContext): string {
   return join(appDir, entries[entries.length - 1]!);
 }
 
+function snapshotContractJsonPath(ctx: JourneyContext, storageHash: string): string {
+  return join(contractSnapshotDir(join(ctx.testDir, 'migrations'), storageHash), 'contract.json');
+}
+
 withTempDir(({ createTempDir }) => {
   describe('migration check', () => {
     it(
@@ -57,7 +62,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'hash mismatch (tampered migrationHash) → PN-MIG-CHECK-001',
+      'hash mismatch (tampered migrationHash) → MIGRATION.CHECK_HASH_MISMATCH',
       async () => {
         const ctx: JourneyContext = setupJourney({ createTempDir });
 
@@ -77,13 +82,13 @@ withTempDir(({ createTempDir }) => {
         expect(json?.['ok']).toBe(false);
         const failures = json?.['failures'] as readonly Record<string, string>[];
         expect(failures.length).toBeGreaterThan(0);
-        expect(failures.some((f) => f['code'] === 'PN-MIG-CHECK-001')).toBe(true);
+        expect(failures.some((f) => f['code'] === 'MIGRATION.CHECK_HASH_MISMATCH')).toBe(true);
       },
       timeouts.typeScriptCompilation,
     );
 
     it(
-      'missing manifest file → PN-MIG-CHECK-002',
+      'missing manifest file → MIGRATION.CHECK_FILE_MISSING',
       async () => {
         const ctx: JourneyContext = setupJourney({ createTempDir });
 
@@ -100,13 +105,13 @@ withTempDir(({ createTempDir }) => {
         const json = parseJsonOutput(check);
         expect(json?.['ok']).toBe(false);
         const failures = json?.['failures'] as readonly Record<string, string>[];
-        expect(failures.some((f) => f['code'] === 'PN-MIG-CHECK-002')).toBe(true);
+        expect(failures.some((f) => f['code'] === 'MIGRATION.CHECK_FILE_MISSING')).toBe(true);
       },
       timeouts.typeScriptCompilation,
     );
 
     it(
-      'orphan migration → PN-MIG-CHECK-003',
+      'orphan migration → MIGRATION.CHECK_UNREACHABLE_MIGRATION',
       async () => {
         const ctx: JourneyContext = setupJourney({ createTempDir });
 
@@ -140,13 +145,15 @@ withTempDir(({ createTempDir }) => {
         const json = parseJsonOutput(check);
         expect(json?.['ok']).toBe(false);
         const failures = json?.['failures'] as readonly Record<string, string>[];
-        expect(failures.some((f) => f['code'] === 'PN-MIG-CHECK-003')).toBe(true);
+        expect(failures.some((f) => f['code'] === 'MIGRATION.CHECK_UNREACHABLE_MIGRATION')).toBe(
+          true,
+        );
       },
       timeouts.typeScriptCompilation,
     );
 
     it(
-      'dangling ref → PN-MIG-CHECK-004',
+      'dangling ref → MIGRATION.CHECK_DANGLING_REF',
       async () => {
         const ctx: JourneyContext = setupJourney({ createTempDir });
 
@@ -167,13 +174,13 @@ withTempDir(({ createTempDir }) => {
         const json = parseJsonOutput(check);
         expect(json?.['ok']).toBe(false);
         const failures = json?.['failures'] as readonly Record<string, string>[];
-        expect(failures.some((f) => f['code'] === 'PN-MIG-CHECK-004')).toBe(true);
+        expect(failures.some((f) => f['code'] === 'MIGRATION.CHECK_DANGLING_REF')).toBe(true);
       },
       timeouts.typeScriptCompilation,
     );
 
     it(
-      'edge mismatch (end-contract.json disagrees with metadata) → PN-MIG-CHECK-005',
+      'edge mismatch (contract snapshot disagrees with metadata) → MIGRATION.CHECK_SNAPSHOT_HASH_MISMATCH',
       async () => {
         const ctx: JourneyContext = setupJourney({ createTempDir });
 
@@ -183,25 +190,20 @@ withTempDir(({ createTempDir }) => {
         expect(plan.exitCode, 'plan').toBe(0);
 
         const migDir = findLatestMigrationDir(ctx);
-        const endContractPath = join(migDir, 'end-contract.json');
-
-        if (existsSync(endContractPath)) {
-          const contract = JSON.parse(readFileSync(endContractPath, 'utf-8'));
-          contract.storage.storageHash = `${'d'.repeat(64)}`;
-          writeFileSync(endContractPath, JSON.stringify(contract, null, 2));
-        } else {
-          writeFileSync(
-            endContractPath,
-            JSON.stringify({ storage: { storageHash: `${'d'.repeat(64)}` } }, null, 2),
-          );
-        }
+        const manifest = JSON.parse(readFileSync(join(migDir, 'migration.json'), 'utf-8'));
+        const snapshotPath = snapshotContractJsonPath(ctx, manifest.to);
+        const contract = JSON.parse(readFileSync(snapshotPath, 'utf-8'));
+        contract.storage.storageHash = 'd'.repeat(64);
+        writeFileSync(snapshotPath, JSON.stringify(contract, null, 2));
 
         const check = await runMigrationCheck(ctx, ['--json']);
         const json = parseJsonOutput(check);
         expect(json?.['ok']).toBe(false);
         const failures = json?.['failures'] as readonly Record<string, string>[];
         expect(failures.length).toBeGreaterThan(0);
-        expect(failures.some((f) => f['code'] === 'PN-MIG-CHECK-005')).toBe(true);
+        expect(failures.some((f) => f['code'] === 'MIGRATION.CHECK_SNAPSHOT_HASH_MISMATCH')).toBe(
+          true,
+        );
       },
       timeouts.typeScriptCompilation,
     );
@@ -213,7 +215,7 @@ withTempDir(({ createTempDir }) => {
     // now called from both branches; this test pins the parity so the
     // asymmetry can't drift back.
     it(
-      'per-migration check detects PN-MIG-CHECK-005 in the same way graph-wide does',
+      'per-migration check detects MIGRATION.CHECK_SNAPSHOT_HASH_MISMATCH in the same way graph-wide does',
       async () => {
         const ctx: JourneyContext = setupJourney({ createTempDir });
 
@@ -224,26 +226,19 @@ withTempDir(({ createTempDir }) => {
 
         const migDir = findLatestMigrationDir(ctx);
         const dirName = migDir.split('/').pop() ?? '';
-        const endContractPath = join(migDir, 'end-contract.json');
-
-        if (existsSync(endContractPath)) {
-          const contract = JSON.parse(readFileSync(endContractPath, 'utf-8'));
-          contract.storage.storageHash = `${'d'.repeat(64)}`;
-          writeFileSync(endContractPath, JSON.stringify(contract, null, 2));
-        } else {
-          writeFileSync(
-            endContractPath,
-            JSON.stringify({ storage: { storageHash: `${'d'.repeat(64)}` } }, null, 2),
-          );
-        }
+        const manifest = JSON.parse(readFileSync(join(migDir, 'migration.json'), 'utf-8'));
+        const snapshotPath = snapshotContractJsonPath(ctx, manifest.to);
+        const contract = JSON.parse(readFileSync(snapshotPath, 'utf-8'));
+        contract.storage.storageHash = 'd'.repeat(64);
+        writeFileSync(snapshotPath, JSON.stringify(contract, null, 2));
 
         const check = await runMigrationCheck(ctx, [dirName, '--json']);
         const json = parseJsonOutput(check);
         expect(json?.['ok'], 'per-migration check reports failure').toBe(false);
         const failures = json?.['failures'] as readonly Record<string, string>[];
         expect(
-          failures.some((f) => f['code'] === 'PN-MIG-CHECK-005'),
-          'per-migration check carries PN-MIG-CHECK-005',
+          failures.some((f) => f['code'] === 'MIGRATION.CHECK_SNAPSHOT_HASH_MISMATCH'),
+          'per-migration check carries MIGRATION.CHECK_SNAPSHOT_HASH_MISMATCH',
         ).toBe(true);
       },
       timeouts.typeScriptCompilation,

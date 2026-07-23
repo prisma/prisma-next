@@ -84,6 +84,18 @@ describe('per-model `namespace` field (TS builder)', () => {
         },
       }),
     ).toThrow(/User.*auth.*does not appear/);
+
+    expect(() =>
+      defineContract({
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
+        namespaces: ['public'],
+        createNamespace: createTestSqlNamespace,
+        models: {
+          User: model('User', { namespace: 'auth', ...userModelArgs }),
+        },
+      }),
+    ).toThrow(expect.objectContaining({ code: 'CONTRACT.NAMESPACE_UNKNOWN' }));
   });
 
   it('rejects per-model `namespace` when no namespaces are declared at all', () => {
@@ -149,5 +161,16 @@ describe('per-model `namespace` field (TS builder)', () => {
         },
       }),
     ).toThrow(/SQLite/);
+
+    expect(() =>
+      defineContract({
+        family: sqlFamilyPack,
+        target: sqliteTargetPack,
+        createNamespace: createTestSqlNamespace,
+        models: {
+          User: model('User', { namespace: 'auth', ...userModelArgs }),
+        },
+      }),
+    ).toThrow(expect.objectContaining({ code: 'CONTRACT.NAMESPACE_UNSUPPORTED' }));
   });
 });

@@ -18,8 +18,9 @@ import { MongoContractView } from './ir/mongo-contract-view';
  * Mirrors the generic parameter used by `PlannerProducedMongoMigration`.
  *
  * Binds the framework base's `Start` / `End` contract generics so a subclass
- * that assigns its `start-contract.json` / `end-contract.json` imports gets
- * fully-typed view accessors: `this.endContract` is a `MongoContractView<End>`
+ * that assigns its snapshot-store `contract.json` imports to
+ * `startContractJson` / `endContractJson` gets fully-typed view accessors:
+ * `this.endContract` is a `MongoContractView<End>`
  * (and `this.startContract` a `MongoContractView<Start> | null`), built lazily
  * from those JSON fields via the shared `MigrationContractViews` helper. The
  * framework base derives `describe()` from the same JSON. View getters live on

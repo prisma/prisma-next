@@ -37,7 +37,9 @@ export function handleResult<T>(
     ui.error(formatErrorOutput(envelope, flags));
   }
 
-  // Infer exit code from error domain: CLI errors = 2, RUN errors = 1
-  const exitCode = result.failure.domain === 'CLI' ? 2 : 1;
+  // Every structured failure reaching this point is an expected failure and
+  // exits 2 (PRECONDITION), except a user-declined prompt, which exits 3
+  // (USER_ABORTED). See CLI Style Guide § Exit Codes / ADR 239 § Exit codes.
+  const exitCode = result.failure.code === 'CLI.INIT_USER_ABORTED' ? 3 : 2;
   return exitCode;
 }

@@ -14,6 +14,7 @@ import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import {
   APP_SPACE_ID,
   createControlStack,
+  issueOutcome,
   type MigrationOperationPolicy,
   type MigrationRunnerFailure,
 } from '@prisma-next/framework-components/control';
@@ -149,6 +150,7 @@ export async function applyMigration(
         fromContract: null,
         frameworkComponents: fw,
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: '../../snapshots',
       });
       if (r.kind !== 'success') throw new Error('Origin planner failed');
       const run = await runner.execute({
@@ -178,6 +180,7 @@ export async function applyMigration(
       fromContract: options.origin ?? null,
       frameworkComponents: fw,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     if (planResult.kind !== 'success') {
       throw new Error(
@@ -210,7 +213,7 @@ export async function applyMigration(
       frameworkComponents: fw,
     });
     if (!vr.ok) {
-      const lines = vr.schema.issues.map((i) => `  - ${i.reason}: ${i.path.join('/')}`);
+      const lines = vr.schema.issues.map((i) => `  - ${issueOutcome(i)}: ${i.path.join('/')}`);
       throw new Error(`Schema verification failed:\n${lines.join('\n')}`);
     }
 

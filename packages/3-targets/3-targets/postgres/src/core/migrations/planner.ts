@@ -21,6 +21,7 @@ import type {
   SchemaDiffIssue,
   SchemaOwnership,
 } from '@prisma-next/framework-components/control';
+import { issueOutcome } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -140,6 +141,12 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
      * {@link SqlMigrationPlannerPlanOptions.ownership}.
      */
     readonly ownership?: SchemaOwnership;
+    /**
+     * POSIX-relative path from the migration package dir to
+     * `migrations/snapshots` — see
+     * {@link SqlMigrationPlannerPlanOptions.snapshotsImportPath}.
+     */
+    readonly snapshotsImportPath: string;
   }): PostgresPlanResult {
     return this.planSql(options as SqlMigrationPlannerPlanOptions);
   }
@@ -155,6 +162,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
         to: context.toHash,
       },
       spaceId,
+      context.snapshotsImportPath,
       this.#lowerer,
     );
   }
@@ -211,7 +219,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       options.policy.allowedOperationClasses.includes('destructive');
     const coalesced = coalesceSubtreeIssues(relationalDiffIssues);
     const owned = retainUnownedExtras(coalesced, options.ownership, options.contract);
-    const gated = strict ? owned : owned.filter((issue) => issue.reason !== 'not-expected');
+    const gated = strict ? owned : owned.filter((issue) => issueOutcome(issue) !== 'not-expected');
 
     // Namespace presence (`CREATE SCHEMA`) is a planner-only op-generation
     // concern stitched in here rather than inside the shared diff — verify
@@ -322,6 +330,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
           to: options.contract.storage.storageHash,
         },
         options.spaceId,
+        options.snapshotsImportPath,
         this.#lowerer,
       ),
       ...(warnings.length > 0 ? { warnings: Object.freeze(warnings) } : {}),
@@ -369,7 +378,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       // 'not-equal' is unreachable for content-addressed policies: the wire name
       // encodes the body hash, so two policies sharing a local key (same name)
       // are always equal and isEqualTo never returns false.
-      if (issue.reason === 'not-found') {
+      if (issueOutcome(issue) === 'not-found') {
         const expected = issue.expected;
         PostgresPolicySchemaNode.assert(expected);
         // expected.namespaceId is the DDL schema name (resolved during projection);
@@ -381,7 +390,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
             expected.namespaceId,
           ),
         });
-      } else if (issue.reason === 'not-expected') {
+      } else if (issueOutcome(issue) === 'not-expected') {
         const actual = issue.actual;
         PostgresPolicySchemaNode.assert(actual);
         extra.push({
@@ -505,7 +514,7 @@ function retainUnownedExtras(
 ): readonly SchemaDiffIssue<SqlSchemaDiffNode>[] {
   if (ownership === undefined) return issues;
   return issues.filter((issue) => {
-    if (issue.reason !== 'not-expected') return true;
+    if (issueOutcome(issue) !== 'not-expected') return true;
     const node = issueNode(issue);
     if (node === undefined) return true;
     const coordinate = postgresNodeStorageCoordinate(node);

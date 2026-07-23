@@ -6,7 +6,7 @@ Supabase extension pack for Prisma Next.
 
 This extension pack ships a **complete, faithful contract of everything Supabase owns in the database** — every `auth` (23) and `storage` (10) table of the reference platform version, their native enum types, and the three platform roles (`anon`, `authenticated`, `service_role`) — all `external`: an application contract composes them via `extensionPacks: [supabasePack]`, the migration planner emits no DDL for them (they're Supabase-managed), and `db verify` confirms they exist in the live database while tolerating the Supabase-internal schemas the pack doesn't declare (`realtime`, `vault`, …).
 
-It also ships the role-binding runtime: `supabase({...})` returns a db whose `asUser(jwt)` / `asAnon()` / `asServiceRole()` bind the Postgres role + JWT claims per session, and `asServiceRole().supabase.{sql,orm}` exposes the pack's own `auth`/`storage` tables as a secondary root for admin reads. See [`projects/supabase-integration/README.md`](../../../projects/supabase-integration/README.md) for the integration's delivery plan.
+It also ships the role-binding runtime: `supabase({...})` returns a db whose `asUser(jwt)` / `asAnon()` / `asServiceRole()` bind the Postgres role + JWT claims per session, and `asServiceRole().supabase.{sql,orm}` exposes the pack's own `auth`/`storage` tables as a secondary root for admin reads. The secondary-root design is [ADR 237](../../../docs/architecture%20docs/adrs/ADR%20237%20-%20Supabase-internal%20access%20is%20a%20service_role-only%20secondary%20root.md).
 
 ## Contract generation
 
@@ -18,7 +18,7 @@ The contract is **introspected, not hand-authored**: `pnpm contract:generate` re
 - **`/pack` subpath**: an `ExtensionPack` value (`supabasePack` default + `supabasePackWith(options)` factory) that an app composes into its config via `extensionPacks`. Tree-shaking-clean — `/pack` imports no runtime code.
 - **`/runtime` subpath**: the `SupabaseRuntime` role-binding runtime and `supabase({...})` facade (session-coupled `set_config` role + claims binding, per [ADR 230](../../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md)), plus the `service_role`-only `.supabase` secondary root.
 - **`/contract` subpath**: branded model handles for the commonly-referenced models (`AuthUser`, `AuthIdentity`, `AuthSession`, `StorageBucket`, `StorageObject`) used for cross-space FK references from app contracts. The handle set is deliberately curated, not one-per-table.
-- **`/test/utils` subpath**: exports `bootstrapSupabaseShim(client)` — restores the full reference fixture (all Supabase schemas, tables, roles) into a test database and layers the grants/`auth.uid()`-style functions tests need. Used by this package's tests and by `examples/supabase`.
+- **Internal test substrate** (not published): `test/fixtures/supabase-reference/set-up-mock-schema.ts` exports `setUpSupabaseMockSchema(client)`, restoring the reference fixture (all Supabase schemas, tables, roles, and the platform's real default privileges) into a test database. Used only by this package's tests — including the hermetic PGlite coverage of the example app's flows (`test/fixtures/example-app/`); `examples/supabase` itself ships only the real-Supabase acceptance suite.
 
 ## Dependencies
 
@@ -75,7 +75,7 @@ import contractJson from './contract.json' with { type: 'json' };
 export const db = await supabase<Contract>({
   contractJson,
   url: process.env['DATABASE_URL']!, // direct Postgres connection
-  jwtSecret: process.env['SUPABASE_JWT_SECRET']!, // xor jwksUrl — see "JWT validation"
+  jwksUrl: process.env['SUPABASE_JWKS_URL']!, // xor jwtSecret (legacy HS256) — see "JWT validation"
 });
 ```
 
@@ -102,14 +102,14 @@ const users = await admin.supabase
 
 `asUser(jwt)` verifies the token with [`jose`](https://github.com/panva/jose) *before* any connection is acquired, then derives the Postgres role from the token's `role` claim (defaulting to `authenticated`). Configure exactly one key source:
 
-- **`jwtSecret`** — the symmetric HS256 secret (the classic Supabase JWT secret).
-- **`jwksUrl`** — a JWKS endpoint, for projects on asymmetric signing keys.
+- **`jwksUrl`** — the project's JWKS endpoint (`https://<project-ref>.supabase.co/auth/v1/.well-known/jwks.json`). **Current Supabase projects sign ES256 with asymmetric keys — this is the default choice.**
+- **`jwtSecret`** — the symmetric HS256 secret, for legacy projects only. `supabase status` prints a `JWT_SECRET` even on ES256 projects; its presence does not mean the project uses it.
 
-Supplying both, or neither, throws `SupabaseConfigError`. A malformed / expired / mis-signed token throws `InvalidJwtError` with a typed `reason`.
+Supplying both, or neither, throws `SupabaseConfigError`. A malformed / expired / mis-signed token throws `InvalidJwtError` with a typed `reason` — including an algorithm/key-source mismatch (an ES256 token against a `jwtSecret` client, or an HS256 token against a `jwksUrl` client) with a message naming the fix.
 
 ### Admin reads of `auth.*` / `storage.*`
 
-Only `service_role` holds grants on the Supabase-internal schemas over a direct connection, so the `.supabase` secondary root exists **only** on `asServiceRole()` — `asUser` / `asAnon` have no `.supabase`. It is the extension's own contract surface, never merged into the app contract. Prefer the GoTrue Admin API for user *management*; direct `service_role` SQL is for ad-hoc admin reads (Supabase-internal schemas can drift across platform upgrades). See [decision C15](../../../projects/supabase-integration/decisions.md).
+The `.supabase` secondary root exists **only** on `asServiceRole()` — `asUser` / `asAnon` have no `.supabase`. It is the extension's own contract surface, never merged into the app contract. Note that a real Supabase project grants `service_role` **no table privileges** on `auth.*` / `storage.*` (only schema `USAGE`); before using the admin root, run the narrow grant once for what you read, e.g. `GRANT USAGE ON SCHEMA auth TO service_role; GRANT SELECT ON TABLE auth.users TO service_role;`. Prefer the GoTrue Admin API for user *management*; direct `service_role` SQL is for ad-hoc admin reads (Supabase-internal schemas can drift across platform upgrades). See [ADR 237](../../../docs/architecture%20docs/adrs/ADR%20237%20-%20Supabase-internal%20access%20is%20a%20service_role-only%20secondary%20root.md).
 
 ### Authoring RLS in TypeScript
 
@@ -122,7 +122,7 @@ The example authors its RLS policies in PSL (`policy_select` / `policy_update` +
 - **Storage uploads** — `storage.*` tables are declared for reference/reads; file upload/download helpers are out of scope (use `@supabase/storage-js`).
 - **PostgREST / `@supabase/supabase-js` interop** — Prisma Next connects directly to Postgres; there is no `serviceRoleKey` / PostgREST path.
 - **Edge runtimes** — the runtime needs a Postgres driver; Cloudflare Workers / Deno / Vercel Edge are out of scope (Node.js + Bun for v0.1).
-- **Triggers & functions as first-class IR** — the "create a profile on signup" trigger is a documented raw-SQL recipe, not contract-authored (functions are not v0.1 contract elements; [decision C4](../../../projects/supabase-integration/decisions.md)). `auth.uid()` etc. live inside opaque RLS predicate strings.
+- **Triggers & functions as first-class IR** — the "create a profile on signup" trigger is a documented raw-SQL recipe, not contract-authored (functions are not contract elements). `auth.uid()` etc. live inside opaque RLS predicate strings.
 
 ## Known gaps (deferred to post-launch)
 
@@ -131,7 +131,7 @@ The example authors its RLS policies in PSL (`policy_select` / `policy_update` +
 
 ## References
 
-- [Supabase integration umbrella](../../../projects/supabase-integration/README.md) — § "Walking skeleton" + the canonical decisions log.
+- [ADR 237](../../../docs/architecture%20docs/adrs/ADR%20237%20-%20Supabase-internal%20access%20is%20a%20service_role-only%20secondary%20root.md) — why Supabase-internal access is a service_role-only secondary root.
 - [ADR 230 — Runtime target layer](../../../docs/architecture%20docs/adrs/ADR%20230%20-%20Runtime%20target%20layer%20session-coupled%20connections.md) — the role-binding model.
 - [ADR 212 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Contract%20spaces.md) — the package layout this extension follows.
 - [ADR 224 — Control Policy](../../../docs/architecture%20docs/adrs/ADR%20224%20-%20Control%20Policy%20—%20framework-locked%20vocabulary%20and%20family-owned%20dispatch.md) — `external` dispatch.

@@ -25,6 +25,7 @@ export class TypeScriptRenderableSqliteMigration
   readonly #meta: MigrationMeta;
   readonly #destination: SqliteMigrationDestinationInfo;
   readonly #spaceId: string;
+  readonly #snapshotsImportPath: string;
   readonly #lowerer: ExecuteRequestLowerer | undefined;
   #operationsCache: readonly (Op | Promise<Op>)[] | undefined;
 
@@ -32,6 +33,7 @@ export class TypeScriptRenderableSqliteMigration
     calls: readonly OpFactoryCall[],
     meta: MigrationMeta,
     spaceId: string,
+    snapshotsImportPath: string,
     destination?: SqliteMigrationDestinationInfo,
     lowerer?: ExecuteRequestLowerer,
   ) {
@@ -39,6 +41,7 @@ export class TypeScriptRenderableSqliteMigration
     this.#calls = calls;
     this.#meta = meta;
     this.#spaceId = spaceId;
+    this.#snapshotsImportPath = snapshotsImportPath;
     this.#destination = destination ?? { storageHash: meta.to };
     this.#lowerer = lowerer;
   }
@@ -69,6 +72,7 @@ export class TypeScriptRenderableSqliteMigration
     return renderCallsToTypeScript(this.#calls, {
       from: this.#meta.from,
       to: this.#meta.to,
+      snapshotsImportPath: this.#snapshotsImportPath,
     });
   }
 }

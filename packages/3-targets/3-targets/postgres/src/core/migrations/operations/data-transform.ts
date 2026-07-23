@@ -5,7 +5,7 @@
  * supplies the control adapter from the migration's injected stack:
  *
  * ```ts
- * import endContract from './end-contract.json' with { type: 'json' };
+ * import endContract from '../../snapshots/93f07d1b…c9e1e5a2/contract.json' with { type: 'json' };
  *
  * class M extends Migration {
  *   override get operations() {
@@ -21,7 +21,7 @@
  *
  * The factory accepts lazy closures (`() => SqlQueryPlan | Buildable`),
  * invokes each one, asserts that its `meta.storageHash` matches the
- * `contract` it was handed (→ `PN-MIG-2005` on mismatch), and lowers the
+ * `contract` it was handed (→ `MIGRATION.DATA_TRANSFORM_CONTRACT_MISMATCH` on mismatch), and lowers the
  * plan via the supplied control adapter to a serialized `{sql, params}`
  * payload.
  *

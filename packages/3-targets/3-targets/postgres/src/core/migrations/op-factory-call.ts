@@ -9,7 +9,7 @@
  * - `toOp()` — converts the IR node to a runtime
  *   `SqlMigrationPlanOperation` by delegating to the matching pure factory
  *   under `operations/`. `DataTransformCall.toOp()` always throws
- *   `PN-MIG-2001` because a planner-generated data transform is an
+ *   `MIGRATION.UNFILLED_PLACEHOLDER` because a planner-generated data transform is an
  *   unfilled authoring stub by construction.
  * - `renderTypeScript()` / `importRequirements()` — inherited from
  *   `TsExpression`. Used by `renderCallsToTypeScript` to emit the call as
@@ -45,7 +45,7 @@ import {
   tableExistsAst,
 } from '../../contract-free/checks';
 import * as contractFreeDdl from '../../contract-free/ddl';
-import type { PostgresRlsPolicy } from '../postgres-rls-policy';
+import type { PostgresRlsPolicy, PostgresRlsPolicyInput } from '../postgres-rls-policy';
 import {
   escapeLiteral,
   quoteIdentifier,
@@ -740,10 +740,6 @@ export class AddNotNullColumnDirectCall extends PostgresOpFactoryCallNode {
   renderTypeScript(): string {
     return `rawSql(${jsonToTsSource({ id: `column.${this.tableName}.${this.columnName}`, label: this.label, operationClass: 'additive' })})`;
   }
-
-  override importRequirements(): readonly ImportRequirement[] {
-    return [];
-  }
 }
 
 /**
@@ -809,10 +805,6 @@ export class AddNotNullColumnWithTempDefaultCall extends PostgresOpFactoryCallNo
 
   renderTypeScript(): string {
     return `rawSql(${jsonToTsSource({ id: `column.${this.tableName}.${this.columnName}`, label: this.label, operationClass: 'additive' })})`;
-  }
-
-  override importRequirements(): readonly ImportRequirement[] {
-    return [];
   }
 }
 
@@ -1515,7 +1507,7 @@ export class AddNativeEnumValueCall extends PostgresOpFactoryCallNode {
  * A planner-generated data-transform stub. `checkSlot` and `runSlot` name
  * the unfilled authoring slots that the rendered `migration.ts` will expose
  * to the user via `placeholder("…")` calls. `toOp()` always throws
- * `PN-MIG-2001`: the planner cannot lower a stubbed transform to a runtime
+ * `MIGRATION.UNFILLED_PLACEHOLDER`: the planner cannot lower a stubbed transform to a runtime
  * op — the user must fill the rendered `migration.ts` and re-emit.
  */
 export class DataTransformCall extends PostgresOpFactoryCallNode {
@@ -1555,12 +1547,7 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
   override importRequirements(): readonly ImportRequirement[] {
     return [
       { moduleSpecifier: POSTGRES_MIGRATION_FACADE, symbol: 'placeholder' },
-      {
-        moduleSpecifier: './end-contract.json',
-        symbol: 'endContract',
-        kind: 'default',
-        attributes: { type: 'json' },
-      },
+      // endContract is imported by the migration scaffold's contractImports; an op never renders outside it.
     ];
   }
 }
@@ -1592,7 +1579,23 @@ export class CreatePostgresRlsPolicyCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `createRlsPolicy(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.policy)})`;
+    const p = this.policy;
+    const input: PostgresRlsPolicyInput = {
+      name: p.name,
+      prefix: p.prefix,
+      tableName: p.tableName,
+      namespaceId: p.namespaceId,
+      operation: p.operation,
+      roles: p.roles,
+      ...ifDefined('using', p.using),
+      ...ifDefined('withCheck', p.withCheck),
+      permissive: p.permissive,
+    };
+    return `this.createRlsPolicy({ schema: ${jsonToTsSource(this.schemaName)}, table: ${jsonToTsSource(this.tableName)}, policy: ${jsonToTsSource(input)} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
   }
 }
 
@@ -1623,7 +1626,11 @@ export class DropPostgresRlsPolicyCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `dropRlsPolicy(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.policyName)})`;
+    return `this.dropRlsPolicy({ schema: ${jsonToTsSource(this.schemaName)}, table: ${jsonToTsSource(this.tableName)}, policy: ${jsonToTsSource(this.policyName)} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
   }
 }
 
@@ -1652,7 +1659,11 @@ export class EnableRowLevelSecurityCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `enableRowLevelSecurity(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)})`;
+    return `this.enableRowLevelSecurity({ schema: ${jsonToTsSource(this.schemaName)}, table: ${jsonToTsSource(this.tableName)} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
   }
 }
 
@@ -1681,7 +1692,11 @@ export class DisableRowLevelSecurityCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `disableRowLevelSecurity(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)})`;
+    return `this.disableRowLevelSecurity({ schema: ${jsonToTsSource(this.schemaName)}, table: ${jsonToTsSource(this.tableName)} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
   }
 }
 
@@ -1724,7 +1739,11 @@ export class RenamePostgresRlsPolicyCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `renameRlsPolicy(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.oldPolicyName)}, ${jsonToTsSource(this.newPolicyName)})`;
+    return `this.renameRlsPolicy({ schema: ${jsonToTsSource(this.schemaName)}, table: ${jsonToTsSource(this.tableName)}, from: ${jsonToTsSource(this.oldPolicyName)}, to: ${jsonToTsSource(this.newPolicyName)} })`;
+  }
+
+  override importRequirements(): readonly ImportRequirement[] {
+    return [];
   }
 }
 

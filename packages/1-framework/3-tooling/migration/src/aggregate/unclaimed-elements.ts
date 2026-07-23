@@ -4,6 +4,7 @@ import type {
   SchemaEntityCoordinate,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
+import { issueOutcome } from '@prisma-next/framework-components/control';
 import { coordinateKey, UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 
 /**
@@ -76,10 +77,12 @@ export function stripExtraFindings(
   classify?: SchemaSubjectClassifier,
 ): VerifyDatabaseSchemaResult {
   const droppedTablePaths = result.schema.issues
-    .filter((issue) => issue.reason === 'not-expected' && isWholeEntityIssue(issue, classify))
+    .filter(
+      (issue) => issueOutcome(issue) === 'not-expected' && isWholeEntityIssue(issue, classify),
+    )
     .map((issue) => issue.path);
   const issues = result.schema.issues.filter((issue) => {
-    if (issue.reason !== 'not-expected') return true;
+    if (issueOutcome(issue) !== 'not-expected') return true;
     if (classify?.(issue) === 'structural') return true;
     return !droppedTablePaths.some((prefix) => pathIsUnder(issue.path, prefix));
   });
@@ -94,7 +97,7 @@ export function stripExtraFindings(
   return {
     ...envelope,
     ok,
-    ...(ok ? {} : { code: result.code ?? 'PN-RUN-3010' }),
+    ...(ok ? {} : { code: result.code ?? 'CONTRACT.MARKER_REQUIRED' }),
     summary: ok ? 'Database schema satisfies contract' : result.summary,
     schema: {
       issues,
@@ -154,7 +157,7 @@ export function collectExtraElementCoordinates(
 ): readonly SchemaEntityCoordinate[] {
   const seen = new Map<string, SchemaEntityCoordinate>();
   for (const issue of result.schema.issues) {
-    if (issue.reason !== 'not-expected') continue;
+    if (issueOutcome(issue) !== 'not-expected') continue;
     const coordinate = schemaDiffIssueCoordinate(issue, classify, classifyEntityKind);
     if (coordinate === undefined) continue;
     seen.set(coordinateKey(coordinate), coordinate);

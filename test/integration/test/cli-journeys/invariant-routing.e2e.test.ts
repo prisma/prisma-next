@@ -18,6 +18,7 @@
 
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { storageHashHex } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
@@ -281,7 +282,7 @@ withTempDir(({ createTempDir }) => {
 
         // P.04: apply --ref prod fails fast with UNKNOWN_INVARIANT, marker untouched.
         const applyFail = await runMigrate(ctx, ['--to', 'prod', '--json']);
-        expect(applyFail.exitCode, 'P.04: apply exits 1').toBe(1);
+        expect(applyFail.exitCode, 'P.04: apply exits 2').toBe(2);
         const applyEnvelope = parseJsonOutput<{
           meta?: { code?: string; unknown?: readonly string[]; declared?: readonly string[] };
         }>(applyFail);
@@ -305,7 +306,7 @@ withTempDir(({ createTempDir }) => {
 
         // P.06: status --ref prod is fatal too (parity with apply).
         const statusFail = await runMigrationStatus(ctx, ['--to', 'prod', '--json']);
-        expect(statusFail.exitCode, 'P.06: status exits 1').toBe(1);
+        expect(statusFail.exitCode, 'P.06: status exits 2').toBe(2);
         const statusEnvelope = parseJsonOutput<{ meta?: { code?: string } }>(statusFail);
         expect(statusEnvelope.meta?.code, 'P.06: status error code').toBe(
           'MIGRATION.UNKNOWN_INVARIANT',
@@ -381,7 +382,7 @@ withTempDir(({ createTempDir }) => {
         // because the id IS declared somewhere in the graph). The structural path
         // points at the CB-branch edge that doesn't cover it.
         const applyFail = await runMigrate(ctx, ['--to', 'prod', '--json']);
-        expect(applyFail.exitCode, 'Q.05: apply exits 1').toBe(1);
+        expect(applyFail.exitCode, 'Q.05: apply exits 2').toBe(2);
         const envelope = parseJsonOutput<{
           meta?: {
             code?: string;
@@ -579,12 +580,13 @@ withTempDir(({ createTempDir }) => {
         expect(draftManifest.from, 'S.03: scaffold has from === to').toBe(c1Hash);
         expect(draftManifest.to).toBe(c1Hash);
 
+        const endContractSpecifier = `../../snapshots/${storageHashHex(c1Hash)}/contract.json`;
         const handAuthored = `import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { Migration, MigrationCLI } from '@prisma-next/postgres/migration';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
-import endContractJson from './end-contract.json' with { type: 'json' };
+import endContractJson from '${endContractSpecifier}' with { type: 'json' };
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 
 const endContract = new PostgresContractSerializer().deserializeContract(endContractJson);
@@ -731,12 +733,13 @@ MigrationCLI.run(import.meta.url, M);
             .at(-1)!,
         );
 
+        const endContractSpecifier = `../../snapshots/${storageHashHex(c1Hash)}/contract.json`;
         const handAuthored = `import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { Migration, MigrationCLI } from '@prisma-next/postgres/migration';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
-import endContractJson from './end-contract.json' with { type: 'json' };
+import endContractJson from '${endContractSpecifier}' with { type: 'json' };
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 
 const endContract = new PostgresContractSerializer().deserializeContract(endContractJson);

@@ -56,7 +56,7 @@ describe('buildReadAggregate — pre-flight loading failures return a structured
 
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.failure.code).toBe('4999');
+    expect(result.failure.code).toBe('CLI.UNEXPECTED');
     expect(result.failure.message).toBe('Unexpected error');
     expect(result.failure.why).toContain('EACCES');
   });
@@ -76,7 +76,7 @@ describe('buildReadAggregate — pre-flight loading failures return a structured
     expect(result.ok).toBe(false);
     if (result.ok) return;
     // Mapped via mapMigrationToolsError (errorRuntime envelope), not errorUnexpected.
-    expect(result.failure.code).toBe('3000');
+    expect(result.failure.code).toBe('CONTRACT.VERIFY_FAILED');
     expect(result.failure.message).toBe(toolsError.message);
     expect(result.failure.why).toBe(toolsError.why);
     expect(result.failure.meta?.['code']).toBe(toolsError.code);

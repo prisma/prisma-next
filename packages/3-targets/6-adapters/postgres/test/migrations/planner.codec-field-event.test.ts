@@ -131,6 +131,7 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expectNarrowedType(result.kind === 'success');
@@ -157,6 +158,7 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expectNarrowedType(result.kind === 'success');
@@ -201,6 +203,7 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     const b = planner.plan({
       contract: c,
@@ -209,6 +212,7 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expectNarrowedType(a.kind === 'success');

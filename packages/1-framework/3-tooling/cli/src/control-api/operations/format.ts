@@ -1,8 +1,9 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { EOL } from 'node:os';
 import { loadConfig } from '@prisma-next/config-loader';
-import { type FormatOptions, format, PslFormatError } from '@prisma-next/psl-parser/format';
+import { type FormatOptions, format } from '@prisma-next/psl-parser/format';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
+import { isStructuredError } from '@prisma-next/utils/structured-error';
 import { CliStructuredError, errorRuntime, errorUnexpected } from '../../utils/cli-errors';
 
 export interface FormatOperationOptions {
@@ -71,12 +72,12 @@ export async function executeFormat(
   try {
     formatted = format(contents, formatOptions);
   } catch (error) {
-    if (error instanceof PslFormatError) {
+    if (isStructuredError(error) && error.code === 'PSL.PARSE_FAILED') {
       return notOk(
         errorRuntime('Cannot format PSL with parse errors', {
           why: error.message,
           fix: 'Fix the parse errors in your schema and try again.',
-          meta: { diagnostics: error.diagnostics },
+          meta: { diagnostics: error.meta?.['diagnostics'] },
         }),
       );
     }

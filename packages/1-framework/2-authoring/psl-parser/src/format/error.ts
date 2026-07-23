@@ -1,13 +1,14 @@
-import type { ParseDiagnostic } from '../parse';
+import type { StructuredError, StructuredErrorOptions } from '@prisma-next/utils/structured-error';
+import { structuredError } from '@prisma-next/utils/structured-error';
 
-export class PslFormatError extends Error {
-  readonly diagnostics: readonly ParseDiagnostic[];
+export type PslCode = `PSL.${PslSubcode}`;
 
-  constructor(diagnostics: readonly ParseDiagnostic[]) {
-    const summary = diagnostics[0]?.message ?? 'unknown parse error';
-    const more = diagnostics.length > 1 ? ` (and ${diagnostics.length - 1} more)` : '';
-    super(`Cannot format PSL with parse errors: ${summary}${more}`);
-    this.name = 'PslFormatError';
-    this.diagnostics = diagnostics;
-  }
+type PslSubcode = 'PARSE_FAILED';
+
+export function pslError(
+  code: PslCode,
+  message: string,
+  options?: StructuredErrorOptions,
+): StructuredError {
+  return structuredError(code, message, options);
 }

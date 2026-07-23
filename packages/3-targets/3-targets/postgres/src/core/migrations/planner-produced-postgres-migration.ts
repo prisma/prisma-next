@@ -15,7 +15,7 @@
  * Placeholder-bearing plans: `renderTypeScript()` always succeeds and embeds
  * `() => placeholder("slot")` at each stub. `operations`, in contrast, is
  * _not safe to enumerate_ on a stub-bearing plan — `DataTransformCall.toOp()`
- * throws `PN-MIG-2001` because a planner-stubbed closure cannot be lowered
+ * throws `MIGRATION.UNFILLED_PLACEHOLDER` because a planner-stubbed closure cannot be lowered
  * to a runtime op. Callers that know a plan may carry stubs must render to
  * `migration.ts`, let the user fill the slots, and re-load the edited
  * migration before enumerating ops. The walk-schema planner does not emit
@@ -42,6 +42,7 @@ export class TypeScriptRenderablePostgresMigration
   readonly #calls: readonly OpFactoryCall[];
   readonly #meta: MigrationMeta;
   readonly #spaceId: string;
+  readonly #snapshotsImportPath: string;
   readonly #lowerer: ExecuteRequestLowerer | undefined;
   #operationsCache:
     | readonly (
@@ -54,12 +55,14 @@ export class TypeScriptRenderablePostgresMigration
     calls: readonly OpFactoryCall[],
     meta: MigrationMeta,
     spaceId: string,
+    snapshotsImportPath: string,
     lowerer?: ExecuteRequestLowerer,
   ) {
     super();
     this.#calls = calls;
     this.#meta = meta;
     this.#spaceId = spaceId;
+    this.#snapshotsImportPath = snapshotsImportPath;
     this.#lowerer = lowerer;
   }
 
@@ -85,6 +88,10 @@ export class TypeScriptRenderablePostgresMigration
   }
 
   renderTypeScript(): string {
-    return renderCallsToTypeScript(this.#calls, { from: this.#meta.from, to: this.#meta.to });
+    return renderCallsToTypeScript(this.#calls, {
+      from: this.#meta.from,
+      to: this.#meta.to,
+      snapshotsImportPath: this.#snapshotsImportPath,
+    });
   }
 }

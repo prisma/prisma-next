@@ -334,9 +334,9 @@ export interface SqlMigrationPlannerPlanOptions {
    * or `null` for reconciliation flows that have no prior contract.
    *
    * Required at every call site so the structural fact "I have a prior
-   * contract / I don't" is visible in the type. `migration plan` reads
-   * the predecessor bundle's `end-contract.json` from disk and passes
-   * the parsed value; `db update` / `db init` reconcile against the
+   * contract / I don't" is visible in the type. `migration plan` reads the
+   * predecessor's contract from the snapshot store by its storage hash and
+   * passes the parsed value; `db update` / `db init` reconcile against the
    * live schema and pass `null`. Strategies that
    * need from/to column-shape comparisons (unsafe type change, nullability
    * tightening) use this to decide whether to emit `dataTransform`
@@ -346,6 +346,13 @@ export interface SqlMigrationPlannerPlanOptions {
    * plan's `describe()` as `fromContract?.storage.storageHash ?? null`.
    */
   readonly fromContract: Contract<SqlStorage> | null;
+  /**
+   * POSIX-relative path from the migration package dir to
+   * `migrations/snapshots`, e.g. `'../../snapshots'`. Threaded straight
+   * into the produced plan's `renderTypeScript()` metadata so the
+   * scaffold's contract-snapshot imports point at the deduplicated store.
+   */
+  readonly snapshotsImportPath: string;
   /**
    * Active framework components participating in this composition.
    * Each component is target-bound so SQL targets can dispatch
@@ -419,16 +426,16 @@ export interface SqlMigrationRunnerExecuteOptions<TTargetDetails> {
 }
 
 export type SqlMigrationRunnerErrorCode =
-  | 'DESTINATION_CONTRACT_MISMATCH'
-  | 'LEGACY_MARKER_SHAPE'
-  | 'MARKER_ORIGIN_MISMATCH'
-  | 'MARKER_CAS_FAILURE'
-  | 'POLICY_VIOLATION'
-  | 'PRECHECK_FAILED'
-  | 'POSTCHECK_FAILED'
-  | 'SCHEMA_VERIFY_FAILED'
-  | 'FOREIGN_KEY_VIOLATION'
-  | 'EXECUTION_FAILED';
+  | 'MIGRATION.DESTINATION_CONTRACT_MISMATCH'
+  | 'MIGRATION.LEGACY_MARKER_SHAPE'
+  | 'MIGRATION.MARKER_ORIGIN_MISMATCH'
+  | 'MIGRATION.MARKER_CAS_FAILURE'
+  | 'MIGRATION.POLICY_VIOLATION'
+  | 'MIGRATION.PRECHECK_FAILED'
+  | 'MIGRATION.POSTCHECK_FAILED'
+  | 'MIGRATION.SCHEMA_VERIFY_FAILED'
+  | 'MIGRATION.FOREIGN_KEY_VIOLATION'
+  | 'MIGRATION.EXECUTION_FAILED';
 
 export interface SqlMigrationRunnerFailure extends MigrationRunnerFailure {
   readonly code: SqlMigrationRunnerErrorCode;

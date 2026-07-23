@@ -87,7 +87,7 @@ describe('migration plan — core flow', () => {
       ops,
     );
 
-    const pkg = await readMigrationPackage(packageDir);
+    const pkg = await readMigrationPackage(packageDir, { migrationsDir });
 
     expect(pkg.metadata.from).toBeNull();
     expect(pkg.metadata.to).toBe('test-hash');
@@ -115,7 +115,7 @@ describe('migration plan — core flow', () => {
     );
 
     // Read migrations and find leaf — leaf should be 'same-hash'
-    const { packages } = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
     const graph = reconstructGraph(packages);
     const leaf = findLeaf(graph);
 
@@ -164,7 +164,7 @@ describe('migration plan — core flow', () => {
       );
 
       // Verify migration chain
-      const { packages } = await readMigrationsDir(migrationsDir);
+      const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
       expect(packages).toHaveLength(2);
 
       const graph = reconstructGraph(packages);
@@ -213,7 +213,7 @@ describe('--from hash lookup', () => {
       [],
     );
 
-    const { packages } = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
     const found = packages.find((p) => p.metadata.to === 'nonexistent');
     expect(found).toBeUndefined();
   });
@@ -236,7 +236,7 @@ describe('--from hash lookup', () => {
       [],
     );
 
-    const { packages } = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
     const result = resolveBundleByPrefix(packages, 'abcdef');
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -262,7 +262,7 @@ describe('--from hash lookup', () => {
       [],
     );
 
-    const { packages } = await readMigrationsDir(migrationsDir);
+    const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
     const result = resolveBundleByPrefix(packages, 'abcdef');
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -302,7 +302,7 @@ describe('--from hash lookup', () => {
         [],
       );
 
-      const { packages } = await readMigrationsDir(migrationsDir);
+      const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
       const result = resolveBundleByPrefix(packages, 'abc');
       expect(result.ok).toBe(false);
       if (!result.ok) {

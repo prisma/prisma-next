@@ -91,6 +91,17 @@ describe('SqliteControlAdapter.introspect', () => {
     expect(fks[0]!.referencedTable).toBe('authors');
     expect(fks[0]!.referencedColumns).toEqual(['id']);
     expect(fks[0]!.onDelete).toBe('cascade');
+    expect(fks[0]!.dependsOn).toEqual([
+      [
+        { nodeKind: 'sql-schema', id: 'database' },
+        { nodeKind: 'sql-table', id: 'authors' },
+      ],
+      [
+        { nodeKind: 'sql-schema', id: 'database' },
+        { nodeKind: 'sql-table', id: 'posts' },
+        { nodeKind: 'sql-column', id: 'column:author_id' },
+      ],
+    ]);
     await driver.close();
   });
 
@@ -221,7 +232,7 @@ describe('normalizeSqliteNativeType', () => {
 });
 
 describe('SqliteControlAdapter.readMarker', () => {
-  it('throws PN-RUN-3005 when marker row fails validation', async () => {
+  it('throws CONTRACT.MARKER_ROW_CORRUPT when marker row fails validation', async () => {
     const driver = createMemoryDriver();
     driver.db.exec(`
       CREATE TABLE _prisma_marker (
@@ -246,7 +257,7 @@ describe('SqliteControlAdapter.readMarker', () => {
 
     const adapter = new SqliteControlAdapter(createSqliteBuiltinCodecLookup());
     await expect(adapter.readMarker(driver, 'app')).rejects.toSatisfy((err: unknown) => {
-      expect((err as CliStructuredError).toEnvelope().code).toBe('PN-RUN-3005');
+      expect((err as CliStructuredError).toEnvelope().code).toBe('CONTRACT.MARKER_ROW_CORRUPT');
       return true;
     });
     await driver.close();

@@ -188,8 +188,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "source": {
                     "columns": [
                       "userId"
@@ -206,7 +204,14 @@
                   }
                 }
               ],
-              "indexes": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "userId"
+                  ],
+                  "name": "post_userId_idx"
+                }
+              ],
               "primaryKey": {
                 "columns": [
                   "id"
@@ -254,7 +259,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "81a88e03a4efaa6884c8d89c966336557ff9fd3049cdf31220a4a11777097f41"
+    "storageHash": "9d1ab6545cf354eda6cdbc627057a22d02466a2acd5822281333050a494aeba0"
   },
   "execution": {
     "executionHash": "67d5a7dcb458a4b6a472b57d3f70b530d92c53291dfa05f9efb0dbc8c7b3b6ec",

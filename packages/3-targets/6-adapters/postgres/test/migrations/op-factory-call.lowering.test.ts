@@ -4,7 +4,7 @@
  * - `renderOps` lowers each variant via its pure factory and pins the
  *   id/operationClass/target.details shape exposed to runners.
  * - `RawSqlCall` is returned verbatim by `renderOps`.
- * - `DataTransformCall` always throws PN-MIG-2001 from `renderOps` because
+ * - `DataTransformCall` always throws MIGRATION.UNFILLED_PLACEHOLDER from `renderOps` because
  *   the planner can only emit unfilled stubs.
  * - `TypeScriptRenderablePostgresMigration` routes `operations` through
  *   `renderOps` and `renderTypeScript()` through `renderCallsToTypeScript`.
@@ -51,7 +51,11 @@ import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
-const META = { from: 'from', to: 'to' } as const;
+const SNAPSHOTS_IMPORT_PATH = '../../snapshots';
+const META = {
+  from: 'a'.repeat(64),
+  to: 'b'.repeat(64),
+} as const;
 const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
 describe('renderOps', () => {
@@ -219,7 +223,7 @@ describe('renderOps', () => {
     expect(rendered).toBe(op);
   });
 
-  it('throws PN-MIG-2001 on DataTransformCall (always an unfilled stub at plan time)', () => {
+  it('throws MIGRATION.UNFILLED_PLACEHOLDER on DataTransformCall (always an unfilled stub at plan time)', () => {
     const call = new DataTransformCall('Backfill', 'check', 'run');
 
     expect(() => renderOps([call])).toThrow(/Unfilled migration placeholder/);
@@ -233,11 +237,12 @@ describe('TypeScriptRenderablePostgresMigration', () => {
       calls,
       META,
       APP_SPACE_ID,
+      SNAPSHOTS_IMPORT_PATH,
       testAdapter,
     );
 
     expect(migration.targetId).toBe('postgres');
-    expect(migration.destination).toEqual({ storageHash: 'to' });
+    expect(migration.destination).toEqual({ storageHash: META.to });
     expect(migration.describe()).toEqual(META);
 
     const operations = await Promise.all(migration.operations);
@@ -247,7 +252,12 @@ describe('TypeScriptRenderablePostgresMigration', () => {
 
   it('renders TypeScript source mirroring renderCallsToTypeScript output', () => {
     const calls = [new DropTableCall('public', 'stale')];
-    const migration = new TypeScriptRenderablePostgresMigration(calls, META, APP_SPACE_ID);
+    const migration = new TypeScriptRenderablePostgresMigration(
+      calls,
+      META,
+      APP_SPACE_ID,
+      SNAPSHOTS_IMPORT_PATH,
+    );
 
     const source = migration.renderTypeScript();
     expect(source).toContain(

@@ -1,3 +1,5 @@
+import { isInternalError } from '@prisma-next/utils/internal-error';
+import { isStructuredError } from '@prisma-next/utils/structured-error';
 import { describe, expect, it } from 'vitest';
 import {
   builtinGeneratorRegistryMetadata,
@@ -59,6 +61,36 @@ describe('@prisma-next/ids', () => {
 
   it('throws for unknown generator id', () => {
     expect(() => generateId({ id: 'nonexistent' })).toThrow('Unknown built-in ID generator');
+  });
+
+  it('throws an InternalError for an unknown generator id', () => {
+    let thrown: unknown;
+    try {
+      generateId({ id: 'nonexistent' });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(isInternalError(thrown)).toBe(true);
+  });
+
+  it('rejects an invalid nanoid size with CONTRACT.ARGUMENT_INVALID', () => {
+    let thrown: unknown;
+    try {
+      nanoid({ size: 1 });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(isStructuredError(thrown)).toBe(true);
+    if (!isStructuredError(thrown)) {
+      throw new Error('expected a structured error');
+    }
+    expect(thrown.code).toBe('CONTRACT.ARGUMENT_INVALID');
+    expect(thrown.message).toBe('nanoid size must be an integer between 2 and 255');
+    expect(thrown.meta).toEqual({
+      helperPath: 'nanoid',
+      paramName: 'size',
+      received: 1,
+    });
   });
 
   it('rejects nanoid with invalid size', () => {

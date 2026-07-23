@@ -58,6 +58,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
         fromContract: null,
         frameworkComponents,
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: '../../snapshots',
       });
       expect(result.kind).toBe('success');
       if (result.kind !== 'success') {
@@ -124,6 +125,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
         fromContract: null,
         frameworkComponents,
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: '../../snapshots',
       });
       if (initialPlan.kind !== 'success') {
         throw new Error('expected initial planner success');

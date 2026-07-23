@@ -6,7 +6,7 @@ For the architectural view of the CLI (distribution, command surface, init pipel
 
 ## Principles
 - Human‑first TTY output; CI/agents get deterministic, parseable output.
-- Deterministic behavior: stable exit codes, PN error codes, and JSON schemas.
+- Deterministic behavior: stable exit codes, structured error codes, and JSON schemas.
 - Actionable feedback: every error tells the user why it happened and what to do next.
 - Respect boundaries: migration vs runtime plane, and family hooks for family‑specific logic.
 - Minimal ceremony: tasteful color/symbols; clack-like decorations are ok; banners only for `init`.
@@ -84,14 +84,15 @@ The CLI checks `process.stdout.isTTY` once at startup to determine the output mo
 - Up to 3 tied suggestions are shown.
 
 ## Errors
-- Codes: `PN-<DOMAIN>-<NNNN>` (e.g., `PN-CLI-4002`, `PN-MIG-2001`, `PN-RUN-3005`, `PN-CON-1001`, `PN-SCHEMA-0001`).
+- Codes: dotted `NAMESPACE.SUBCODE` (e.g., `CONFIG.CONTRACT_MISSING`, `MIGRATION.UNFILLED_PLACEHOLDER`, `CONTRACT.MARKER_ROW_CORRUPT`, `CLI.UNKNOWN_FLAG`). The namespace *is* the category — there is no separate `domain`. Namespaces come from the closed list in [ADR 239](architecture%20docs/adrs/ADR%20239%20-%20Errors%20are%20structural%20envelopes%20with%20dotted%20namespace%20codes.md), which also carries the crosswalk from the retired numeric `PN-DOMAIN-NNNN` codes.
 - Human layout (TTY):
   - First line: `✖` concise summary + code
   - Why: one line cause
   - Fix: one line next step
   - Where: `file:line` when applicable
-  - More: hint to rerun with `-v`/`--trace`; docs link by code
-- JSON schema (single object): `{ code, domain, severity, summary, why, fix, where: { path, line }, meta, docsUrl }`.
+  - More: hint to rerun with `-v`/`--trace`; docs link by code (`docs.prisma.io/docs/orm/next/reference/error-reference#<CODE>`)
+- JSON schema (single object): `{ code, severity, summary, why, fix, where: { path, line }, meta, docsUrl }`.
+- Exit code: a structured failure exits `2` (precondition; see [Exit Codes](#exit-codes)), except a user-declined prompt which exits `3`. Only an internal bug or uncaught error exits `1`.
 - **Missing-input failures**: when a command fails because required flags are missing in non-interactive mode, the envelope MUST set `meta.missingFlags: string[]` listing each missing flag's long form (e.g. `["--target", "--authoring"]`) so callers can react programmatically. The `fix:` text SHOULD list the same flags in canonical CLI form, copy-pasteable.
 
 ## Plans & Preflights (Rendering)
@@ -145,7 +146,7 @@ This is a deliberate divergence from clig.dev §Arguments §Confirmation. AI age
 
 ## Exit Codes
 
-Exit codes are a **coarse classification** of command outcomes, intended for shell-level branching (`if ! prisma-next ...; then`) and CI gates. Fine-grained discrimination uses **PN error codes** — every structured error carries one, and scripts that need to react to a specific failure mode (e.g. "retry on `PN-CLI-5004` but fail on `PN-CLI-5003`") MUST match on the PN code.
+Exit codes are a **coarse classification** of command outcomes, intended for shell-level branching (`if ! prisma-next ...; then`) and CI gates. Fine-grained discrimination uses **structured error codes** — every structured error carries one, and scripts that need to react to a specific failure mode (e.g. "retry on `CLI.INIT_INVALID_FLAG_VALUE` but fail on `CLI.INIT_MISSING_FLAGS`") MUST match on the error code.
 
 Streams are covered in [Output Conventions](#output-conventions-composable-cli-output): stdout carries the data the caller asked for (including explicit `--help` / `--version`); stderr carries decoration, warnings, errors, and help-as-decoration (e.g. usage hints printed alongside an unknown-command error).
 
@@ -170,7 +171,7 @@ Codes `4`–`99` are available for command-specific outcome codes. Each command:
 - MUST document each code in its `--help`, package `README.md`, or both.
 - SHOULD pick names that describe an **outcome shape** (`INSTALL_FAILED`, `VERIFY_DRIFT`, `PLAN_HAS_DESTRUCTIVE_OPS`), not a specific cause.
 
-The same numeric value MAY mean different things in different commands (e.g. `init`'s `4 = INSTALL_FAILED` is unrelated to `migration check`'s `4 = INTEGRITY_FAILED`). Exit codes are always interpreted in the context of the command that produced them; the PN code disambiguates within the class.
+The same numeric value MAY mean different things in different commands (e.g. `init`'s `4 = INSTALL_FAILED` is unrelated to `migration check`'s `4 = INTEGRITY_FAILED`). Exit codes are always interpreted in the context of the command that produced them; the error code disambiguates within the class.
 
 Codes `100` and above are reserved for runtime-environment signals (POSIX `128 + N`) and MUST NOT be claimed by a command.
 
@@ -178,11 +179,11 @@ Codes `100` and above are reserved for runtime-environment signals (POSIX `128 +
 
 If a category of failure recurs across multiple commands and would benefit from a stable cross-command meaning, it MAY be promoted into the reserved range. Promotion is a breaking change to any command that already used that numeric code in the open range, MUST renumber every prior use, and MUST be flagged in release notes. Treat command-specific codes as conventionally stable, like any other public API.
 
-### Why both exit codes and PN codes?
+### Why both exit codes and error codes?
 
 Exit codes are the right tool for shell pipelines: they're a single integer, every shell understands them, and matching on them is one line of bash. They MUST stay coarse — pipelines built on exit-code matching are surprisingly common, and a small reserved core is enough for almost every shell-level decision.
 
-PN error codes (`PN-CLI-5003`, `PN-MIG-2001`, etc.) are the precise channel — every structured error carries one. Scripts that need to discriminate between two specific failure modes that share an exit code MUST match on the PN code, not the exit code.
+Structured error codes (`CLI.INIT_MISSING_FLAGS`, `MIGRATION.UNFILLED_PLACEHOLDER`, etc.) are the precise channel — every structured error carries one. Scripts that need to discriminate between two specific failure modes that share an exit code MUST match on the error code, not the exit code.
 
 ## Removed-verb redirects
 
@@ -219,7 +220,7 @@ Concrete examples (from the migration CLI verb refactor, TML-2546). Each entry b
   - `--marker-only` performs marker-only verification.
   - `--schema-only` skips marker checks and verifies only that the live schema satisfies the contract.
   - `--strict` makes schema verification fail when the database includes elements not present in the contract.
-  - `--marker-only` cannot be combined with `--schema-only` or `--strict` (exit code 2, `PN-CLI-4012`). `--schema-only --strict` is valid.
+  - `--marker-only` cannot be combined with `--schema-only` or `--strict` (exit code 2, `CLI.INVALID_VERIFY_MODE`). `--schema-only --strict` is valid.
   - Non‑interactive; single JSON with `--json`.
 - `db sign` (canonical):
   - Runs the same verify phase first, then writes/updates the marker row.

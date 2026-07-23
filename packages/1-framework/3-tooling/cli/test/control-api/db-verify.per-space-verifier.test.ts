@@ -28,6 +28,7 @@ describe('createPerSpaceVerifier', () => {
       refs: {},
       headRef: { hash: contract.storage.storageHash, invariants: [] },
       refsDir: '/tmp/refs',
+      migrationsDir: '/tmp/migrations',
       resolveContract: () => contract,
       deserializeContract: (json) => json as Contract,
     });

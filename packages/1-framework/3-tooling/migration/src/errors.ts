@@ -401,14 +401,20 @@ export function errorMigrationHashMismatch(
   });
 }
 
-export function errorSnapshotMissing(refName: string): MigrationToolsError {
+/**
+ * A ref name that resolves to nothing: no pointer file named `refName`
+ * exists, and the hash being resolved (the `contractAt` argument, used as a
+ * fallback when the pointer is absent) is not a node in the migration graph
+ * either. There is no contract to materialize.
+ */
+export function errorRefNotResolvable(refName: string): MigrationToolsError {
   return new MigrationToolsError(
-    'MIGRATION.SNAPSHOT_MISSING',
-    `Ref "${refName}" has no paired contract snapshot`,
+    'MIGRATION.REF_NOT_RESOLVABLE',
+    `Ref "${refName}" is not resolvable`,
     {
-      why: `Ref "${refName}" exists but its paired snapshot files are missing.`,
-      fix: `Run "prisma-next db update --advance-ref ${refName}" to repopulate the snapshot, or "prisma-next ref delete ${refName}" to clear the orphan pointer.`,
-      details: { refName, identifier: refName, viaRef: true },
+      why: `Ref "${refName}" has no pointer file, and the hash being resolved is not a node in the migration graph either — there is nothing to materialize a contract from.`,
+      fix: `Create the ref with "prisma-next ref set ${refName} <hash>" (or advance it via "prisma-next db update --advance-ref ${refName}"), or pass a hash that is a node in the migration graph.`,
+      details: { refName, identifier: refName },
     },
   );
 }
@@ -421,7 +427,7 @@ export function errorBundleNotFoundForGraphNode(
     ? `No migration bundle found for reference "${explicitLabel}" (resolved hash: ${hash})`
     : `No migration bundle found for graph node ${hash}`;
   return new MigrationToolsError('MIGRATION.BUNDLE_NOT_FOUND_FOR_GRAPH_NODE', summary, {
-    why: `The hash ${hash} is a graph node but no on-disk migration package has an end-contract hash matching it.`,
+    why: `The hash ${hash} is a graph node but no on-disk migration package has a destination (\`to\`) hash matching it.`,
     fix: 'Provide a ref or hash that corresponds to an existing migration package, or run `migration list` to see available migrations.',
     details: { hash, ...(explicitLabel ? { explicitLabel } : {}) },
   });
@@ -452,6 +458,37 @@ export function errorHashNotInGraph(hash: string, graph: MigrationGraph): Migrat
       why: `The migration graph contains nodes ${reachableList}; "${hash}" isn't one of them.`,
       fix: `Pass a hash that's the from-or-to of an on-disk migration bundle, use --from with a graph-node hash, or run "prisma-next migration plan" to introduce it.`,
       details: { hash, reachableHashes },
+    },
+  );
+}
+
+export function errorContractSnapshotMissing(
+  storageHash: string,
+  expectedPath: string,
+): MigrationToolsError {
+  return new MigrationToolsError(
+    'MIGRATION.CONTRACT_SNAPSHOT_MISSING',
+    'Contract snapshot is missing',
+    {
+      why: `Expected a contract snapshot for ${storageHash} at "${expectedPath}" but the file does not exist.`,
+      fix: "Re-emit the contract snapshot by re-running the command that authored the migration referencing this hash (`prisma-next migration plan` for app-space migrations; the extension's contract-space build for extension spaces), or restore migrations/snapshots/ from version control.",
+      details: { storageHash, expectedPath },
+    },
+  );
+}
+
+export function errorContractSnapshotHashMismatch(
+  storageHash: string,
+  actualHash: string,
+  dir: string,
+): MigrationToolsError {
+  return new MigrationToolsError(
+    'MIGRATION.CONTRACT_SNAPSHOT_HASH_MISMATCH',
+    'Contract snapshot hash mismatch',
+    {
+      why: `The contract JSON's inner storage.storageHash ("${actualHash}") does not match the requested storage hash ("${storageHash}") for snapshot directory "${dir}".`,
+      fix: 'Pass a contractJson whose storage.storageHash equals the storageHash argument passed to writeContractSnapshot — the two must agree by construction.',
+      details: { storageHash, actualHash, dir },
     },
   );
 }

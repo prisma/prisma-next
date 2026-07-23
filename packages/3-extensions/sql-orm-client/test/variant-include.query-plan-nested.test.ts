@@ -13,6 +13,7 @@ import {
   WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
+import { POLYMORPHIC_DISCRIMINATOR_ALIAS } from '../src/collection-contract';
 import { compileSelectWithIncludes } from '../src/query-plan-select';
 import { emptyState } from '../src/types';
 import { buildMixedPolyContract } from './helpers';
@@ -26,7 +27,6 @@ import {
   rowAggregate,
   selectedState,
   tasksInclude,
-  taskVariantProjection,
 } from './variant-include.query-plan-fixtures';
 
 describe('nested variant-owned include correlation', () => {
@@ -56,7 +56,6 @@ describe('nested variant-owned include correlation', () => {
           projection('id', 'tasks', 'id', 'pg/int4@1'),
           projection('title', 'tasks', 'title', 'pg/text@1'),
           projection('type', 'tasks', 'type', 'pg/text@1'),
-          ...taskVariantProjection('features'),
           ProjectionItem.of('assignee', SubqueryExpr.of(assigneeAggregate)),
         ])
         .withWhere(
@@ -84,7 +83,7 @@ describe('nested variant-owned include correlation', () => {
     const childRows = childRowsFor(plan.ast, 'tasks');
     const baseProjection = [
       projection('title', 'tasks', 'title', 'pg/text@1'),
-      ...taskVariantProjection('features'),
+      projection('features__assignee_id', 'features', 'assignee_id', 'pg/int4@1'),
     ];
     const ranked = SelectAst.from(TableSource.named('tasks', undefined, 'public'))
       .withProjection([
@@ -104,7 +103,7 @@ describe('nested variant-owned include correlation', () => {
     const deduped = SelectAst.from(DerivedTableSource.as('tasks__ranked', ranked))
       .withProjection(
         baseProjection.map((item) =>
-          ProjectionItem.of(item.alias, ColumnRef.of('tasks__ranked', item.alias)),
+          ProjectionItem.of(item.alias, ColumnRef.of('tasks__ranked', item.alias), item.codec),
         ),
       )
       .withWhere(
@@ -119,10 +118,52 @@ describe('nested variant-owned include correlation', () => {
     expect(childRows).toEqual(
       SelectAst.from(DerivedTableSource.as('tasks__distinct', deduped)).withProjection([
         projection('title', 'tasks__distinct', 'title', 'pg/text@1'),
-        ...taskVariantProjection('tasks__distinct', true),
         ProjectionItem.of('assignee', SubqueryExpr.of(assigneeAggregate)),
       ]),
     );
+  });
+
+  it('forwards selected MTI fields and a hidden discriminator through a distinct wrapper', () => {
+    const contract = buildMixedPolyContract();
+    const subtasks = includeExpr({
+      relationName: 'subtasks',
+      relatedModelName: 'Task',
+      relatedTableName: 'tasks',
+      localTableName: 'tasks',
+      targetColumn: 'parent_id',
+      localColumn: 'id',
+      cardinality: '1:N',
+      nested: selectedState('id'),
+    });
+    const nested = {
+      ...selectedState('id', 'priority'),
+      distinct: ['id'],
+      includes: [subtasks],
+    };
+    const plan = compileSelectWithIncludes(
+      contract,
+      'public',
+      'projects_tbl',
+      { ...emptyState(), includes: [tasksInclude(nested)], selectedFields: ['name'] },
+      'Project',
+    );
+    const childRows = childRowsFor(plan.ast, 'tasks');
+
+    expect(childRows.from).toBeInstanceOf(DerivedTableSource);
+    if (!(childRows.from instanceof DerivedTableSource)) {
+      throw new Error('Expected distinct child rows to read from a derived table');
+    }
+    expect(childRows.from.query.projection.map((item) => item.alias)).toEqual([
+      'id',
+      'features__priority',
+      POLYMORPHIC_DISCRIMINATOR_ALIAS,
+    ]);
+    expect(childRows.projection.map((item) => item.alias)).toEqual([
+      'id',
+      'features__priority',
+      POLYMORPHIC_DISCRIMINATOR_ALIAS,
+      'subtasks',
+    ]);
   });
 
   it('correlates every composite M:N parent column through forwarded MTI aliases', () => {
@@ -194,11 +235,15 @@ describe('nested variant-owned include correlation', () => {
           ),
         ]),
     );
-    expect(childRows.projection.map((item) => item.alias)).toEqual([
+    expect(childRows.from).toBeInstanceOf(DerivedTableSource);
+    if (!(childRows.from instanceof DerivedTableSource)) {
+      throw new Error('Expected distinct child rows to read from a derived table');
+    }
+    expect(childRows.from.query.projection.map((item) => item.alias)).toEqual([
       'title',
       'features__priority',
       'features__assignee_id',
-      'labels',
     ]);
+    expect(childRows.projection.map((item) => item.alias)).toEqual(['title', 'labels']);
   });
 });

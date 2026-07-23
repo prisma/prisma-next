@@ -7,6 +7,7 @@ import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { loadContractSpaceAggregate } from '../../src/aggregate/loader';
 import type { ContractSpaceAggregate } from '../../src/aggregate/types';
+import { writeContractSnapshot } from '../../src/contract-snapshot-store';
 import type { IntegrityViolation } from '../../src/integrity-violation';
 import { writeTestPackage } from '../fixtures';
 
@@ -73,10 +74,12 @@ describe('loadContractSpaceAggregate', () => {
     await writeFile(join(refsDir, 'head.json'), JSON.stringify(headRef, null, 2));
   }
 
-  /** Write `migrations/<spaceId>/contract.json` verbatim. */
-  async function writeContractJson(spaceId: string, contract: unknown): Promise<void> {
-    await mkdir(join(migrationsDir, spaceId), { recursive: true });
-    await writeFile(join(migrationsDir, spaceId, 'contract.json'), JSON.stringify(contract));
+  /** Write a contract snapshot store entry keyed by `storageHash`. */
+  async function writeContractSnapshotEntry(storageHash: string, contract: unknown): Promise<void> {
+    await writeContractSnapshot(migrationsDir, storageHash, {
+      contractJson: contract,
+      contractDts: 'export type Contract = unknown;\n',
+    });
   }
 
   function violationsOfKind<K extends IntegrityViolation['kind']>(
@@ -123,8 +126,8 @@ describe('loadContractSpaceAggregate', () => {
     it('reads head ref from disk when space has no packages', async () => {
       const extContract = sqlContractWithTables({ tables: ['ext_table'] });
       const headHash = extContract.storage.storageHash;
-      // Write the space artefacts including head.json (as emitContractSpaceArtefacts does).
-      await writeContractJson('supabase', extContract);
+      // Write the space artifacts including head.json (as emitContractSpaceArtifacts does).
+      await writeContractSnapshotEntry(headHash, extContract);
       await writeHeadRef('supabase', { hash: headHash, invariants: [] });
 
       const aggregate = await load();
@@ -136,7 +139,7 @@ describe('loadContractSpaceAggregate', () => {
 
     it('produces no headRefNotInGraph violation when packages is empty and head.json is on disk', async () => {
       const extContract = sqlContractWithTables({ tables: ['ext_table'] });
-      await writeContractJson('supabase', extContract);
+      await writeContractSnapshotEntry(extContract.storage.storageHash, extContract);
       await writeHeadRef('supabase', { hash: extContract.storage.storageHash, invariants: [] });
 
       const aggregate = await load();
@@ -151,8 +154,9 @@ describe('loadContractSpaceAggregate', () => {
 
     it('reports headRefMissing for an extension space with no packages and no head.json', async () => {
       // No packages and no head.json — headRefMissing is always an authoring error.
-      const extContract = sqlContractWithTables({ tables: ['ext_table'] });
-      await writeContractJson('supabase', extContract);
+      // The space directory itself exists on disk (e.g. scaffolded but never
+      // seeded), which is what makes it enumerable at all.
+      await mkdir(join(migrationsDir, 'supabase'), { recursive: true });
 
       const aggregate = await load();
       const violations = aggregate.checkIntegrity();
@@ -214,9 +218,10 @@ describe('loadContractSpaceAggregate', () => {
 
     it('extension contract() deserializes the on-disk contract.json and memoises it', async () => {
       const extContract = sqlContractWithTables({ tables: ['ext_table'] });
-      await writePackage('cipherstash', '20260101T0000_init', { from: null, to: 'c1' });
-      await writeHeadRef('cipherstash', { hash: 'c1', invariants: [] });
-      await writeContractJson('cipherstash', extContract);
+      const headHash = extContract.storage.storageHash;
+      await writePackage('cipherstash', '20260101T0000_init', { from: null, to: headHash });
+      await writeHeadRef('cipherstash', { hash: headHash, invariants: [] });
+      await writeContractSnapshotEntry(headHash, extContract);
 
       const aggregate = await load();
       const space = aggregate.space('cipherstash');
@@ -338,19 +343,22 @@ describe('loadContractSpaceAggregate', () => {
 
     it('gates target / disjointness / contract checks behind checkContracts', async () => {
       // wrongtarget: a deserializable contract whose target differs.
-      await writePackage('wrongtarget', '20260101T0000_init', { from: null, to: 'w1' });
-      await writeHeadRef('wrongtarget', { hash: 'w1', invariants: [] });
-      await writeContractJson(
-        'wrongtarget',
-        sqlContractWithTables({ target: 'sqlite', tables: ['wt'] }),
-      );
+      const wrongTargetContract = sqlContractWithTables({ target: 'sqlite', tables: ['wt'] });
+      const wrongTargetHash = wrongTargetContract.storage.storageHash;
+      await writePackage('wrongtarget', '20260101T0000_init', { from: null, to: wrongTargetHash });
+      await writeHeadRef('wrongtarget', { hash: wrongTargetHash, invariants: [] });
+      await writeContractSnapshotEntry(wrongTargetHash, wrongTargetContract);
       // sharer: claims the same `user` table as the app → disjointness.
-      await writePackage('sharer', '20260101T0000_init', { from: null, to: 's1' });
-      await writeHeadRef('sharer', { hash: 's1', invariants: [] });
-      await writeContractJson('sharer', sqlContractWithTables({ tables: ['user'] }));
-      // broken: no contract.json → contract() throws → contractUnreadable.
-      await writePackage('broken', '20260101T0000_init', { from: null, to: 'k1' });
-      await writeHeadRef('broken', { hash: 'k1', invariants: [] });
+      const sharerContract = sqlContractWithTables({ tables: ['user'] });
+      const sharerHash = sharerContract.storage.storageHash;
+      await writePackage('sharer', '20260101T0000_init', { from: null, to: sharerHash });
+      await writeHeadRef('sharer', { hash: sharerHash, invariants: [] });
+      await writeContractSnapshotEntry(sharerHash, sharerContract);
+      // broken: head ref points at a hash with no store entry → contract()
+      // throws → contractUnreadable.
+      const brokenHash = '9'.repeat(64);
+      await writePackage('broken', '20260101T0000_init', { from: null, to: brokenHash });
+      await writeHeadRef('broken', { hash: brokenHash, invariants: [] });
 
       const aggregate = await load();
 

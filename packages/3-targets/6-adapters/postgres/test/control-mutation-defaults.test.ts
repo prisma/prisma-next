@@ -146,6 +146,55 @@ describe('createPostgresDefaultFunctionRegistry', () => {
     expect(result).toMatchObject({ ok: false });
   });
 
+  describe('dbgenerated keeps the raw expression verbatim, never resolving it', () => {
+    // `lowerDbgenerated` must not resolve the raw SQL text — a literal-shaped
+    // expression (e.g. `'{}'::jsonb`) is normalized once, at SchemaIR
+    // construction on the expected side (`contractToSchemaIR`'s
+    // target-supplied `resolveDefault` hook), not here. Rewriting here would
+    // also discard the user's original expression for cases like
+    // `nextval('my_seq')`, whose DDL must keep referencing the named sequence.
+    const handler = createPostgresDefaultFunctionRegistry().get('dbgenerated')!;
+
+    function lower(expression: string) {
+      return handler.lower({
+        call: makeCall('dbgenerated', { expression }),
+        context: stubContext,
+      });
+    }
+
+    it('keeps a jsonb literal expression as a function, unresolved', () => {
+      const expression = "'{}'::jsonb";
+      expect(lower(expression)).toMatchObject({
+        ok: true,
+        value: { kind: 'storage', defaultValue: { kind: 'function', expression } },
+      });
+    });
+
+    it('keeps a text[] literal expression as a function, unresolved', () => {
+      const expression = "'{}'::text[]";
+      expect(lower(expression)).toMatchObject({
+        ok: true,
+        value: { kind: 'storage', defaultValue: { kind: 'function', expression } },
+      });
+    });
+
+    it('keeps gen_random_uuid() a function', () => {
+      const expression = 'gen_random_uuid()';
+      expect(lower(expression)).toMatchObject({
+        ok: true,
+        value: { kind: 'storage', defaultValue: { kind: 'function', expression } },
+      });
+    });
+
+    it("keeps nextval(...) a function, unchanged (doesn't adopt the normalizer's autoincrement() rewrite)", () => {
+      const expression = "nextval('seq'::regclass)";
+      expect(lower(expression)).toMatchObject({
+        ok: true,
+        value: { kind: 'storage', defaultValue: { kind: 'function', expression } },
+      });
+    });
+  });
+
   it('lowers uuid(4) explicitly to uuidv4 execution generator', () => {
     const handler = registry.get('uuid')!;
     const result = handler.lower({

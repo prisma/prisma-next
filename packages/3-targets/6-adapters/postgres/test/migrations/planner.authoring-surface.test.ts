@@ -15,13 +15,16 @@ import {
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
+const TO_STORAGE_HASH = '2'.repeat(64);
+const FROM_STORAGE_HASH = '3'.repeat(64);
+
 function createEmptyContract(): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
     profileHash: profileHash('test'),
     storage: new SqlStorage({
-      storageHash: coreHash('test'),
+      storageHash: coreHash(TO_STORAGE_HASH),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -64,7 +67,7 @@ describe('PostgresMigrationPlanner authoring surface', () => {
       const fromContract: Contract<SqlStorage> = {
         ...createEmptyContract(),
         storage: new SqlStorage({
-          storageHash: coreHash('from-hash-stub'),
+          storageHash: coreHash(FROM_STORAGE_HASH),
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
               id: UNBOUND_NAMESPACE_ID,
@@ -80,6 +83,7 @@ describe('PostgresMigrationPlanner authoring surface', () => {
         fromContract,
         frameworkComponents: [],
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: '../../snapshots',
       });
 
       if (result.kind !== 'success') {
@@ -97,7 +101,7 @@ describe('PostgresMigrationPlanner authoring surface', () => {
       expect(source).toContain('export default class M extends Migration<Start, End>');
       expect(source).toContain('override readonly endContractJson = endContract;');
       expect(source).not.toContain('describe()');
-      expect(source).not.toContain(coreHash('from-hash-stub'));
+      expect(source).not.toContain(coreHash(FROM_STORAGE_HASH));
     });
   });
 
@@ -108,7 +112,8 @@ describe('PostgresMigrationPlanner authoring surface', () => {
         {
           packageDir: '/tmp/migration-pkg',
           fromHash: null,
-          toHash: 'to-hash-stub',
+          toHash: 'to',
+          snapshotsImportPath: '../../snapshots',
         },
         APP_SPACE_ID,
       );
@@ -120,11 +125,14 @@ describe('PostgresMigrationPlanner authoring surface', () => {
 
     it('renders a stub that derives from/to from contract JSON and has an empty operations list', () => {
       const planner = makeFrameworkPlanner();
+      const fromHash = 'e'.repeat(64);
+      const toHash = 'f'.repeat(64);
       const empty = planner.emptyMigration(
         {
           packageDir: '/tmp/migration-pkg',
-          fromHash: 'from-hash-stub',
-          toHash: 'to-hash-stub',
+          fromHash,
+          toHash,
+          snapshotsImportPath: '../../snapshots',
         },
         APP_SPACE_ID,
       );
@@ -135,8 +143,8 @@ describe('PostgresMigrationPlanner authoring surface', () => {
       expect(source).toContain('export default class M extends Migration<Start, End>');
       expect(source).toContain('override readonly endContractJson = endContract;');
       expect(source).not.toContain('describe()');
-      expect(source).not.toContain('"from-hash-stub"');
-      expect(source).not.toContain('"to-hash-stub"');
+      expect(source).not.toContain(`"${fromHash}"`);
+      expect(source).not.toContain(`"${toHash}"`);
       expect(source).toContain('override get operations()');
     });
   });

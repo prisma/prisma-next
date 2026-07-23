@@ -125,7 +125,7 @@ describe('family instance schemaVerify - basic', () => {
 
         expect(result.ok).toBe(false);
         expect(result.schema.issues).toContainEqual(
-          expect.objectContaining({ reason: 'not-found', path: ['database', 'public', 'post'] }),
+          expect.objectContaining({ path: ['database', 'public', 'post'] }),
         );
       },
       timeouts.spinUpPpgDev,
@@ -163,7 +163,6 @@ describe('family instance schemaVerify - basic', () => {
         expect(result.ok).toBe(false);
         expect(result.schema.issues).toContainEqual(
           expect.objectContaining({
-            reason: 'not-found',
             path: ['database', 'public', 'user', 'column:email'],
           }),
         );

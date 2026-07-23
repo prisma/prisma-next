@@ -74,6 +74,7 @@ describe('collection-mutation-dispatch', () => {
       selectedFields: undefined,
       hiddenColumns: ['email'],
       mapRow: (mapped) => mapped,
+      operation: 'delete',
       onMissingRowMessage: 'missing row',
     });
 
@@ -97,6 +98,7 @@ describe('collection-mutation-dispatch', () => {
       selectedFields: undefined,
       hiddenColumns: ['email'],
       mapRow: (mapped) => mapped,
+      operation: 'update',
       onMissingRowMessage: 'missing row',
     });
 

@@ -254,12 +254,15 @@ function finaliseVerifyResult(args: {
   if (!verifyResult.ok) {
     emitVerifySpan(onProgress, 'spanEndError');
     return notOk(
-      new CliStructuredError('5002', 'Aggregate verifier introspection failed', {
-        domain: 'MIG',
-        why: verifyResult.failure.detail,
-        fix: 'Check database connectivity and the introspection tooling.',
-        docsUrl: 'https://pris.ly/contract-spaces',
-      }),
+      new CliStructuredError(
+        'MIGRATION.CONTRACT_SPACE_VIOLATION',
+        'Aggregate verifier introspection failed',
+        {
+          why: verifyResult.failure.detail,
+          fix: 'Check database connectivity and the introspection tooling.',
+          docsUrl: 'https://pris.ly/contract-spaces',
+        },
+      ),
     );
   }
   const markerError = skipMarker
@@ -300,7 +303,8 @@ function buildSkippedSchemaResult(space: AggregateContractSpace): VerifyDatabase
 /**
  * Translate per-space marker check failures and orphan markers into a
  * single CLI structured error envelope. Preserves the legacy code
- * `5002` (was emitted by `runContractSpaceVerifierMarkerCheck`).
+ * `MIGRATION.CONTRACT_SPACE_VIOLATION` (was emitted by
+ * `runContractSpaceVerifierMarkerCheck`).
  */
 function mapMarkerCheckFailures(
   appSpaceId: string,
@@ -354,8 +358,7 @@ function mapMarkerCheckFailures(
     violations.length === 1
       ? 'Contract-space verifier found a violation'
       : `Contract-space verifier found violations (${violations.length})`;
-  return new CliStructuredError('5002', summary, {
-    domain: 'MIG',
+  return new CliStructuredError('MIGRATION.CONTRACT_SPACE_VIOLATION', summary, {
     why: `The on-disk \`migrations/\` directory, the \`extensionPacks\` declaration, and the live database marker rows are not in agreement.\n${lines.join('\n')}`,
     fix: violations[0]?.remediation ?? 'Review and reconcile the violations listed above.',
     docsUrl: 'https://pris.ly/contract-spaces',

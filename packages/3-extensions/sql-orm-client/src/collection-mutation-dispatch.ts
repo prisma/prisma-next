@@ -11,6 +11,7 @@ import {
   stripHiddenMappedFields,
 } from './collection-runtime';
 import { executeQueryPlan } from './execute-query-plan';
+import { ormError } from './orm-errors';
 import type { CollectionContext, IncludeExpr } from './types';
 
 function createMutationRowMapper(
@@ -175,6 +176,7 @@ interface ExecuteSingleMutationOptions<Row> {
   readonly selectedFields: readonly string[] | undefined;
   readonly hiddenColumns: readonly string[];
   readonly mapRow: (mapped: Record<string, unknown>) => Row;
+  readonly operation: string;
   readonly onMissingRowMessage: string;
 }
 
@@ -193,6 +195,7 @@ export async function executeMutationReturningSingleRow<Row>(
     selectedFields,
     hiddenColumns,
     mapRow,
+    operation,
     onMissingRowMessage,
   } = options;
   const { contract } = context;
@@ -231,5 +234,7 @@ export async function executeMutationReturningSingleRow<Row>(
   })) {
     return row;
   }
-  throw new Error(onMissingRowMessage);
+  throw ormError('ORM.MUTATION_ROW_MISSING', onMissingRowMessage, {
+    meta: { operation, model: modelName, tableName },
+  });
 }

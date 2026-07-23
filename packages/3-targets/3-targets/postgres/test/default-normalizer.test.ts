@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parsePostgresDefault } from '../src/core/default-normalizer';
+import { parsePostgresDefault, postgresResolveDefault } from '../src/core/default-normalizer';
 
 describe('parsePostgresDefault array literals', () => {
   it('parses an empty array body', () => {
@@ -343,6 +343,65 @@ describe('parsePostgresDefault unparseable expressions', () => {
     expect(parsePostgresDefault('some_custom_function(1, 2)')).toEqual({
       kind: 'function',
       expression: 'some_custom_function(1, 2)',
+    });
+  });
+});
+
+describe('postgresResolveDefault', () => {
+  // The contract-derived (expected) side's `resolveDefault` hook, called at
+  // `SchemaIR` construction so the expected side normalizes a `dbgenerated`
+  // literal-shaped function default the same way introspection does. If this
+  // ever passes the contract default through unnormalized, `db verify`
+  // reports permanent drift for a jsonb/text[] literal default that matches
+  // the live database exactly.
+
+  it('a literal default passes through unchanged', () => {
+    const literal = { kind: 'literal' as const, value: 'draft' };
+    expect(postgresResolveDefault(literal, 'text')).toEqual(literal);
+  });
+
+  it('resolves a dbgenerated jsonb literal to a literal object, matching introspection', () => {
+    const result = postgresResolveDefault({ kind: 'function', expression: "'{}'::jsonb" }, 'jsonb');
+    expect(result).toEqual({ kind: 'literal', value: {} });
+  });
+
+  it('resolves a dbgenerated text[] literal to a literal array, matching introspection', () => {
+    const result = postgresResolveDefault(
+      { kind: 'function', expression: "'{}'::text[]" },
+      'text[]',
+    );
+    expect(result).toEqual({ kind: 'literal', value: [] });
+  });
+
+  it('normalizes a dbgenerated nextval(...) to autoincrement(), matching a serial/identity column', () => {
+    const result = postgresResolveDefault(
+      { kind: 'function', expression: "nextval('my_seq'::regclass)" },
+      'int4',
+    );
+    expect(result).toEqual({ kind: 'function', expression: 'autoincrement()' });
+  });
+
+  it('keeps gen_random_uuid() a function, unresolved', () => {
+    const expression = 'gen_random_uuid()';
+    expect(postgresResolveDefault({ kind: 'function', expression }, 'uuid')).toEqual({
+      kind: 'function',
+      expression,
+    });
+  });
+
+  it('keeps a now()-plus-interval expression a function, unresolved', () => {
+    const expression = "(now() + '00:03:00'::interval)";
+    expect(postgresResolveDefault({ kind: 'function', expression }, 'timestamptz')).toEqual({
+      kind: 'function',
+      expression,
+    });
+  });
+
+  it('keeps an enum-cast literal a function (unqualified cast type defeats the string-literal pattern)', () => {
+    const expression = "'confidential'::auth.oauth_client_type";
+    expect(postgresResolveDefault({ kind: 'function', expression }, 'oauth_client_type')).toEqual({
+      kind: 'function',
+      expression,
     });
   });
 });

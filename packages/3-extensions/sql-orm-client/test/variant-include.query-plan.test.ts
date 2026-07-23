@@ -3,6 +3,7 @@ import {
   BinaryExpr,
   ColumnRef,
   JsonObjectExpr,
+  NativeJsonValueProjection,
   ProjectionItem,
   SelectAst,
   SubqueryExpr,
@@ -23,7 +24,6 @@ import {
   rootState,
   rowAggregate,
   selectedState,
-  taskVariantProjection,
 } from './variant-include.query-plan-fixtures';
 
 describe('variant-owned include parent correlation', () => {
@@ -45,7 +45,6 @@ describe('variant-owned include parent correlation', () => {
       SelectAst.from(TableSource.named('tasks', undefined, 'public'))
         .withProjection([
           projection('title', 'tasks', 'title', 'pg/text@1'),
-          ...taskVariantProjection('features'),
           ProjectionItem.of('assignee', SubqueryExpr.of(aggregate)),
         ])
         .withJoins([featureJoin]),
@@ -139,7 +138,6 @@ describe('variant-owned include child alias collisions', () => {
       SelectAst.from(TableSource.named('tasks', undefined, 'public'))
         .withProjection([
           projection('title', 'tasks', 'title', 'pg/text@1'),
-          ...taskVariantProjection('features'),
           ProjectionItem.of('relatedFeature', SubqueryExpr.of(aggregate)),
         ])
         .withJoins([featureJoin]),
@@ -165,7 +163,9 @@ describe('variant-owned include child alias collisions', () => {
       .withProjection([
         ProjectionItem.of(
           'featureCount',
-          JsonObjectExpr.fromEntries([JsonObjectExpr.entry('value', AggregateExpr.count())]),
+          JsonObjectExpr.fromEntries([
+            JsonObjectExpr.entry('value', new NativeJsonValueProjection(AggregateExpr.count())),
+          ]),
         ),
       ])
       .withWhere(
@@ -187,7 +187,6 @@ describe('variant-owned include child alias collisions', () => {
       SelectAst.from(TableSource.named('tasks', undefined, 'public'))
         .withProjection([
           projection('title', 'tasks', 'title', 'pg/text@1'),
-          ...taskVariantProjection('features'),
           ProjectionItem.of('featureCount', SubqueryExpr.of(scalarSelect)),
         ])
         .withJoins([featureJoin]),

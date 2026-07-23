@@ -6,7 +6,7 @@
  * This file pins:
  *
  * 1. `migration show` without a target is rejected (target is required).
- * 2. Wrong-grammar diagnostics reach the user in that state (not PN-MIG-5001).
+ * 2. Wrong-grammar diagnostics reach the user in that state (not MIGRATION.CONTRACT_SPACE_LAYOUT_VIOLATION).
  * 3. A valid app-space migration directory resolves and returns details.
  */
 
@@ -94,7 +94,9 @@ withTempDir(({ createTempDir }) => {
         expect(json?.['ok'], 'response is an error envelope').toBe(false);
 
         const code = json?.['code'];
-        expect(code, 'must not be the aggregate-loader code').not.toBe('PN-MIG-5001');
+        expect(code, 'must not be the aggregate-loader code').not.toBe(
+          'MIGRATION.CONTRACT_SPACE_LAYOUT_VIOLATION',
+        );
 
         const meta = json?.['meta'] as Record<string, unknown> | undefined;
         expect(meta?.['input'], 'meta echoes the user input verbatim').toBe('production');

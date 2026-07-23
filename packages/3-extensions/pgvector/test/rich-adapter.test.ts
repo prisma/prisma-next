@@ -13,6 +13,7 @@ import {
   JoinAst,
   JsonArrayAggExpr,
   JsonObjectExpr,
+  NativeJsonValueProjection,
   OperationExpr,
   OrderByItem,
   ParamRef,
@@ -98,10 +99,18 @@ describe('Postgres rich AST lowering', () => {
       ProjectionItem.of(
         'posts',
         JsonArrayAggExpr.of(
-          JsonObjectExpr.fromEntries([
-            JsonObjectExpr.entry('id', ColumnRef.of('post_rows', 'id')),
-            JsonObjectExpr.entry('title', ColumnRef.of('post_rows', 'title')),
-          ]),
+          new NativeJsonValueProjection(
+            JsonObjectExpr.fromEntries([
+              JsonObjectExpr.entry(
+                'id',
+                new NativeJsonValueProjection(ColumnRef.of('post_rows', 'id')),
+              ),
+              JsonObjectExpr.entry(
+                'title',
+                new NativeJsonValueProjection(ColumnRef.of('post_rows', 'title')),
+              ),
+            ]),
+          ),
           'emptyArray',
           [OrderByItem.asc(ColumnRef.of('post_rows', 'title'))],
         ),

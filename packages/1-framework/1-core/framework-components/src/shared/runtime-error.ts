@@ -1,6 +1,14 @@
 export interface RuntimeErrorEnvelope extends Error {
   readonly code: string;
-  readonly category: 'PLAN' | 'CONTRACT' | 'LINT' | 'BUDGET' | 'RUNTIME';
+  readonly category:
+    | 'PLAN'
+    | 'CONTRACT'
+    | 'LINT'
+    | 'BUDGET'
+    | 'RUNTIME'
+    | 'DRIVER'
+    | 'MIGRATION'
+    | 'ORM';
   readonly severity: 'error';
   readonly details?: Record<string, unknown>;
 }
@@ -43,6 +51,9 @@ function resolveCategory(code: string): RuntimeErrorEnvelope['category'] {
     case 'CONTRACT':
     case 'LINT':
     case 'BUDGET':
+    case 'DRIVER':
+    case 'MIGRATION':
+    case 'ORM':
       return prefix;
     default:
       return 'RUNTIME';

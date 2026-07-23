@@ -40,8 +40,9 @@ type Op = SqlMigrationPlanOperation<SqlitePlanTargetDetails>;
  * through every call.
  *
  * Binds the framework base's `Start` / `End` contract generics so a subclass
- * that assigns its `start-contract.json` / `end-contract.json` imports gets
- * fully-typed view accessors: `this.endContract` is a `SqliteContractView<End>`
+ * that assigns its snapshot-store `contract.json` imports to
+ * `startContractJson` / `endContractJson` gets fully-typed view accessors:
+ * `this.endContract` is a `SqliteContractView<End>`
  * (sole namespace unwrapped to the root — `this.endContract.table.<name>`),
  * built lazily from the JSON fields via the shared `MigrationContractViews`
  * helper. Mirrors `MongoMigration`'s view getters; the framework base derives
@@ -57,7 +58,7 @@ export abstract class SqliteMigration<
    * Materialized SQLite control adapter, created once per migration
    * instance from the injected stack. `undefined` only when the migration
    * was instantiated without a stack (test fixtures); `controlAdapterFor`
-   * throws a PN-MIG-2008 in that case to surface the misuse.
+   * throws a MIGRATION.SQLITE_CONTROL_STACK_MISSING in that case to surface the misuse.
    */
   protected readonly controlAdapter: SqlControlAdapter<'sqlite'> | undefined;
 
@@ -81,7 +82,7 @@ export abstract class SqliteMigration<
   }
 
   /**
-   * Returns the materialized control adapter, or throws a PN-MIG-2008 naming
+   * Returns the materialized control adapter, or throws a MIGRATION.SQLITE_CONTROL_STACK_MISSING naming
    * `operation` when the migration was constructed without a `ControlStack`.
    * Single home for the null-check that every DDL/DML method shares.
    */

@@ -150,6 +150,7 @@ async function planOpIds(
     fromContract: null,
     frameworkComponents: [],
     spaceId: APP_SPACE_ID,
+    snapshotsImportPath: '../../snapshots',
   });
   expect(result.kind).toBe('success');
   if (result.kind !== 'success') return [];
@@ -256,6 +257,7 @@ describe('external-table grading', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;

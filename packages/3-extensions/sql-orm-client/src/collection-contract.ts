@@ -7,6 +7,8 @@ import type {
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { InternalError } from '@prisma-next/utils/internal-error';
+import { ormError } from './orm-errors';
 import {
   domainModelTableInNamespace,
   resolveTableForContract,
@@ -41,6 +43,8 @@ export interface PolymorphismInfo {
   readonly mtiVariants: readonly PolymorphismVariantInfo[];
 }
 
+export const POLYMORPHIC_DISCRIMINATOR_ALIAS = '__prisma_polymorphic_discriminator';
+
 // Model map for a model's metadata resolution. The lookup is always scoped to
 // an explicit namespace coordinate (`orm.<ns>.<Model>`); bare-name access
 // resolves the sole namespace upstream (in the ORM factory) before reaching
@@ -48,7 +52,7 @@ export interface PolymorphismInfo {
 function modelsOf(contract: Contract<SqlStorage>, namespaceId: string): ModelsMap {
   const namespace = contract.domain.namespaces[namespaceId];
   if (namespace === undefined) {
-    throw new Error(`domain namespace "${namespaceId}" is not present on the contract`);
+    throw new InternalError(`domain namespace "${namespaceId}" is not present on the contract`);
   }
   return blindCast<ModelsMap, 'domain namespace models are model entries for this SQL contract'>(
     namespace.models,
@@ -115,7 +119,7 @@ export function resolvePolymorphismInfo(
   for (const [variantModelName, variantEntry] of Object.entries(model.variants)) {
     const variantModel = models[variantModelName];
     if (!variantModel) {
-      throw new Error(
+      throw new InternalError(
         `Model "${modelName}" declares variant "${variantModelName}", but that model is missing from the contract`,
       );
     }
@@ -326,12 +330,16 @@ export function resolveIncludeRelation(
 
   relation ??= resolveModelRelations(contract, namespaceId, baseModelName)[relationName];
   if (!relation) {
-    throw new Error(`Relation '${relationName}' not found on model '${baseModelName}'`);
+    throw ormError(
+      'ORM.RELATION_UNKNOWN',
+      `Relation '${relationName}' not found on model '${baseModelName}'`,
+      { meta: { model: baseModelName, relation: relationName } },
+    );
   }
   const localField = relation.on.localFields[0];
   const targetField = relation.on.targetFields[0];
   if (!localField || !targetField) {
-    throw new Error(
+    throw new InternalError(
       `Relation '${relationName}' on model '${declaringModelName}' has incomplete join metadata (missing localFields or targetFields)`,
     );
   }
@@ -526,7 +534,7 @@ export function resolveModelTableName(
 ): string {
   const table = domainModelTableInNamespace(contract, namespaceId, modelName);
   if (table === undefined) {
-    throw new Error(
+    throw new InternalError(
       `Model "${modelName}" has invalid or missing storage.table in namespace "${namespaceId}"`,
     );
   }
@@ -576,7 +584,9 @@ export function assertReturningCapability(contract: Contract<SqlStorage>, action
     return;
   }
 
-  throw new Error(`${action} requires contract capability "returning"`);
+  throw ormError('ORM.CAPABILITY_MISSING', `${action} requires contract capability "returning"`, {
+    meta: { capability: 'returning', action },
+  });
 }
 
 export function hasContractCapability(contract: Contract<SqlStorage>, capability: string): boolean {

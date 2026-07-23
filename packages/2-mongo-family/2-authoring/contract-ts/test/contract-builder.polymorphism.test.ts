@@ -369,6 +369,7 @@ describe('mongo contract builder — polymorphic index scoping', () => {
       thrown = err;
     }
     expect(thrown).toBeInstanceOf(Error);
+    expect(thrown).toMatchObject({ code: 'CONTRACT.INDEX_INVALID' });
     const message = (thrown as Error).message;
     expect(message).toMatch(/Bug/);
     expect(message).toMatch(/type/);

@@ -9,7 +9,7 @@ describe('sqlContractCanonicalizationHooks.shouldPreserveEmpty', () => {
   it('preserves a column default literal payload (false / empty-array defaults)', () => {
     // `{ kind: 'literal', value: false }` reaches the default-omission walk
     // as a default value; without this veto the emitted contract fails its
-    // own validation on the next read (PN-CLI-4003 on Boolean @default(false)).
+    // own validation on the next read (CONTRACT.VALIDATION_FAILED on Boolean @default(false)).
     expect(
       sqlContractCanonicalizationHooks.shouldPreserveEmpty([
         'storage',

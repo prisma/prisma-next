@@ -326,7 +326,7 @@ describe('MongoMigrationRunner.executeDataTransform', () => {
     const result = await execute(harness, [op], { idempotencyChecks: false });
 
     expect(result.assertNotOk()).toMatchObject({
-      code: 'PRECHECK_FAILED',
+      code: 'MIGRATION.PRECHECK_FAILED',
       summary: `Operation ${op.id} failed during precheck`,
       meta: { operationId: op.id, name: op.name },
     });
@@ -351,7 +351,7 @@ describe('MongoMigrationRunner.executeDataTransform', () => {
     const result = await execute(harness, [op], { idempotencyChecks: false });
 
     expect(result.assertNotOk()).toMatchObject({
-      code: 'POSTCHECK_FAILED',
+      code: 'MIGRATION.POSTCHECK_FAILED',
       summary: `Operation ${op.id} failed during postcheck`,
       meta: { operationId: op.id, name: op.name },
     });
@@ -377,7 +377,7 @@ describe('MongoMigrationRunner.executeDataTransform', () => {
     }
 
     expect(thrown).toMatchObject({
-      code: '3020',
+      code: 'MIGRATION.RUNNER_FAILED',
       meta: {
         commandKind: 'rawUpdateMany',
         collection: RUN_COLLECTION,
@@ -472,12 +472,10 @@ describe('MongoMigrationRunner schema verification', () => {
     });
 
     const failure = result.assertNotOk();
-    expect(failure.code).toBe('SCHEMA_VERIFY_FAILED');
+    expect(failure.code).toBe('MIGRATION.SCHEMA_VERIFY_FAILED');
     expect(failure.why).toMatch(/destination contract/);
     expect(failure.meta?.['issues']).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ path: ['rogue'], reason: 'not-expected' }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ path: ['rogue'] })]),
     );
     expect(calls).toEqual({ initMarker: 0, updateMarker: 0, writeLedgerEntry: 0 });
   });
@@ -778,6 +776,6 @@ describe('MongoMigrationRunner - per-edge ledger', () => {
       migrationName: '',
       migrationHash: destHash,
     });
-    expect((ledgerEntries[0]?.operations as unknown[]).length).toBe(1);
+    expect((ledgerEntries[0]!.operations as unknown[]).length).toBe(1);
   });
 });

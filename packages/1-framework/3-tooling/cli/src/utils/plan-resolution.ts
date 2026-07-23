@@ -27,9 +27,9 @@ export function looksLikeFullHash(input: string): boolean {
 
 export type FromResolution =
   | { kind: 'greenfield'; fromHash: null; fromContract: null }
-  | { kind: 'graph-node'; fromHash: string; fromContract: Contract; sourceDir: string }
+  | { kind: 'graph-node'; fromHash: string; fromContract: Contract }
   | {
-      kind: 'snapshot';
+      kind: 'ref';
       fromHash: string;
       fromContract: Contract;
       contractDts: string;
@@ -81,7 +81,7 @@ export function assertFromIsGraphNode(
 
 type RefContractResolution =
   | {
-      kind: 'snapshot';
+      kind: 'ref';
       hash: string;
       contract: Contract;
       contractJson: unknown;
@@ -93,7 +93,6 @@ type RefContractResolution =
       contract: Contract;
       contractJson: unknown;
       contractDts: string;
-      sourceDir: string;
     };
 
 async function resolveContractRef(
@@ -107,9 +106,9 @@ async function resolveContractRef(
   try {
     const at = await space.contractAt(hash, refName !== undefined ? { refName } : undefined);
 
-    if (at.provenance === 'snapshot') {
+    if (at.provenance === 'ref') {
       return ok({
-        kind: 'snapshot',
+        kind: 'ref',
         hash: at.hash,
         contract: at.contract,
         contractJson: at.contractJson,
@@ -123,7 +122,6 @@ async function resolveContractRef(
       contract: at.contract,
       contractJson: at.contractJson,
       contractDts: at.contractDts,
-      sourceDir: at.sourceDir,
     });
   } catch (error) {
     return mapContractAtError(
@@ -152,7 +150,6 @@ async function resolveFromPolicy(
       kind: 'graph-node',
       fromHash: resolution.value.hash,
       fromContract: resolution.value.contract,
-      sourceDir: resolution.value.sourceDir,
     });
   }
 
@@ -178,7 +175,7 @@ async function resolveFromPolicy(
     throw error;
   }
   return ok({
-    kind: 'snapshot',
+    kind: 'ref',
     fromHash: hash,
     fromContract: contract,
     contractDts,

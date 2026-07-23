@@ -73,6 +73,7 @@ export function makeAggregateContractSpace(args: {
   packages?: readonly OnDiskMigrationPackage[];
   refs?: Refs;
   refsDir?: string;
+  migrationsDir?: string;
   deserializeContract?: (raw: unknown) => Contract;
 }): AggregateContractSpace {
   const contract = args.contract ?? createContract();
@@ -84,6 +85,7 @@ export function makeAggregateContractSpace(args: {
     headRef:
       args.headRef === undefined ? { hash: EMPTY_CONTRACT_HASH, invariants: [] } : args.headRef,
     refsDir: args.refsDir ?? '/tmp/refs',
+    migrationsDir: args.migrationsDir ?? '/tmp/migrations',
     resolveContract: () => contract,
     deserializeContract,
   });

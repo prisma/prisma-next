@@ -1,14 +1,23 @@
 #!/usr/bin/env node
 /**
- * Regenerates `end-contract.d.ts` files for Mongo migration snapshots by
- * hydrating the adjacent `end-contract.json` through the Mongo target
- * serializer and re-running the emitter's typedef generator. The .json
- * file is left untouched so historical storage hashes stay stable —
- * only the .d.ts is rewritten to match the post-class-flip type surface
- * (collections carry a `kind: 'mongo-collection'` discriminator, etc.).
+ * Regenerates a Mongo contract's `.d.ts` file by hydrating its adjacent
+ * `.json` through the Mongo target serializer and re-running the emitter's
+ * typedef generator. The `.json` file is left untouched so historical
+ * storage hashes stay stable — only the `.d.ts` is rewritten to match the
+ * post-class-flip type surface (collections carry a
+ * `kind: 'mongo-collection'` discriminator, etc.).
+ *
+ * Purely path-generic: it writes `<arg with .json replaced by .d.ts>`
+ * beside each argument, so it works unchanged whether the argument is a
+ * migrations-root-wide store entry (`migrations/snapshots/<hex>/contract.json`)
+ * or (pre-dedup) a per-package `end-contract.json`. Callers pass whichever
+ * path is the current source of truth; the script does not resolve the
+ * store itself, so there is no `writeContractSnapshot` call here — it
+ * overwrites the `.d.ts` unconditionally, whereas the store's writer is
+ * write-if-absent for the *pair*.
  *
  * Usage:
- *   node scripts/regen-mongo-end-contract-dts.mjs <path/to/end-contract.json>...
+ *   node scripts/regen-mongo-end-contract-dts.mjs <path/to/contract.json>...
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -37,7 +46,7 @@ const { MongoTargetContractSerializer } = await importFromRepo(
 
 const args = process.argv.slice(2);
 if (args.length === 0) {
-  console.error('usage: node regen-mongo-end-contract-dts.mjs <end-contract.json>...');
+  console.error('usage: node regen-mongo-end-contract-dts.mjs <path/to/contract.json>...');
   process.exit(1);
 }
 

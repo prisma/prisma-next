@@ -14,12 +14,13 @@ import type { Contract } from '@prisma-next/contract/types';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { APP_SPACE_ID, createControlStack } from '@prisma-next/framework-components/control';
 import { loadContractSpaceAggregate } from '@prisma-next/migration-tools/aggregate';
-import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
-  copyFilesWithRename,
-  formatMigrationDirName,
-  writeMigrationPackage,
-} from '@prisma-next/migration-tools/io';
+  contractSnapshotDir,
+  snapshotsImportPathFrom,
+  writeContractSnapshot,
+} from '@prisma-next/migration-tools/contract-snapshot-store';
+import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
+import { formatMigrationDirName, writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { findLatestMigration } from '@prisma-next/migration-tools/migration-graph';
 import { writeMigrationTs } from '@prisma-next/migration-tools/migration-ts';
@@ -28,7 +29,6 @@ import { Command } from 'commander';
 import { join, relative } from 'pathe';
 import {
   CliStructuredError,
-  errorFileNotFound,
   errorRuntime,
   errorTargetMigrationNotSupported,
   errorUnexpected,
@@ -133,7 +133,6 @@ async function executeMigrationNewCommand(
   const graph = aggregate.app.graph();
 
   let fromHash: string | null = null;
-  let fromContractSourceDir: string | null = null;
 
   if (packages.length > 0) {
     if (options.from) {
@@ -147,17 +146,10 @@ async function executeMigrationNewCommand(
         );
       }
       fromHash = match.metadata.to;
-      fromContractSourceDir = match.dirPath;
     } else {
       const latestMigration = findLatestMigration(graph);
       if (latestMigration) {
         fromHash = latestMigration.to;
-        const leafPkg = packages.find(
-          (p) => p.metadata.migrationHash === latestMigration.migrationHash,
-        );
-        if (leafPkg) {
-          fromContractSourceDir = leafPkg.dirPath;
-        }
       }
     }
   }
@@ -209,39 +201,23 @@ async function executeMigrationNewCommand(
 
     await writeMigrationPackage(packageDir, metadata, []);
     const destinationArtifacts = getEmittedArtifactPaths(contractPathAbsolute);
-    await copyFilesWithRename(packageDir, [
-      { sourcePath: destinationArtifacts.jsonPath, destName: 'end-contract.json' },
-      { sourcePath: destinationArtifacts.dtsPath, destName: 'end-contract.d.ts' },
+    const [contractJsonRaw, contractDts] = await Promise.all([
+      readFile(destinationArtifacts.jsonPath, 'utf-8'),
+      readFile(destinationArtifacts.dtsPath, 'utf-8'),
     ]);
-    if (fromContractSourceDir !== null) {
-      const sourceArtifacts = getEmittedArtifactPaths(
-        join(fromContractSourceDir, 'end-contract.json'),
-      );
-      try {
-        await copyFilesWithRename(packageDir, [
-          { sourcePath: sourceArtifacts.jsonPath, destName: 'start-contract.json' },
-          { sourcePath: sourceArtifacts.dtsPath, destName: 'start-contract.d.ts' },
-        ]);
-      } catch (error) {
-        if (error instanceof Error && (error as { code?: string }).code === 'ENOENT') {
-          return notOk(
-            errorFileNotFound(sourceArtifacts.jsonPath, {
-              why: `Predecessor migration is missing its destination contract snapshot at ${sourceArtifacts.jsonPath}`,
-              fix: 'Re-emit the predecessor migration (`prisma-next migration plan` from its source) so its sibling `end-contract.json` is restored, then re-run this command.',
-            }),
-          );
-        }
-        throw error;
-      }
-    }
+    await writeContractSnapshot(migrationsDir, toStorageHash, {
+      contractJson: JSON.parse(contractJsonRaw) as unknown,
+      contractDts,
+    });
 
     const planner = migrations.createPlanner(controlAdapter);
     const emptyPlan = planner.emptyMigration(
       {
         packageDir,
-        contractJsonPath: join(packageDir, 'end-contract.json'),
+        contractJsonPath: join(contractSnapshotDir(migrationsDir, toStorageHash), 'contract.json'),
         fromHash,
         toHash: toStorageHash,
+        snapshotsImportPath: snapshotsImportPathFrom(packageDir, migrationsDir),
       },
       APP_SPACE_ID,
     );

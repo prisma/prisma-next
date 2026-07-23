@@ -13,7 +13,6 @@ import {
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import {
-  applyFkDefaults,
   type ReferentialAction,
   SqlStorage,
   StorageTable,
@@ -90,8 +89,6 @@ export function createContractTable(
       name?: string;
       onDelete?: ReferentialAction;
       onUpdate?: ReferentialAction;
-      constraint?: boolean;
-      index?: boolean;
     }>;
     uniques?: ReadonlyArray<{ columns: readonly string[]; name?: string }>;
     indexes?: ReadonlyArray<{
@@ -120,7 +117,6 @@ export function createContractTable(
       ...fk,
       source: { ...fk.source, namespaceId: asNamespaceId(fk.source.namespaceId) },
       target: { ...fk.target, namespaceId: asNamespaceId(fk.target.namespaceId) },
-      ...applyFkDefaults(fk),
     })),
     uniques: options?.uniques ?? [],
     indexes: options?.indexes ?? [],

@@ -21,7 +21,12 @@
  *      relative TypeScript siblings).
  *   5. Re-pins `migrations/refs/head.json` with the new hash, preserving
  *      the existing `invariants` array verbatim.
- *   6. Syncs `end-contract.{json,d.ts}` from `src/contract.{json,d.ts}`.
+ *   6. Writes `src/contract.{json,d.ts}` into the migrations-root-wide
+ *      content-addressed store (`migrations/snapshots/<hex>/`, write-if-
+ *      absent) under the new hash, and rewrites any `endContract` /
+ *      `Contract as End` import specifiers in the head migration's
+ *      `migration.ts` to point at it (a no-op for the hand-authored
+ *      Path B migrations in this repo today, which carry no such import).
  *   7. Runs `biome format` via stdin on each touched JSON file so output is
  *      byte-identical to the committed canonical format (biome keeps short
  *      arrays inline and adds a trailing newline).
@@ -40,6 +45,14 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  contractSnapshotJsonSpecifier,
+  contractSnapshotTypesSpecifier,
+} from '@prisma-next/framework-components/control';
+import {
+  snapshotsImportPathFrom,
+  writeContractSnapshot,
+} from '@prisma-next/migration-tools/contract-snapshot-store';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const extensionsDir = join(repoRoot, 'packages', '3-extensions');
@@ -197,39 +210,33 @@ function repinHeadRef(headRefPath, newHash) {
 }
 
 /**
- * Sync `end-contract.{json,d.ts}` from `src/contract.{json,d.ts}` inside
- * the head migration directory.
- *
- * `src/contract.json` is emitted without a trailing newline; the on-disk
- * end-contract.json convention includes one. A trailing newline is added
- * if absent so idempotence holds on the first run.
- *
- * `src/contract.d.ts` is formatted by prettier during emission and already
- * carries a trailing newline; it is copied verbatim.
+ * Rewrite the store specifiers in a migration.ts's contract import block —
+ * `import endContract from '...'` and `import type { Contract as End } from
+ * '...'` — to point at `toHash`'s store entry. Keyed on the fixed import
+ * bindings the renderers always emit rather than on whatever hex the
+ * specifier currently encodes, so it is idempotent regardless of the
+ * previous hash. A no-op (via `String.prototype.replace`'s no-match
+ * passthrough) on migrations that carry no such import — e.g. the
+ * hand-authored Path B extension migrations, whose `describe()` returns a
+ * hash literal instead.
  */
-/**
- * Sync `end-contract.{json,d.ts}` from the resolved contract source directory.
- *
- * `contractSrcDir` is the directory containing `contract.json` and
- * `contract.d.ts` — either `extDir/src` (TypeScript-authored extensions) or
- * `extDir/src/contract` (PSL-authored extensions). The caller is responsible
- * for resolving the correct path via the same lookup that found contractJsonPath.
- */
-function syncEndContract(contractSrcDir, headMigrationDir) {
-  for (const ext of ['json', 'd.ts']) {
-    const src = join(contractSrcDir, `contract.${ext}`);
-    const dest = join(headMigrationDir, `end-contract.${ext}`);
-    const content = readFileSync(src, 'utf8');
-    const normalized = content.endsWith('\n') ? content : `${content}\n`;
-    writeFileSync(dest, normalized, 'utf8');
-  }
+function rewriteContractSnapshotSpecifiers(source, snapshotsImportPath, toHash) {
+  return source
+    .replace(
+      /(import\s+endContract\s+from\s+')[^']*(')/,
+      `$1${contractSnapshotJsonSpecifier(snapshotsImportPath, toHash)}$2`,
+    )
+    .replace(
+      /(import\s+type\s*\{\s*Contract\s+as\s+End\s*\}\s+from\s+')[^']*(')/,
+      `$1${contractSnapshotTypesSpecifier(snapshotsImportPath, toHash)}$2`,
+    );
 }
 
 /**
  * Process one extension directory. Returns `'skipped'` or `'updated'`;
  * throws on error.
  */
-function processExtension(extDir) {
+async function processExtension(extDir) {
   const migrationsDir = join(extDir, 'migrations');
   if (!existsSync(migrationsDir)) {
     return 'skipped';
@@ -279,13 +286,26 @@ function processExtension(extDir) {
   }
 
   rewriteMigrationToHash(migrationTsPath, newHash);
-  const contractSrcDir = dirname(contractJsonPath);
-  syncEndContract(contractSrcDir, headMigrationDir);
-  biomeFormatInPlace(join(headMigrationDir, 'end-contract.json'));
   reemitMigrationArtifacts(extDir, migrationTsPath);
   biomeFormatInPlace(join(headMigrationDir, 'migration.json'));
   biomeFormatInPlace(join(headMigrationDir, 'ops.json'));
   repinHeadRef(headRefPath, newHash);
+
+  const contractSrcDir = dirname(contractJsonPath);
+  const contractDts = readFileSync(join(contractSrcDir, 'contract.d.ts'), 'utf8');
+  await writeContractSnapshot(migrationsDir, newHash, { contractJson, contractDts });
+
+  const freshMigrationMeta = readJson(join(headMigrationDir, 'migration.json'));
+  const snapshotsImportPath = snapshotsImportPathFrom(headMigrationDir, migrationsDir);
+  const migrationTsSrc = readFileSync(migrationTsPath, 'utf8');
+  const rewrittenMigrationTs = rewriteContractSnapshotSpecifiers(
+    migrationTsSrc,
+    snapshotsImportPath,
+    freshMigrationMeta.to,
+  );
+  if (rewrittenMigrationTs !== migrationTsSrc) {
+    writeFileSync(migrationTsPath, rewrittenMigrationTs, 'utf8');
+  }
 
   return 'updated';
 }
@@ -297,7 +317,7 @@ const extraExtensionRoots = [
   join(repoRoot, 'examples', 'multi-extension-monorepo', 'packages', 'feature-flags'),
 ];
 
-function main() {
+async function main() {
   let entries;
   try {
     entries = readdirSync(extensionsDir, { withFileTypes: true }).filter((e) => e.isDirectory());
@@ -312,7 +332,7 @@ function main() {
   for (const entry of entries) {
     const extDir = join(extensionsDir, entry.name);
     try {
-      const result = processExtension(extDir);
+      const result = await processExtension(extDir);
       if (result === 'updated') {
         process.stdout.write(`regen-extension-migrations: updated ${entry.name}\n`);
       }
@@ -325,7 +345,7 @@ function main() {
   for (const extDir of extraExtensionRoots) {
     if (!existsSync(extDir)) continue;
     try {
-      const result = processExtension(extDir);
+      const result = await processExtension(extDir);
       if (result === 'updated') {
         process.stdout.write(`regen-extension-migrations: updated ${extDir}\n`);
       }
@@ -340,4 +360,4 @@ function main() {
   }
 }
 
-main();
+await main();

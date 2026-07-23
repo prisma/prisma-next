@@ -41,6 +41,9 @@ function canonicalizeContract(
   return canonicalizeContractRaw(contract, { ...identityOptions, ...options });
 }
 
+// `constraint`/`index` below are illustrative boolean fields exercising the
+// generic empty-value preservation mechanism — not a claim about the real
+// SQL contract's `ForeignKey` shape, which (post FK1) never carries them.
 const sqlPreserveEmptyPatterns = [
   ['storage', 'namespaces', '*', 'entries', 'table'],
   ['storage', 'namespaces', '*', 'entries', 'table', '*'],

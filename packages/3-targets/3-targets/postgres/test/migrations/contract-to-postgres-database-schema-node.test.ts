@@ -125,6 +125,27 @@ describe('contractToPostgresDatabaseSchemaNode', () => {
     expect(table?.policies).toContainEqual(expect.objectContaining({ name: policy.name }));
   });
 
+  it('stamps the policy dependsOn as its table plus one chain per granted role', () => {
+    const policy = makePolicy('read_own_profiles_a1b2c3d4');
+    const root = contractToPostgresDatabaseSchemaNode(
+      makeContract({ policies: [policy], rlsMarkedTables: [TABLE_NAME] }),
+      projectionOptions,
+    );
+    const table = root.namespaces[SCHEMA_NAME]?.tables[TABLE_NAME];
+    const policyNode = table?.policies.find((p) => p.name === policy.name);
+    expect(policyNode?.dependsOn).toEqual([
+      [
+        { nodeKind: 'postgres-database', id: 'database' },
+        { nodeKind: 'postgres-namespace', id: SCHEMA_NAME },
+        { nodeKind: 'postgres-table', id: TABLE_NAME },
+      ],
+      [
+        { nodeKind: 'postgres-database', id: 'database' },
+        { nodeKind: 'postgres-role', id: 'authenticated' },
+      ],
+    ]);
+  });
+
   it('throws at derivation time when a policy targets a table that carries no rls marker', () => {
     const policy = makePolicy('read_own_profiles_a1b2c3d4');
     expect(() =>
@@ -287,8 +308,6 @@ describe('contractToPostgresDatabaseSchemaNode — FK resolvedReferencedNamespac
                   tableName: 'users',
                   columns: ['id'],
                 },
-                constraint: true,
-                index: true,
               },
             ],
             uniques: [],
@@ -330,6 +349,27 @@ describe('contractToPostgresDatabaseSchemaNode — FK resolvedReferencedNamespac
     );
     const fk = root.namespaces[SCHEMA_NAME]?.tables[TABLE_NAME]?.foreignKeys[0];
     expect(fk?.resolvedReferencedNamespace).toBe('public');
+  });
+
+  it('stamps dependsOn as the referenced table (resolved namespace) plus own columns', () => {
+    const root = contractToPostgresDatabaseSchemaNode(
+      contractWithFk(UNBOUND_NAMESPACE_ID),
+      projectionOptions,
+    );
+    const fk = root.namespaces[SCHEMA_NAME]?.tables[TABLE_NAME]?.foreignKeys[0];
+    expect(fk?.dependsOn).toEqual([
+      [
+        { nodeKind: 'postgres-database', id: 'database' },
+        { nodeKind: 'postgres-namespace', id: 'public' },
+        { nodeKind: 'postgres-table', id: 'users' },
+      ],
+      [
+        { nodeKind: 'postgres-database', id: 'database' },
+        { nodeKind: 'postgres-namespace', id: 'public' },
+        { nodeKind: 'postgres-table', id: TABLE_NAME },
+        { nodeKind: 'sql-column', id: 'column:user_id' },
+      ],
+    ]);
   });
 
   it('an unbound-namespace contract FK pairs by id with an introspected public FK', () => {

@@ -584,8 +584,6 @@ describe('contractToSchemaIR', () => {
                     name: 'Post_authorId_fkey',
                     onDelete: 'cascade',
                     onUpdate: 'restrict',
-                    constraint: true,
-                    index: true,
                   },
                 ],
               }),
@@ -608,7 +606,13 @@ describe('contractToSchemaIR', () => {
     ]);
   });
 
-  it('omits constraintless foreign keys from physical schema IR', () => {
+  it('maps foreignKeys and indexes through 1:1 — materialization now happens upstream at contract emit, not here', () => {
+    // Pre-FK1, `convertTable` synthesized backing indexes from `index: true`
+    // FKs and dropped `constraint: false` FKs. FK1 moved that materialization
+    // to `buildSqlContractFromDefinition` (contract-ts), so by the time a
+    // contract reaches `contractToSchemaIR` its `foreignKeys[]` are already
+    // constraint-only and its `indexes[]` already carry any FK-backing
+    // entries. This asserts the new pass-through contract directly.
     const storage = new SqlStorage({
       storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
@@ -628,21 +632,8 @@ describe('contractToSchemaIR', () => {
                   workflowId: col({ nativeType: 'text' }),
                   teamId: col({ nativeType: 'text' }),
                 },
+                indexes: [{ columns: ['workflowId'], name: 'WorkflowState_workflowId_idx' }],
                 foreignKeys: [
-                  {
-                    source: {
-                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                      tableName: 'WorkflowState',
-                      columns: ['workflowId'],
-                    },
-                    target: {
-                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                      tableName: 'Workflow',
-                      columns: ['id'],
-                    },
-                    constraint: false,
-                    index: true,
-                  },
                   {
                     source: {
                       namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
@@ -656,8 +647,6 @@ describe('contractToSchemaIR', () => {
                     },
                     name: 'workflow_state_workflow_team_fkey',
                     onDelete: 'cascade',
-                    constraint: true,
-                    index: false,
                   },
                 ],
               }),
@@ -840,8 +829,6 @@ describe('contractToSchemaIR', () => {
                       tableName: 'User',
                       columns: ['id'],
                     },
-                    constraint: true,
-                    index: true,
                   },
                 ],
               }),
@@ -859,147 +846,6 @@ describe('contractToSchemaIR', () => {
         referencedColumns: ['id'],
       }),
     );
-  });
-
-  it('does not synthesize FK backing index when FK columns match primary key columns', () => {
-    const storage = new SqlStorage({
-      storageHash: 'test' as StorageHashBase<string>,
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
-          id: UNBOUND_NAMESPACE_ID,
-          entries: {
-            table: {
-              User: table({
-                columns: { id: col({ nativeType: 'text' }) },
-                primaryKey: { columns: ['id'] },
-              }),
-              Post: table({
-                columns: { userId: col({ nativeType: 'text' }) },
-                primaryKey: { columns: ['userId'] },
-                foreignKeys: [
-                  {
-                    source: {
-                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                      tableName: 'Post',
-                      columns: ['userId'],
-                    },
-                    target: {
-                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                      tableName: 'User',
-                      columns: ['id'],
-                    },
-                    constraint: true,
-                    index: true,
-                  },
-                ],
-              }),
-            },
-          },
-        }),
-      },
-    });
-
-    const result = contractToSchemaIR(wrap(storage));
-    expect(result.tables['Post']!.indexes).toEqual([]);
-  });
-
-  it('does not synthesize FK backing index when FK columns match unique columns', () => {
-    const storage = new SqlStorage({
-      storageHash: 'test' as StorageHashBase<string>,
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
-          id: UNBOUND_NAMESPACE_ID,
-          entries: {
-            table: {
-              User: table({
-                columns: { id: col({ nativeType: 'text' }) },
-                primaryKey: { columns: ['id'] },
-              }),
-              Post: table({
-                columns: { userId: col({ nativeType: 'text' }) },
-                uniques: [{ columns: ['userId'] }],
-                foreignKeys: [
-                  {
-                    source: {
-                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                      tableName: 'Post',
-                      columns: ['userId'],
-                    },
-                    target: {
-                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                      tableName: 'User',
-                      columns: ['id'],
-                    },
-                    constraint: true,
-                    index: true,
-                  },
-                ],
-              }),
-            },
-          },
-        }),
-      },
-    });
-
-    const result = contractToSchemaIR(wrap(storage));
-    expect(result.tables['Post']!.indexes).toEqual([]);
-  });
-
-  it('deduplicates synthesized FK backing indexes for repeated FK column sets', () => {
-    const storage = new SqlStorage({
-      storageHash: 'test' as StorageHashBase<string>,
-      namespaces: {
-        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
-          id: UNBOUND_NAMESPACE_ID,
-          entries: {
-            table: {
-              User: table({
-                columns: { id: col({ nativeType: 'text' }) },
-                primaryKey: { columns: ['id'] },
-              }),
-              Post: table({
-                columns: { userId: col({ nativeType: 'text' }) },
-                foreignKeys: [
-                  {
-                    source: {
-                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                      tableName: 'Post',
-                      columns: ['userId'],
-                    },
-                    target: {
-                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                      tableName: 'User',
-                      columns: ['id'],
-                    },
-                    constraint: true,
-                    index: true,
-                  },
-                  {
-                    source: {
-                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                      tableName: 'Post',
-                      columns: ['userId'],
-                    },
-                    target: {
-                      namespaceId: asNamespaceId(UNBOUND_NAMESPACE_ID),
-                      tableName: 'User',
-                      columns: ['id'],
-                    },
-                    constraint: true,
-                    index: true,
-                  },
-                ],
-              }),
-            },
-          },
-        }),
-      },
-    });
-
-    const result = contractToSchemaIR(wrap(storage));
-    expect(result.tables['Post']!.indexes).toEqual([
-      new SqlIndexIR({ columns: ['userId'], unique: false, name: 'Post_userId_idx' }),
-    ]);
   });
 });
 
@@ -1020,8 +866,6 @@ describe('contractToSchemaIR — FK referenced-namespace identity', () => {
             columns: ['id'],
           },
           name: 'Post_authorId_fkey',
-          constraint: true,
-          index: false,
         },
       ],
     });
@@ -1079,6 +923,67 @@ describe('contractToSchemaIR — FK referenced-namespace identity', () => {
     const fk = contractToSchemaIR(wrap(storage)).tables['Post']!.foreignKeys[0]!;
     expect(fk.referencedSchema).toBe('other_contract_ns');
     expect(fk.resolvedReferencedNamespace).toBe('other_contract_ns');
+  });
+
+  it('stamps dependsOn as the referenced table plus its own columns in the flat tree', () => {
+    const storage = new SqlStorage({
+      storageHash: 'test' as StorageHashBase<string>,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          entries: { table: { Post: postTable(UNBOUND_NAMESPACE_ID) } },
+        }),
+      },
+    });
+
+    const fk = contractToSchemaIR(wrap(storage)).tables['Post']!.foreignKeys[0]!;
+    expect(fk.dependsOn).toEqual([
+      [
+        { nodeKind: 'sql-schema', id: 'database' },
+        { nodeKind: 'sql-table', id: 'User' },
+      ],
+      [
+        { nodeKind: 'sql-schema', id: 'database' },
+        { nodeKind: 'sql-table', id: 'Post' },
+        { nodeKind: 'sql-column', id: 'column:authorId' },
+      ],
+    ]);
+  });
+
+  it('stamps own-column dependsOn on index, unique, and primary key in the flat tree', () => {
+    const storage = new SqlStorage({
+      storageHash: 'test' as StorageHashBase<string>,
+      namespaces: {
+        [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
+          id: UNBOUND_NAMESPACE_ID,
+          entries: {
+            table: {
+              Widget: table({
+                columns: { id: col({ nativeType: 'text' }), slug: col({ nativeType: 'text' }) },
+                primaryKey: { columns: ['id'] },
+                uniques: [{ columns: ['slug'] }],
+                indexes: [{ columns: ['slug'] }],
+              }),
+            },
+          },
+        }),
+      },
+    });
+
+    const widget = contractToSchemaIR(wrap(storage)).tables['Widget']!;
+    const pkCol = [
+      { nodeKind: 'sql-schema', id: 'database' },
+      { nodeKind: 'sql-table', id: 'Widget' },
+      { nodeKind: 'sql-column', id: 'column:id' },
+    ];
+    const slugCol = [
+      { nodeKind: 'sql-schema', id: 'database' },
+      { nodeKind: 'sql-table', id: 'Widget' },
+      { nodeKind: 'sql-column', id: 'column:slug' },
+    ];
+    expect(widget.primaryKey?.dependsOn).toEqual([pkCol]);
+    expect(widget.uniques[0]?.dependsOn).toEqual([slugCol]);
+    expect(widget.indexes[0]?.dependsOn).toEqual([slugCol]);
   });
 });
 
@@ -1275,6 +1180,38 @@ describe('contractToSchemaIR — resolved leaf values', () => {
     expect(columns['status']!.resolvedDefault).toEqual({ kind: 'literal', value: 'draft' });
     expect(columns['created']!.resolvedDefault).toEqual({ kind: 'function', expression: 'now()' });
     expect(columns['plain']!.resolvedDefault).toBeUndefined();
+  });
+
+  it('passes the raw default through resolveDefault when supplied', () => {
+    // Without a target-supplied `resolveDefault`, the contract's raw
+    // default becomes the resolved default unchanged — this is what a
+    // target that never normalizes (e.g. one with no literal-vs-function
+    // ambiguity in its default syntax) gets by omitting the hook. Proves
+    // the hook actually runs, and runs with the resolved (`[]`-suffixed for
+    // arrays) native type, not the base one.
+    const storage = unboundStorage('test' as StorageHashBase<string>, {
+      T: table({
+        columns: {
+          tags: col({
+            nativeType: 'text',
+            many: true,
+            default: { kind: 'function', expression: "'{}'::text[]" },
+          }),
+        },
+      }),
+    });
+
+    const result = contractToSchemaIR(wrap(storage), {
+      renderDefault: testRenderer,
+      resolveDefault: (def, resolvedNativeType) =>
+        def.kind === 'function' && resolvedNativeType === 'text[]'
+          ? { kind: 'literal', value: [] }
+          : def,
+    });
+    expect(result.tables['T']!.columns['tags']!.resolvedDefault).toEqual({
+      kind: 'literal',
+      value: [],
+    });
   });
 
   it('check nodes carry the value-set resolved permittedValues', () => {

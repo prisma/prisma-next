@@ -31,7 +31,7 @@ withTempDir(({ createTempDir }) => {
     const db = useDevDatabase();
 
     it(
-      'returns PN-RUN-3005 on migration status when marker is corrupt and migrations dir is empty',
+      'returns CONTRACT.MARKER_ROW_CORRUPT on migration status when marker is corrupt and migrations dir is empty',
       async () => {
         const ctx = setupJourney({ connectionString: db.connectionString, createTempDir });
 
@@ -44,7 +44,7 @@ withTempDir(({ createTempDir }) => {
 
         const envelope = extractJson(statusFail.stdout);
         expect(envelope).toMatchObject({
-          code: 'PN-RUN-3005',
+          code: 'CONTRACT.MARKER_ROW_CORRUPT',
           summary: 'Marker row is corrupt or incompatible',
         });
       },

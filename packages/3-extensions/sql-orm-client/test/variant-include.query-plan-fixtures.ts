@@ -6,6 +6,7 @@ import {
   JoinAst,
   JsonArrayAggExpr,
   JsonObjectExpr,
+  NativeJsonValueProjection,
   ProjectionItem,
   SelectAst,
   SubqueryExpr,
@@ -113,9 +114,14 @@ export function rowAggregate(
     ProjectionItem.of(
       relationName,
       JsonArrayAggExpr.of(
-        JsonObjectExpr.fromEntries(
-          projectedAliases.map((alias) =>
-            JsonObjectExpr.entry(alias, ColumnRef.of(rowsAlias, alias)),
+        new NativeJsonValueProjection(
+          JsonObjectExpr.fromEntries(
+            projectedAliases.map((alias) =>
+              JsonObjectExpr.entry(
+                alias,
+                new NativeJsonValueProjection(ColumnRef.of(rowsAlias, alias)),
+              ),
+            ),
           ),
         ),
         'emptyArray',

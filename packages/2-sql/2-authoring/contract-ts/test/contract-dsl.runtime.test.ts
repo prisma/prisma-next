@@ -99,6 +99,10 @@ describe('contract DSL runtime helpers', () => {
     ).toThrow('Model tokens require model("ModelName", ...) before calling .ref(...)');
 
     expect(() =>
+      Reflect.apply(Anonymous.ref as (...args: readonly unknown[]) => unknown, Anonymous, ['id']),
+    ).toThrow(expect.objectContaining({ code: 'CONTRACT.MODEL_TOKEN_INVALID' }));
+
+    expect(() =>
       Reflect.apply(rel.belongsTo as (...args: readonly unknown[]) => unknown, rel, [
         Anonymous,
         { from: 'id', to: 'id' },
@@ -116,6 +120,16 @@ describe('contract DSL runtime helpers', () => {
         { fk: { name: 'post_user_id_fkey' } },
       ]),
     ).toThrow('relation.sql(...) is only supported for belongsTo relations.');
+
+    expect(() =>
+      Reflect.apply(hasMany.sql as (...args: readonly unknown[]) => unknown, hasMany, [
+        { fk: { name: 'post_user_id_fkey' } },
+      ]),
+    ).toThrow(expect.objectContaining({ code: 'CONTRACT.RELATION_INVALID' }));
+
+    expect(() => model('User', undefined as never)).toThrow(
+      expect.objectContaining({ code: 'CONTRACT.ARGUMENT_INVALID' }),
+    );
   });
 
   it('builds sql specs with explicit options and validates target refs eagerly', () => {
@@ -203,6 +217,9 @@ describe('contract DSL runtime helpers', () => {
     }));
 
     expect(() => BrokenEmpty.buildSqlSpec()).toThrow('Expected at least one target ref');
+    expect(() => BrokenEmpty.buildSqlSpec()).toThrow(
+      expect.objectContaining({ code: 'CONTRACT.FOREIGN_KEY_INVALID' }),
+    );
     expect(() => BrokenMixed.buildSqlSpec()).toThrow(
       'All target refs in a foreign key must point to the same model',
     );

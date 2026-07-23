@@ -2,18 +2,28 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   type AnyExpression,
+  type AstRewriter,
+  BinaryExpr,
   ColumnRef,
   DefaultValueExpr,
   DeleteAst,
+  EqColJoinOn,
+  ExistsExpr,
   InsertAst,
   InsertOnConflict,
+  JoinAst,
   ParamRef,
   ProjectionItem,
+  SelectAst,
+  TableSource,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { InternalError } from '@prisma-next/utils/internal-error';
+import { resolvePolymorphismInfo, resolvePrimaryKeyColumn } from './collection-contract';
+import { ormError } from './orm-errors';
 import { buildOrmQueryPlan, deriveParamsFromAst, resolveTableColumns } from './query-plan-meta';
 import { storageTableForContract, tableSourceForContract } from './storage-resolution';
 import { combineWhereExprs } from './where-utils';
@@ -52,7 +62,9 @@ function toParamAssignments(
 
   for (const [column, value] of Object.entries(values)) {
     if (!table.columns[column]) {
-      throw new Error(`Unknown column "${column}" in table "${tableName}"`);
+      throw ormError('ORM.COLUMN_UNKNOWN', `Unknown column "${column}" in table "${tableName}"`, {
+        meta: { namespaceId, tableName, column },
+      });
     }
     const codec = codecRefForStorageColumn(contract.storage, namespaceId, tableName, column);
     assignments[column] = ParamRef.of(value, {
@@ -73,7 +85,7 @@ function normalizeInsertRows(
   readonly rows: ReadonlyArray<Record<string, ParamRef | DefaultValueExpr>>;
 } {
   if (rows.length === 0) {
-    throw new Error('normalizeInsertRows requires at least one row');
+    throw new InternalError('normalizeInsertRows requires at least one row');
   }
 
   const orderedColumns: string[] = [];
@@ -100,7 +112,11 @@ function normalizeInsertRows(
     for (const column of orderedColumns) {
       if (Object.hasOwn(row, column)) {
         if (!table.columns[column]) {
-          throw new Error(`Unknown column "${column}" in table "${tableName}"`);
+          throw ormError(
+            'ORM.COLUMN_UNKNOWN',
+            `Unknown column "${column}" in table "${tableName}"`,
+            { meta: { namespaceId, tableName, column } },
+          );
         }
         const codec = codecRefForStorageColumn(contract.storage, namespaceId, tableName, column);
         normalizedRow[column] = ParamRef.of(row[column], {
@@ -156,6 +172,70 @@ function stripUndefinedValues(row: Record<string, unknown>): Record<string, unkn
   return result;
 }
 
+function createTableRefRemapper(fromTable: string, toTable: string): AstRewriter {
+  return {
+    columnRef: (col) => (col.table === fromTable ? ColumnRef.of(toTable, col.column) : col),
+    tableSource: (source) => {
+      if (source.alias === fromTable) {
+        return TableSource.named(source.name, toTable, source.namespaceId);
+      }
+      if (!source.alias && source.name === fromTable) {
+        return TableSource.named(source.name, toTable, source.namespaceId);
+      }
+      return source;
+    },
+    eqColJoinOn: (on) =>
+      EqColJoinOn.of(
+        on.left.table === fromTable ? ColumnRef.of(toTable, on.left.column) : on.left,
+        on.right.table === fromTable ? ColumnRef.of(toTable, on.right.column) : on.right,
+      ),
+  };
+}
+
+function buildCountMutationWhere(
+  contract: Contract<SqlStorage>,
+  namespaceId: string,
+  tableName: string,
+  filters: readonly AnyExpression[],
+  variantName?: string | undefined,
+  modelName?: string | undefined,
+): AnyExpression | undefined {
+  if (!variantName || !modelName) {
+    return combineWhereExprs(filters);
+  }
+
+  const polyInfo = resolvePolymorphismInfo(contract, namespaceId, modelName);
+  const variant = polyInfo?.variants.get(variantName);
+  if (!polyInfo || !variant || variant.strategy !== 'mti') {
+    return combineWhereExprs(filters);
+  }
+
+  const pkColumn = resolvePrimaryKeyColumn(contract, namespaceId, tableName);
+  const baseTableRef = `${tableName}__write_filter`;
+  const remapper = createTableRefRemapper(tableName, baseTableRef);
+  const innerFilters = filters.map((filter) => filter.rewrite(remapper));
+  const correlation = BinaryExpr.eq(
+    ColumnRef.of(baseTableRef, pkColumn),
+    ColumnRef.of(tableName, pkColumn),
+  );
+  const where = combineWhereExprs([correlation, ...innerFilters]);
+  const joinOn = EqColJoinOn.of(
+    ColumnRef.of(baseTableRef, pkColumn),
+    ColumnRef.of(variant.table, pkColumn),
+  );
+  let subquery = SelectAst.from(TableSource.named(tableName, baseTableRef, namespaceId))
+    .withProjection([ProjectionItem.of('_write_filter', ColumnRef.of(baseTableRef, pkColumn))])
+    .withJoins([
+      JoinAst.inner(tableSourceForContract(contract, namespaceId, variant.table), joinOn),
+    ]);
+
+  if (where) {
+    subquery = subquery.withWhere(where);
+  }
+
+  return ExistsExpr.exists(subquery);
+}
+
 // Groups rows by their set of present columns so each group can be emitted as a single INSERT statement. Groups are created in input order — rows with the same signature that are non-adjacent produce separate groups. This is deliberate: preserving insertion order ensures autogenerated/autoincrement columns are assigned in the same order as the caller's input.
 function groupRowsByColumnSignature(
   rows: readonly Record<string, unknown>[],
@@ -192,7 +272,9 @@ export function compileInsertReturningSplit(
   returningColumns: readonly string[] | undefined,
 ): ReadonlyArray<SqlQueryPlan<Record<string, unknown>>> {
   if (rows.length === 0) {
-    throw new Error('create() requires at least one row');
+    throw ormError('ORM.MUTATION_DATA_MISSING', 'create() requires at least one row', {
+      meta: { method: 'create', namespaceId, tableName },
+    });
   }
   return groupRowsByColumnSignature(rows).map((group) =>
     compileInsertReturning(contract, namespaceId, tableName, group, returningColumns),
@@ -206,7 +288,9 @@ export function compileInsertCountSplit(
   rows: readonly Record<string, unknown>[],
 ): ReadonlyArray<SqlQueryPlan<Record<string, unknown>>> {
   if (rows.length === 0) {
-    throw new Error('createCount() requires at least one row');
+    throw ormError('ORM.MUTATION_DATA_MISSING', 'createCount() requires at least one row', {
+      meta: { method: 'createCount', namespaceId, tableName },
+    });
   }
   return groupRowsByColumnSignature(rows).map((group) =>
     compileInsertCount(contract, namespaceId, tableName, group),
@@ -270,8 +354,17 @@ export function compileUpdateCount(
   tableName: string,
   setValues: Record<string, unknown>,
   filters: readonly AnyExpression[],
+  variantName?: string | undefined,
+  modelName?: string | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
-  const where = combineWhereExprs(filters);
+  const where = buildCountMutationWhere(
+    contract,
+    namespaceId,
+    tableName,
+    filters,
+    variantName,
+    modelName,
+  );
   const { assignments } = toParamAssignments(contract, namespaceId, tableName, setValues);
   let ast = UpdateAst.table(tableSourceForContract(contract, namespaceId, tableName)).withSet(
     assignments,
@@ -306,8 +399,17 @@ export function compileDeleteCount(
   namespaceId: string,
   tableName: string,
   filters: readonly AnyExpression[],
+  variantName?: string | undefined,
+  modelName?: string | undefined,
 ): SqlQueryPlan<Record<string, unknown>> {
-  const where = combineWhereExprs(filters);
+  const where = buildCountMutationWhere(
+    contract,
+    namespaceId,
+    tableName,
+    filters,
+    variantName,
+    modelName,
+  );
   let ast = DeleteAst.from(tableSourceForContract(contract, namespaceId, tableName));
   if (where) {
     ast = ast.withWhere(where);

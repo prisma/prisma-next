@@ -13,12 +13,11 @@ import {
 } from '../src/utils/cli-errors';
 
 describe('CliStructuredError.toEnvelope()', () => {
-  it('converts driver required error to envelope with PN-CLI-4010', () => {
+  it('converts driver required error to envelope with CONFIG.DRIVER_REQUIRED', () => {
     const error = errorDriverRequired();
     const envelope = error.toEnvelope();
 
-    expect(envelope.code).toBe('PN-CLI-4010');
-    expect(envelope.domain).toBe('CLI');
+    expect(envelope.code).toBe('CONFIG.DRIVER_REQUIRED');
     expect(envelope.summary).toBe('Driver is required for DB-connected commands');
     expect(envelope.fix).toBe(
       'Add a control-plane driver to prisma-next.config.ts (e.g. import a driver descriptor and set `driver: postgresDriver`)',
@@ -26,12 +25,11 @@ describe('CliStructuredError.toEnvelope()', () => {
     expect(envelope.docsUrl).toBe('https://prisma-next.dev/docs/cli/config');
   });
 
-  it('converts readMarker error to envelope with PN-CLI-4007', () => {
+  it('converts readMarker error to envelope with CONFIG.FAMILY_READ_MARKER_REQUIRED', () => {
     const error = errorFamilyReadMarkerSqlRequired();
     const envelope = error.toEnvelope();
 
-    expect(envelope.code).toBe('PN-CLI-4007');
-    expect(envelope.domain).toBe('CLI');
+    expect(envelope.code).toBe('CONFIG.FAMILY_READ_MARKER_REQUIRED');
     expect(envelope.summary).toBe('Family readMarker() is required');
     expect(envelope.fix).toBe(
       'Ensure family.verify.readMarker() is exported by your family package',
@@ -63,7 +61,7 @@ describe('errorPathUnreachable', () => {
     expect((envelope.fix ?? '').toLowerCase()).toContain('hint');
   });
 
-  it('omits the --from clause when the runner kind is neverPlanned (no fromHash in meta)', () => {
+  it('prescribes a bare plan command when the runner kind is neverPlanned (no graph to resolve --to against)', () => {
     const failure: MigrateFailure = {
       code: 'MIGRATION_PATH_NOT_FOUND',
       summary: 'No on-disk migrations for contract space "app"',
@@ -71,7 +69,10 @@ describe('errorPathUnreachable', () => {
       meta: { spaceId: 'app', kind: 'neverPlanned', target: targetHash },
     };
     const envelope = errorPathUnreachable(failure).toEnvelope();
-    expect(envelope.fix).toContain(`prisma-next migration plan --to ${targetHash} --name <slug>`);
+    // A never-planned space has an EMPTY graph, and `--to <hash>` only
+    // resolves against graph nodes — the remediation must run verbatim.
+    expect(envelope.fix).toContain('prisma-next migration plan --name <slug>');
+    expect(envelope.fix).not.toContain('--to');
     expect(envelope.fix).not.toContain('--from');
     expect(envelope.fix).not.toContain('<unknown>');
   });
@@ -135,8 +136,11 @@ describe('errorPathUnreachable', () => {
     expect(envelope.why?.toLowerCase()).toContain('no migrations');
     expect(envelope.why).not.toContain('migration plan');
 
-    expect(envelope.fix).toContain(`prisma-next migration plan --to ${targetHash} --name <slug>`);
-    expect(envelope.fix).toContain(`prisma-next migrate --to ${targetHash}`);
+    // A never-planned space has an empty graph; the fix must not
+    // prescribe a `--to <hash>` the empty graph cannot resolve.
+    expect(envelope.fix).toContain('prisma-next migration plan --name <slug>');
+    expect(envelope.fix).toContain('prisma-next migrate');
+    expect(envelope.fix).not.toContain('--to');
     expect((envelope.fix ?? '').toLowerCase()).toContain('destructive');
     expect((envelope.fix ?? '').toLowerCase()).toContain('hint');
   });

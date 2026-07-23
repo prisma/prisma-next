@@ -24,7 +24,7 @@ withTempDir(({ createTempDir }) => {
     const db = useDevDatabase();
 
     it(
-      'returns PN-RUN-3005 when marker row has invalid invariants',
+      'returns CONTRACT.MARKER_ROW_CORRUPT when marker row has invalid invariants',
       async () => {
         const ctx = setupJourney({
           connectionString: db.connectionString,
@@ -50,7 +50,7 @@ withTempDir(({ createTempDir }) => {
 
         const envelope = extractJson(`${verifyFail.stdout}\n${verifyFail.stderr}`);
         expect(envelope).toMatchObject({
-          code: 'PN-RUN-3005',
+          code: 'CONTRACT.MARKER_ROW_CORRUPT',
           summary: 'Marker row is corrupt or incompatible',
           why: expect.stringContaining('Invalid contract marker row'),
           fix: expect.stringContaining('prisma-next db sign'),

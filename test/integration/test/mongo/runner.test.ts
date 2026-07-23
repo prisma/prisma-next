@@ -214,6 +214,7 @@ function planFor(contract: MongoContract, fromContract: MongoContract | null) {
     policy: ALL_POLICY,
     fromContract,
     frameworkComponents: [],
+    snapshotsImportPath: '../../snapshots',
   });
   if (result.kind !== 'success') {
     throw new Error(`Plan failed: ${JSON.stringify(result.conflicts ?? [])}`);
@@ -414,7 +415,7 @@ describe('mongoTargetDescriptor.execute (across spaces)', {
       expect(failingResult.ok).toBe(false);
       if (failingResult.ok) throw new Error('unreachable');
       expect(failingResult.failure.failingSpace).toBe(APP_SPACE_ID);
-      expect(failingResult.failure.code).toBe('SCHEMA_VERIFY_FAILED');
+      expect(failingResult.failure.code).toBe('MIGRATION.SCHEMA_VERIFY_FAILED');
 
       const extMarkerAfterFail = await controlAdapter.readMarker(
         new MongoControlDriver(db, client),

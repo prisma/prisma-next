@@ -215,22 +215,30 @@ export function errorPlanForgotTheFlag(
   });
 }
 
+/**
+ * `viaRef: true` (the default) mirrors migration-tools' `errorRefNotResolvable`:
+ * a ref name with no pointer file, where the fallback hash isn't a graph
+ * node either — there's nothing to materialize a contract from.
+ * `viaRef: false` is a distinct, ref-independent case: an explicit `--from
+ * <hash>` that doesn't name a ref, on an empty migration graph, so there is
+ * no graph node and no ref to resolve a contract through.
+ */
 export function errorSnapshotMissing(
   identifier: string,
   options?: { readonly viaRef?: boolean },
 ): CliStructuredError {
   const viaRef = options?.viaRef !== false;
   const fix = viaRef
-    ? `Run "prisma-next db update --advance-ref ${identifier}" to repopulate the snapshot, or "prisma-next ref delete ${identifier}" to clear the orphan pointer.`
-    : `No contract source exists for hash "${identifier}" on an empty migration graph. Use --from with a ref name that has a paired snapshot, or run db update first.`;
+    ? `Create the ref with "prisma-next ref set ${identifier} <hash>" (or advance it via "prisma-next db update --advance-ref ${identifier}"), or pass a hash that is a node in the migration graph.`
+    : `No contract source exists for hash "${identifier}" on an empty migration graph. Use --from with a ref name (its contract resolves through the snapshot store), or run db update first.`;
   return errorRuntime(
     viaRef
-      ? `Ref "${identifier}" has no paired contract snapshot`
+      ? `Ref "${identifier}" is not resolvable`
       : `No contract source for from-hash "${identifier}"`,
     {
       why: viaRef
-        ? `Ref "${identifier}" exists but its paired snapshot files are missing.`
-        : `Hash "${identifier}" is not a graph node and no paired ref snapshot supplies a contract.`,
+        ? `Ref "${identifier}" has no pointer file, and the hash being resolved is not a node in the migration graph either.`
+        : `Hash "${identifier}" is not a node in the migration graph (the graph is empty), and it does not name a ref either.`,
       fix,
       meta: {
         code: 'MIGRATION.SNAPSHOT_MISSING',
@@ -287,7 +295,18 @@ export function errorPathUnreachable(failure: MigrateFailure): CliStructuredErro
   // Plan-then-apply recovery. The planner destination is the missing edge's
   // target; `migration plan --to` (built for arbitrary targets) makes this a
   // real command, so the diagnostic that sends you here is now honest.
+  //
+  // Never-planned spaces have an EMPTY migration graph, and contract-ref
+  // resolution only resolves full hashes against graph nodes — a
+  // `--to <hash>` remediation would reject its own input. `migration plan`
+  // without `--to` targets the working contract (the same contract the app
+  // space's synthesized head ref carries), so the bare form is the one that
+  // runs verbatim.
+  const neverPlanned = meta['kind'] === 'neverPlanned';
   const planCommand = (() => {
+    if (neverPlanned) {
+      return 'prisma-next migration plan --name <slug>';
+    }
     if (planFromHash !== null && targetHash !== null) {
       return `prisma-next migration plan --from ${planFromHash} --to ${targetHash} --name <slug>`;
     }
@@ -300,7 +319,9 @@ export function errorPathUnreachable(failure: MigrateFailure): CliStructuredErro
     return 'prisma-next migration plan';
   })();
   const applyCommand =
-    targetHash !== null ? `prisma-next migrate --to ${targetHash}` : 'prisma-next migrate';
+    targetHash !== null && !neverPlanned
+      ? `prisma-next migrate --to ${targetHash}`
+      : 'prisma-next migrate';
   return errorRuntime(failure.summary, {
     why:
       failure.why ??
@@ -347,7 +368,7 @@ export function mapMigrationToolsError(error: MigrationToolsError): CliStructure
  * Shared "needs a live database" precondition for read verbs that consult the
  * marker/ledger (`migration log`, `migration status`). A command needs both a
  * connection string and a control-plane driver; either missing yields the same
- * `PN-CLI-4005` envelope with `meta.missingFlags` (canonical long-form flags
+ * `CONFIG.DB_CONNECTION_REQUIRED` envelope with `meta.missingFlags` (canonical long-form flags
  * per CLI Style Guide §Errors) so callers can react programmatically. Returns
  * `null` when both are present.
  */

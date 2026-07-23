@@ -113,6 +113,17 @@ describe('resolveStorageTable', () => {
     expect(() => resolveStorageTable(storage, 'users')).toThrow(/public/);
   });
 
+  it('ambiguous table error carries CONTRACT.TABLE_AMBIGUOUS', () => {
+    const { storage } = twoNamespaceSameTableName();
+
+    expect(() => resolveStorageTable(storage, 'users')).toThrowError(
+      expect.objectContaining({
+        code: 'CONTRACT.TABLE_AMBIGUOUS',
+        meta: expect.objectContaining({ tableName: 'users' }),
+      }) as unknown as Error,
+    );
+  });
+
   it('returns undefined for an unknown table within a given namespace', () => {
     const { storage } = twoNamespaceSameTableName();
 

@@ -94,8 +94,6 @@ describe('SQL contract factories', () => {
       expect(foreignKey).toEqual({
         source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
         target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
-        constraint: true,
-        index: true,
       });
     });
 
@@ -104,8 +102,6 @@ describe('SQL contract factories', () => {
       expect(foreignKey).toEqual({
         source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
         target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
-        constraint: true,
-        index: true,
         name: 'user_posts_fkey',
       });
     });
@@ -123,8 +119,6 @@ describe('SQL contract factories', () => {
           tableName: 'user',
           columns: ['tenantId', 'id'],
         },
-        constraint: true,
-        index: true,
       });
     });
 
@@ -134,8 +128,6 @@ describe('SQL contract factories', () => {
         source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
         target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
         onDelete: 'cascade',
-        constraint: true,
-        index: true,
       });
     });
 
@@ -149,8 +141,6 @@ describe('SQL contract factories', () => {
         target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
         onDelete: 'cascade',
         onUpdate: 'noAction',
-        constraint: true,
-        index: true,
       });
     });
 
@@ -166,8 +156,6 @@ describe('SQL contract factories', () => {
         name: 'post_userId_fkey',
         onDelete: 'setNull',
         onUpdate: 'cascade',
-        constraint: true,
-        index: true,
       });
     });
 
@@ -248,8 +236,6 @@ describe('SQL contract factories', () => {
         {
           source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
           target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
-          constraint: true,
-          index: true,
         },
       ]);
     });
@@ -275,8 +261,6 @@ describe('SQL contract factories', () => {
         {
           source: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'post', columns: ['userId'] },
           target: { namespaceId: UNBOUND_NAMESPACE_ID, tableName: 'user', columns: ['id'] },
-          constraint: true,
-          index: true,
         },
       ]);
     });

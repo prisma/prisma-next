@@ -143,6 +143,15 @@ describe('generic entities handle channel', () => {
         entities: [{ entityKind: 'gadget' }],
       }),
     ).toThrow(/entityKind "gadget", which no composed pack registers/);
+
+    expect(() =>
+      defineContract({
+        family: sqlFamilyPack,
+        target: targetPack,
+        createNamespace: createTestSqlNamespace,
+        entities: [{ entityKind: 'gadget' }],
+      }),
+    ).toThrow(expect.objectContaining({ code: 'CONTRACT.ENTITY_KIND_UNKNOWN' }));
   });
 
   it('rejects a claimed kind whose pack implements no lowering hook, naming the kind', () => {

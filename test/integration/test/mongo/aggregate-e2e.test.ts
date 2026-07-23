@@ -13,6 +13,7 @@ import {
   APP_SPACE_ID,
   createControlStack,
   hasMigrations,
+  issueOutcome,
   type MigrationRunnerPerSpaceOptions,
 } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
@@ -127,6 +128,7 @@ function planFor(
     policy: ALL_POLICY,
     fromContract,
     frameworkComponents: [],
+    snapshotsImportPath: '../../snapshots',
   });
   if (result.kind !== 'success') {
     throw new Error(`Plan failed: ${JSON.stringify(result.conflicts ?? [])}`);
@@ -328,7 +330,7 @@ describe('Mongo contract-space aggregate e2e', {
       });
       expect(extVerify.ok).toBe(false);
       const indexIssues = extVerify.schema.issues.filter(
-        (i) => i.reason === 'not-equal' && i.path[1]?.startsWith('index:'),
+        (i) => issueOutcome(i) === 'not-found' && i.path[1]?.startsWith('index:'),
       );
       expect(indexIssues.length).toBeGreaterThan(0);
       for (const issue of indexIssues) {

@@ -364,7 +364,7 @@ withTempDir(({ createTempDir }) => {
             unknown
           >;
           expect(parsed).toMatchObject({
-            code: 'PN-RUN-3001',
+            code: 'CONTRACT.MARKER_MISSING',
             summary: expect.any(String),
             why: expect.any(String),
             fix: expect.any(String),
@@ -673,7 +673,7 @@ withTempDir(({ createTempDir }) => {
           unknown
         >;
         expect(parsed).toMatchObject({
-          code: 'PN-CLI-4005',
+          code: 'CONFIG.DB_CONNECTION_REQUIRED',
           summary: 'Database connection is required',
         });
         expect(parsed['fix']).toContain(
@@ -863,7 +863,7 @@ withTempDir(({ createTempDir }) => {
 
           const parsed = extractJson(consoleOutput) as Record<string, unknown>;
           expect(parsed).toMatchObject({
-            code: 'PN-CLI-4012',
+            code: 'CLI.INVALID_VERIFY_MODE',
             summary: 'Invalid verify mode',
           });
         });
@@ -904,7 +904,7 @@ withTempDir(({ createTempDir }) => {
 
           const parsed = extractJson(consoleOutput) as Record<string, unknown>;
           expect(parsed).toMatchObject({
-            code: 'PN-CLI-4012',
+            code: 'CLI.INVALID_VERIFY_MODE',
             summary: 'Invalid verify mode',
           });
         });
@@ -966,7 +966,7 @@ withTempDir(({ createTempDir }) => {
           // consoleOutput may contain Clack decoration alongside JSON; extract the JSON block.
           const parsed = extractJson(consoleOutput) as Record<string, unknown>;
           expect(parsed).toMatchObject({
-            code: 'PN-RUN-3001',
+            code: 'CONTRACT.MARKER_MISSING',
             summary: expect.any(String),
             why: expect.any(String),
             fix: expect.any(String),
@@ -978,7 +978,7 @@ withTempDir(({ createTempDir }) => {
     );
 
     it(
-      'reports PN-CLI-4010 when driver is missing',
+      'reports CONFIG.DRIVER_REQUIRED when driver is missing',
       async () => {
         await withDevDatabase(async ({ connectionString }) => {
           // Set up test directory from fixtures with config that has db.connection but no driver
@@ -1075,7 +1075,7 @@ withTempDir(({ createTempDir }) => {
           // consoleOutput may contain Clack decoration alongside JSON; extract the JSON block.
           const parsed = extractJson(consoleOutput) as Record<string, unknown>;
           expect(parsed).toMatchObject({
-            code: 'PN-CLI-4010',
+            code: 'CONFIG.DRIVER_REQUIRED',
             summary: expect.any(String),
             why: expect.any(String),
             fix: expect.any(String),

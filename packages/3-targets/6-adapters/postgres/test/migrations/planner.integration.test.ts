@@ -58,6 +58,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     if (initialPlan.kind !== 'success') {
       throw new Error('expected initial plan success');
@@ -91,6 +92,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     expect(supersetResult).toMatchObject({
       kind: 'success',
@@ -111,6 +113,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(subsetResult.kind).toBe('success');
@@ -143,6 +146,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(planResult.kind).toBe('success');
@@ -180,6 +184,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(conflictResult).toMatchObject({

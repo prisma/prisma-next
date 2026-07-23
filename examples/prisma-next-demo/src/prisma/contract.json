@@ -654,8 +654,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": false,
                   "onDelete": "cascade",
                   "source": {
                     "columns": [
@@ -702,8 +700,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": false,
                   "onDelete": "cascade",
                   "source": {
                     "columns": [
@@ -793,8 +789,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "source": {
                     "columns": [
                       "userId"
@@ -811,7 +805,14 @@
                   }
                 }
               ],
-              "indexes": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "userId"
+                  ],
+                  "name": "post_userId_idx"
+                }
+              ],
               "primaryKey": {
                 "columns": [
                   "id"
@@ -836,8 +837,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "source": {
                     "columns": [
                       "postId"
@@ -854,8 +853,6 @@
                   }
                 },
                 {
-                  "constraint": true,
-                  "index": true,
                   "source": {
                     "columns": [
                       "tagId"
@@ -872,7 +869,20 @@
                   }
                 }
               ],
-              "indexes": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "postId"
+                  ],
+                  "name": "post_tag_postId_idx"
+                },
+                {
+                  "columns": [
+                    "tagId"
+                  ],
+                  "name": "post_tag_tagId_idx"
+                }
+              ],
               "primaryKey": {
                 "columns": [
                   "postId",
@@ -960,8 +970,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "source": {
                     "columns": [
                       "userId"
@@ -978,7 +986,14 @@
                   }
                 }
               ],
-              "indexes": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "userId"
+                  ],
+                  "name": "task_userId_idx"
+                }
+              ],
               "primaryKey": {
                 "columns": [
                   "id"
@@ -1074,7 +1089,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "9f49f8f9e51a9cc016f1ec2098ebae9406521a3cc2cf00207adc795078333d8b",
+    "storageHash": "6c96d4165531a6e68599368aa8d4de3d90d1c7e592c7143cd167d69feee89dc0",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",

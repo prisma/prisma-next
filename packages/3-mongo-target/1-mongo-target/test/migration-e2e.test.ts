@@ -1,12 +1,14 @@
 import { execFile, spawnSync } from 'node:child_process';
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
+import { storageHashHex } from '@prisma-next/framework-components/control';
 import { writeMigrationTs } from '@prisma-next/migration-tools/migration-ts';
 import { join, resolve } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+const SNAPSHOTS_IMPORT_PATH = './snapshots';
 const execFileAsync = promisify(execFile);
 const packageRoot = resolve(import.meta.dirname, '..');
 const repoRoot = resolve(packageRoot, '../../..');
@@ -93,11 +95,14 @@ describe('migration file E2E', () => {
   }
 
   /**
-   * The rendered (new-shape) scaffold imports its from/to identity from
-   * committed contract JSON. Write minimal `{start,end}-contract.json` (carrying
-   * `storage.storageHash`, which the base's derived describe() reads) and the
-   * matching `{start,end}-contract.ts` type modules so the executed migration
-   * resolves its imports; the hashes match `meta` so describe() is consistent.
+   * The rendered (new-shape) scaffold imports its from/to identity from the
+   * deduplicated snapshot store. Write minimal `snapshots/<hex>/contract.json`
+   * (carrying `storage.storageHash`, which the base's derived describe()
+   * reads) and the matching `snapshots/<hex>/contract.ts` type module for
+   * each of `meta.to` and (when non-null) `meta.from` so the executed
+   * migration resolves its imports; the hashes match `meta` so describe() is
+   * consistent. `SNAPSHOTS_IMPORT_PATH` matches the `snapshotsImportPath`
+   * baked into the rendered source.
    */
   async function writeContractFixtures(meta: {
     readonly from: string | null;
@@ -105,17 +110,18 @@ describe('migration file E2E', () => {
   }): Promise<void> {
     const contractType =
       'export type Contract = { readonly storage: { readonly storageHash: string } };\n';
-    await writeFile(
-      join(tmpDir, 'end-contract.json'),
-      JSON.stringify({ storage: { storageHash: meta.to } }, null, 2),
-    );
-    await writeFile(join(tmpDir, 'end-contract.ts'), contractType);
-    if (meta.from !== null) {
+    const writeSnapshot = async (storageHash: string) => {
+      const snapshotDir = join(tmpDir, SNAPSHOTS_IMPORT_PATH, storageHashHex(storageHash));
+      await mkdir(snapshotDir, { recursive: true });
       await writeFile(
-        join(tmpDir, 'start-contract.json'),
-        JSON.stringify({ storage: { storageHash: meta.from } }, null, 2),
+        join(snapshotDir, 'contract.json'),
+        JSON.stringify({ storage: { storageHash } }, null, 2),
       );
-      await writeFile(join(tmpDir, 'start-contract.ts'), contractType);
+      await writeFile(join(snapshotDir, 'contract.ts'), contractType);
+    };
+    await writeSnapshot(meta.to);
+    if (meta.from !== null) {
+      await writeSnapshot(meta.from);
     }
   }
 
@@ -221,8 +227,9 @@ describe('migration file E2E', () => {
 
   describe('renderCallsToTypeScript round-trip', () => {
     const defaultMeta = {
-      from: '0000000000000000000000000000000000000000000000000000000000000000',
-      to: '1111111111111111111111111111111111111111111111111111111111111111',
+      from: '0'.repeat(64),
+      to: '1'.repeat(64),
+      snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
     } as const;
 
     it('produces ops.json identical to direct factory invocation', async () => {
@@ -306,7 +313,11 @@ describe('migration file E2E', () => {
       const { DropCollectionCall } = await import('../src/core/op-factory-call');
       const calls = [new DropCollectionCall('legacy')];
 
-      const meta = { from: 'aaa', to: 'bbb' } as const;
+      const meta = {
+        from: 'a'.repeat(64),
+        to: 'b'.repeat(64),
+        snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
+      } as const;
       const tsSource = renderCallsToTypeScript(calls, meta);
       const resolvedSource = tsSource
         .replace("'@prisma-next/family-mongo/migration'", `'${migrationExport}'`)
@@ -325,8 +336,8 @@ describe('migration file E2E', () => {
 
       const manifestJson = await readFile(join(tmpDir, 'migration.json'), 'utf-8');
       const manifest = JSON.parse(manifestJson);
-      expect(manifest.from).toBe('aaa');
-      expect(manifest.to).toBe('bbb');
+      expect(manifest.from).toBe(meta.from);
+      expect(manifest.to).toBe(meta.to);
     });
   });
 
@@ -483,8 +494,9 @@ describe('migration file E2E', () => {
       ];
 
       const directRunMeta = {
-        from: '0000000000000000000000000000000000000000000000000000000000000000',
-        to: '1111111111111111111111111111111111111111111111111111111111111111',
+        from: '0'.repeat(64),
+        to: '1'.repeat(64),
+        snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
       } as const;
       const migrationSource = renderCallsToTypeScript(calls, directRunMeta)
         .replace("'@prisma-next/family-mongo/migration'", `'${familyMongoDistMigration}'`)

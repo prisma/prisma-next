@@ -209,8 +209,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "onDelete": "cascade",
                   "onUpdate": "cascade",
                   "source": {
@@ -225,7 +223,12 @@
                   }
                 }
               ],
-              "indexes": [],
+              "indexes": [
+                {
+                  "columns": ["userId"],
+                  "name": "post_userId_idx"
+                }
+              ],
               "primaryKey": {
                 "columns": ["id"]
               },
@@ -303,7 +306,7 @@
         "id": "public"
       }
     },
-    "storageHash": "5a547d8e812d450a9ed848c3ef8c728f2bbb4867f72a5cdb92efed19a91b62ef",
+    "storageHash": "4fc5ea7513d4649538498ac8067f119e352100d1b4f98bb0beb27b49cafe268c",
     "types": {
       "Embedding": {
         "codecId": "pg/vector@1",

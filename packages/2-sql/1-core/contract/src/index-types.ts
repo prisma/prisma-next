@@ -1,4 +1,5 @@
 import type { Type } from 'arktype';
+import { contractError } from './contract-errors';
 
 export interface IndexTypeEntry<TOptions = unknown> {
   readonly type: string;
@@ -34,7 +35,11 @@ class IndexTypeBuilderImpl<TMap extends IndexTypeMap> implements IndexTypeBuilde
     entry: { readonly options: Type<TOpts> },
   ): IndexTypeBuilder<TMap & Record<TLit, { readonly options: TOpts }>> {
     if (this.entries.some((e) => e.type === typeLiteral)) {
-      throw new Error(`Index type "${typeLiteral}" is already declared in this builder`);
+      throw contractError(
+        'CONTRACT.PACK_CONTRIBUTION_INVALID',
+        `Index type "${typeLiteral}" is already declared in this builder`,
+        { meta: { indexType: typeLiteral } },
+      );
     }
     return new IndexTypeBuilderImpl<TMap & Record<TLit, { readonly options: TOpts }>>([
       ...this.entries,
@@ -58,7 +63,11 @@ class IndexTypeRegistryImpl implements IndexTypeRegistry {
 
   register(entry: IndexTypeEntry): void {
     if (this.entries.has(entry.type)) {
-      throw new Error(`Index type "${entry.type}" is already registered`);
+      throw contractError(
+        'CONTRACT.PACK_CONTRIBUTION_INVALID',
+        `Index type "${entry.type}" is already registered`,
+        { meta: { indexType: entry.type } },
+      );
     }
     this.entries.set(entry.type, entry);
   }

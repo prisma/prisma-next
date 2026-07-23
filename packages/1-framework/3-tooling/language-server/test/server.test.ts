@@ -2,6 +2,7 @@ import { tmpdir } from 'node:os';
 import { PassThrough } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 import type { ContractSourceContext } from '@prisma-next/config/config-types';
+import { errorUnexpected } from '@prisma-next/errors/control';
 import type { AuthoringPslBlockDescriptorNamespace } from '@prisma-next/framework-components/authoring';
 import { buildSymbolTable, type SymbolTable } from '@prisma-next/psl-parser';
 import type { FormatOptions } from '@prisma-next/psl-parser/format';
@@ -51,7 +52,7 @@ import type { ConfigResolution } from '../src/config-resolution';
 import type { DocumentArtifacts } from '../src/project-artifacts';
 import { resolveSchemaInputs } from '../src/schema-inputs';
 import { semanticTokensLegend } from '../src/semantic-tokens';
-import { createServer } from '../src/server';
+import { CONFIG_LOAD_FAILED_CODE, createServer } from '../src/server';
 
 type ResolveInputs = (configPath: string) => Promise<ConfigResolution>;
 type FindNearestConfigPathForFile = (filePath: string) => Promise<string | undefined>;
@@ -201,6 +202,7 @@ interface Harness {
   readonly waitForWarning: (predicate: (message: string) => boolean) => Promise<string>;
   readonly latestDiagnostics: (uri: string) => readonly Diagnostic[] | undefined;
   readonly publishCount: (uri: string) => number;
+  readonly nonEmptyPublishCount: (uri: string) => number;
   readonly diagnosticRefreshCount: () => number;
   readonly waitForDiagnosticRefresh: () => Promise<void>;
   readonly notifyConfigChanged: (uri?: string) => void;
@@ -233,6 +235,7 @@ function startHarness(
   const pending = new Map<string, (diagnostics: readonly Diagnostic[]) => void>();
   const latest = new Map<string, readonly Diagnostic[]>();
   const publishCounts = new Map<string, number>();
+  const nonEmptyPublishCounts = new Map<string, number>();
   interface PredicateWaiter {
     readonly predicate: (diagnostics: readonly Diagnostic[]) => boolean;
     readonly resolve: (diagnostics: readonly Diagnostic[]) => void;
@@ -247,6 +250,9 @@ function startHarness(
     latest.set(params.uri, params.diagnostics);
     const publishCount = (publishCounts.get(params.uri) ?? 0) + 1;
     publishCounts.set(params.uri, publishCount);
+    if (params.diagnostics.length > 0) {
+      nonEmptyPublishCounts.set(params.uri, (nonEmptyPublishCounts.get(params.uri) ?? 0) + 1);
+    }
     pending.get(params.uri)?.(params.diagnostics);
     const countQueue = countWaiters.get(params.uri);
     if (countQueue) {
@@ -361,6 +367,7 @@ function startHarness(
       }),
     latestDiagnostics: (uri) => latest.get(uri),
     publishCount: (uri) => publishCounts.get(uri) ?? 0,
+    nonEmptyPublishCount: (uri) => nonEmptyPublishCounts.get(uri) ?? 0,
     diagnosticRefreshCount: () => diagnosticRefreshes,
     waitForDiagnosticRefresh: () =>
       new Promise((resolve) => {
@@ -1671,7 +1678,7 @@ describe('language server config watching', { timeout: timeouts.databaseOperatio
     expect((await diagnosed).length).toBeGreaterThan(0);
   });
 
-  it('stops managing a project when a config edit breaks the config', async () => {
+  it('keeps serving the last-good project when a config edit breaks the config', async () => {
     const hook = mutableResolve(resolveToSchema);
     harness = startHarness(hook.resolve, watchedFilesCapabilities);
     await harness.initialize();
@@ -1679,15 +1686,21 @@ describe('language server config watching', { timeout: timeouts.databaseOperatio
     harness.client.sendNotification(DidOpenTextDocumentNotification.type, {
       textDocument: { uri: schemaUri, languageId: 'prisma', version: 1, text: 'model {' },
     });
-    expect((await harness.waitForDiagnostics(schemaUri)).length).toBeGreaterThan(0);
+    const before = await harness.waitForDiagnostics(schemaUri);
+    expect(before.length).toBeGreaterThan(0);
 
-    const cleared = harness.waitForDiagnosticsMatching(
-      schemaUri,
-      (diagnostics) => diagnostics.length === 0,
-    );
     hook.set(resolveFails);
     harness.notifyConfigChanged();
-    expect(await cleared).toEqual([]);
+
+    // Successful loads publish harmless empty clears on the config URI, so
+    // wait for the non-empty marker specifically.
+    const configDiagnostics = await harness.waitForDiagnosticsMatching(
+      configUri,
+      (diagnostics) => diagnostics.length > 0,
+    );
+    expect(configDiagnostics).toHaveLength(1);
+    await settle();
+    expect(harness.latestDiagnostics(schemaUri)).toEqual(before);
   });
 });
 
@@ -2212,5 +2225,237 @@ describe('language server interpreter diagnostics', { timeout: timeouts.database
     });
     await requestPullDiagnostics(harness, schemaUri);
     expect(spy).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('language server config failure surfacing', {
+  timeout: timeouts.databaseOperation,
+}, () => {
+  const cleanSchema = 'model User {\n  id Int @id\n}\n';
+  const expectedConfigFailure = (message: string): Diagnostic => ({
+    range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+    message,
+    code: CONFIG_LOAD_FAILED_CODE,
+    severity: DiagnosticSeverity.Error,
+    source: 'prisma-next',
+  });
+
+  function interpretingResolution(): ConfigResolution {
+    const source = {
+      sourceFormat: 'psl',
+      inputs: [schemaPath],
+      load: async () => ok({} as never),
+      interpret: () =>
+        notOk({
+          summary: 'Schema has 1 error',
+          diagnostics: [{ code: 'PSL_INTERPRETER_FINDING', message: 'finding' }],
+        }),
+    } as unknown as PslInterpretCapable;
+    return {
+      ...resolutionForInputs([schemaPath]),
+      interpretation: { source, context: {} as unknown as ContractSourceContext },
+    };
+  }
+
+  it('publishes one config diagnostic on first-load failure and leaves the document unmanaged', async () => {
+    harness = startHarness(async () => {
+      throw new Error('config exploded');
+    });
+    await harness.initialize();
+    openDocument(harness, schemaUri, cleanSchema);
+
+    const published = await harness.waitForDiagnostics(configUri);
+    expect(published).toEqual([expectedConfigFailure('config exploded')]);
+    expect(harness.getDocumentAst(schemaUri)).toBeUndefined();
+
+    await settle();
+    expect(harness.latestDiagnostics(configUri)).toEqual([
+      expectedConfigFailure('config exploded'),
+    ]);
+  });
+
+  it('publishes the structured error why text instead of the generic envelope title', async () => {
+    harness = startHarness(async () => {
+      throw errorUnexpected('boom', { why: 'Failed to load config: boom' });
+    });
+    await harness.initialize();
+    openDocument(harness, schemaUri, cleanSchema);
+
+    const published = await harness.waitForDiagnostics(configUri);
+    expect(published).toEqual([expectedConfigFailure('Failed to load config: boom')]);
+  });
+
+  it('publishes the config diagnostic exactly once when two documents await the same load', async () => {
+    const otherPath = join(root, 'other.psl');
+    const otherUri = pathToFileURL(otherPath).toString();
+    const gate = deferredSettleable<ConfigResolution>();
+    harness = startHarness(() => gate.promise);
+    await harness.initialize();
+    openDocument(harness, schemaUri, cleanSchema);
+    openDocument(harness, otherUri, cleanSchema);
+    // Both open notifications are processed before the shared load settles.
+    await settle();
+    gate.reject(new Error('config exploded'));
+
+    await harness.waitForDiagnostics(configUri);
+    await settle();
+    expect(harness.nonEmptyPublishCount(configUri)).toBe(1);
+  });
+
+  it('publishes the config diagnostic even for pull-capable clients', async () => {
+    harness = startHarness(async () => {
+      throw new Error('config exploded');
+    }, pullDiagnosticsCapabilities);
+    await harness.initialize();
+    openDocument(harness, schemaUri, cleanSchema);
+    // Pull clients trigger project resolution through the pull request.
+    const report = await requestPullDiagnostics(harness, schemaUri);
+    expect(fullReportItems(report)).toEqual([]);
+
+    const published = await harness.waitForDiagnostics(configUri);
+    expect(published).toEqual([expectedConfigFailure('config exploded')]);
+  });
+
+  it('clears the config diagnostic on the next successful load', async () => {
+    let failures = 1;
+    harness = startHarness(async () => {
+      if (failures > 0) {
+        failures -= 1;
+        throw new Error('config exploded');
+      }
+      return resolutionForInputs([schemaPath]);
+    });
+    await harness.initialize();
+    openDocument(harness, schemaUri, cleanSchema);
+    await harness.waitForDiagnostics(configUri);
+
+    harness.notifyConfigChanged();
+
+    await harness.waitForDiagnosticsMatching(configUri, (diagnostics) => diagnostics.length === 0);
+    expect(harness.latestDiagnostics(configUri)).toEqual([]);
+  });
+
+  it('keeps serving the last-good project through a broken reload, then swaps in the fix', async () => {
+    let mode: 'good' | 'broken' | 'fixed' = 'good';
+    harness = startHarness(async () => {
+      if (mode === 'broken') {
+        throw new Error('config exploded');
+      }
+      return interpretingResolution();
+    }, pullDiagnosticsCapabilities);
+    await harness.initialize();
+    openDocument(harness, schemaUri, cleanSchema);
+
+    const before = await requestPullDiagnostics(harness, schemaUri);
+    expect(fullReportItems(before).map((d) => d.code)).toContain('PSL_INTERPRETER_FINDING');
+
+    mode = 'broken';
+    harness.notifyConfigChanged();
+    const failure = await harness.waitForDiagnosticsMatching(
+      configUri,
+      (diagnostics) => diagnostics.length > 0,
+    );
+    expect(failure).toEqual([expectedConfigFailure('config exploded')]);
+
+    const retained = await requestPullDiagnostics(harness, schemaUri);
+    expect(fullReportItems(retained).map((d) => d.code)).toContain('PSL_INTERPRETER_FINDING');
+
+    mode = 'fixed';
+    harness.notifyConfigChanged();
+    await harness.waitForDiagnosticsMatching(configUri, (diagnostics) => diagnostics.length === 0);
+
+    const after = await requestPullDiagnostics(harness, schemaUri);
+    expect(fullReportItems(after).map((d) => d.code)).toContain('PSL_INTERPRETER_FINDING');
+  });
+
+  it('clears the config diagnostic when the last managed document closes', async () => {
+    let broken = false;
+    harness = startHarness(async () => {
+      if (broken) {
+        throw new Error('config exploded');
+      }
+      return resolutionForInputs([schemaPath]);
+    });
+    await harness.initialize();
+    openDocument(harness, schemaUri, cleanSchema);
+    await harness.waitForDiagnostics(schemaUri);
+
+    broken = true;
+    harness.notifyConfigChanged();
+    await harness.waitForDiagnostics(configUri);
+
+    harness.client.sendNotification(DidCloseTextDocumentNotification.type, {
+      textDocument: { uri: schemaUri },
+    });
+
+    await harness.waitForDiagnosticsMatching(configUri, (diagnostics) => diagnostics.length === 0);
+  });
+
+  it('drops the project without resurrection or zombie marker when a reload fails after the last document closed', async () => {
+    const gate = deferredSettleable<ConfigResolution>();
+    let call = 0;
+    harness = startHarness(() => {
+      call += 1;
+      return call === 1 ? Promise.resolve(resolutionForInputs([schemaPath])) : gate.promise;
+    });
+    await harness.initialize();
+    openDocument(harness, schemaUri, cleanSchema);
+    await harness.waitForDiagnostics(schemaUri);
+
+    harness.notifyConfigChanged();
+    await settle();
+    harness.client.sendNotification(DidCloseTextDocumentNotification.type, {
+      textDocument: { uri: schemaUri },
+    });
+    await settle();
+    gate.reject(new Error('config exploded'));
+    await settle();
+
+    expect(harness.nonEmptyPublishCount(configUri)).toBe(0);
+    expect(harness.latestDiagnostics(configUri) ?? []).toEqual([]);
+  });
+
+  it('leaves a newer load untouched when a superseded load fails', async () => {
+    const first = deferredSettleable<ConfigResolution>();
+    let calls = 0;
+    harness = startHarness(() => {
+      calls += 1;
+      return calls === 1 ? first.promise : Promise.resolve(resolutionForInputs([schemaPath]));
+    });
+    await harness.initialize();
+    openDocument(harness, schemaUri, cleanSchema);
+    harness.notifyConfigChanged();
+    await settle();
+    first.reject(new Error('superseded failure'));
+
+    const published = await harness.waitForDiagnostics(schemaUri);
+    expect(published).toEqual([]);
+    await settle();
+    expect(harness.nonEmptyPublishCount(configUri)).toBe(0);
+    expect(harness.getDocumentAst(schemaUri)).toBeDefined();
+    // The newer load's result serves directly — no rediscovery reload churn.
+    expect(calls).toBe(2);
+  });
+
+  it('stays silent for a superseded load failure', async () => {
+    const first = deferredSettleable<ConfigResolution>();
+    let call = 0;
+    harness = startHarness(() => {
+      call += 1;
+      return call === 1 ? first.promise : Promise.resolve(resolutionForInputs([schemaPath]));
+    });
+    await harness.initialize();
+    openDocument(harness, schemaUri, cleanSchema);
+
+    harness.notifyConfigChanged();
+    // The watched-config handler swaps the current load synchronously before
+    // its first await; settling lets that notification dispatch, so the
+    // rejection below lands on a superseded load.
+    await settle();
+    first.reject(new Error('superseded failure'));
+
+    await harness.waitForDiagnostics(schemaUri);
+    await settle();
+    expect(harness.nonEmptyPublishCount(configUri)).toBe(0);
   });
 });

@@ -16,6 +16,7 @@ export type {
 
 export {
   assertNode,
+  defineNonEnumerable,
   PrimaryKey,
   RelationalSchemaNodeKind,
   relationalNodeEntityKind,

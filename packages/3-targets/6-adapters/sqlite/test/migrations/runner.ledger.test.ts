@@ -393,6 +393,7 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     if (result.kind !== 'success') throw new Error('expected planner success');
 

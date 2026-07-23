@@ -14,6 +14,7 @@ import {
   JsonArrayAggExpr,
   JsonObjectExpr,
   LiteralExpr,
+  NativeJsonValueProjection,
   OperationExpr,
   OrderByItem,
   OrExpr,
@@ -317,6 +318,31 @@ describe('compileSelectWithIncludes', () => {
     expect(childRows.limit).toBe(2);
   });
 
+  it('preserves complete codec metadata through row-number dedup', () => {
+    const codec: CodecRef = {
+      codecId: 'pg/vector@1',
+      typeParams: { length: 3 },
+      many: true,
+    };
+    const contract = structuredClone(baseContract);
+    Object.assign(contract.storage.namespaces.public.entries.table.posts.columns.embedding, codec);
+    const { collection } = createCollection();
+    const state = collection.include('posts', (posts) =>
+      posts.select('embedding').distinct('embedding'),
+    ).state;
+
+    const plan = compileSelectWithIncludes(contract, 'public', 'users', state);
+    expectSelectAst(plan.ast);
+
+    const postsProjection = plan.ast.projection.find((item) => item.alias === 'posts');
+    expectSubqueryExpr(postsProjection?.expr);
+    expectDerivedTableSource(postsProjection.expr.query.from);
+
+    const dedupedRows = postsProjection.expr.query.from.query;
+    const embeddingProjection = dedupedRows.projection.find((item) => item.alias === 'embedding');
+    expect(embeddingProjection?.codec).toEqual(codec);
+  });
+
   // Each scalar reducer lowers to a correlated subquery whose
   // projection is the `json_build_object('value', AGG(...))` envelope.
   // The JSON wrapper lets the value travel through the existing
@@ -341,7 +367,9 @@ describe('compileSelectWithIncludes', () => {
       expect(subquerySelect.projection).toEqual([
         ProjectionItem.of(
           relationName,
-          JsonObjectExpr.fromEntries([JsonObjectExpr.entry('value', expectedAggregate)]),
+          JsonObjectExpr.fromEntries([
+            JsonObjectExpr.entry('value', new NativeJsonValueProjection(expectedAggregate)),
+          ]),
         ),
       ]);
     }
@@ -504,7 +532,9 @@ describe('compileSelectWithIncludes', () => {
       expect(commentsProjection.expr.query.projection).toEqual([
         ProjectionItem.of(
           'comments',
-          JsonObjectExpr.fromEntries([JsonObjectExpr.entry('value', AggregateExpr.count())]),
+          JsonObjectExpr.fromEntries([
+            JsonObjectExpr.entry('value', new NativeJsonValueProjection(AggregateExpr.count())),
+          ]),
         ),
       ]);
     });
@@ -543,8 +573,14 @@ describe('compileSelectWithIncludes', () => {
         ProjectionItem.of(
           'posts',
           JsonObjectExpr.fromEntries([
-            JsonObjectExpr.entry('recent', ColumnRef.of('posts__combine__recent', 'posts')),
-            JsonObjectExpr.entry('total', ColumnRef.of('posts__combine__total', 'posts')),
+            JsonObjectExpr.entry(
+              'recent',
+              new NativeJsonValueProjection(ColumnRef.of('posts__combine__recent', 'posts')),
+            ),
+            JsonObjectExpr.entry(
+              'total',
+              new NativeJsonValueProjection(ColumnRef.of('posts__combine__total', 'posts')),
+            ),
           ]),
         ),
       ]);
@@ -577,7 +613,9 @@ describe('compileSelectWithIncludes', () => {
       expect(aSelect.projection).toEqual([
         ProjectionItem.of(
           'posts',
-          JsonObjectExpr.fromEntries([JsonObjectExpr.entry('value', AggregateExpr.count())]),
+          JsonObjectExpr.fromEntries([
+            JsonObjectExpr.entry('value', new NativeJsonValueProjection(AggregateExpr.count())),
+          ]),
         ),
       ]);
       const bJoin = subquery.joins?.[0];
@@ -587,7 +625,10 @@ describe('compileSelectWithIncludes', () => {
         ProjectionItem.of(
           'posts',
           JsonObjectExpr.fromEntries([
-            JsonObjectExpr.entry('value', AggregateExpr.sum(ColumnRef.of('posts', 'views'))),
+            JsonObjectExpr.entry(
+              'value',
+              new NativeJsonValueProjection(AggregateExpr.sum(ColumnRef.of('posts', 'views'))),
+            ),
           ]),
         ),
       ]);
@@ -668,10 +709,18 @@ describe('M:N include correlated subquery', () => {
       ProjectionItem.of(
         'tags',
         JsonArrayAggExpr.of(
-          JsonObjectExpr.fromEntries([
-            JsonObjectExpr.entry('id', ColumnRef.of('tags__rows', 'id')),
-            JsonObjectExpr.entry('name', ColumnRef.of('tags__rows', 'name')),
-          ]),
+          new NativeJsonValueProjection(
+            JsonObjectExpr.fromEntries([
+              JsonObjectExpr.entry(
+                'id',
+                new NativeJsonValueProjection(ColumnRef.of('tags__rows', 'id')),
+              ),
+              JsonObjectExpr.entry(
+                'name',
+                new NativeJsonValueProjection(ColumnRef.of('tags__rows', 'name')),
+              ),
+            ]),
+          ),
           'emptyArray',
         ),
       ),
@@ -737,11 +786,22 @@ describe('M:N include correlated subquery', () => {
       ProjectionItem.of(
         'related',
         JsonArrayAggExpr.of(
-          JsonObjectExpr.fromEntries([
-            JsonObjectExpr.entry('id', ColumnRef.of('related__rows', 'id')),
-            JsonObjectExpr.entry('name', ColumnRef.of('related__rows', 'name')),
-            JsonObjectExpr.entry('tenant_id', ColumnRef.of('related__rows', 'tenant_id')),
-          ]),
+          new NativeJsonValueProjection(
+            JsonObjectExpr.fromEntries([
+              JsonObjectExpr.entry(
+                'id',
+                new NativeJsonValueProjection(ColumnRef.of('related__rows', 'id')),
+              ),
+              JsonObjectExpr.entry(
+                'name',
+                new NativeJsonValueProjection(ColumnRef.of('related__rows', 'name')),
+              ),
+              JsonObjectExpr.entry(
+                'tenant_id',
+                new NativeJsonValueProjection(ColumnRef.of('related__rows', 'tenant_id')),
+              ),
+            ]),
+          ),
           'emptyArray',
         ),
       ),
@@ -856,23 +916,34 @@ describe('M:N include correlated subquery', () => {
       ProjectionItem.of(
         'related',
         JsonArrayAggExpr.of(
-          JsonObjectExpr.fromEntries([
-            JsonObjectExpr.entry('id', ColumnRef.of('related__rows', 'id')),
-            JsonObjectExpr.entry('name', ColumnRef.of('related__rows', 'name')),
-            JsonObjectExpr.entry('tenant_id', ColumnRef.of('related__rows', 'tenant_id')),
-          ]),
+          new NativeJsonValueProjection(
+            JsonObjectExpr.fromEntries([
+              JsonObjectExpr.entry(
+                'id',
+                new NativeJsonValueProjection(ColumnRef.of('related__rows', 'id')),
+              ),
+              JsonObjectExpr.entry(
+                'name',
+                new NativeJsonValueProjection(ColumnRef.of('related__rows', 'name')),
+              ),
+              JsonObjectExpr.entry(
+                'tenant_id',
+                new NativeJsonValueProjection(ColumnRef.of('related__rows', 'tenant_id')),
+              ),
+            ]),
+          ),
           'emptyArray',
         ),
       ),
     ]);
 
-    // Dedup filter SELECT: keep rn = 1, forwarding scalar columns (no codec) up
-    // from the ranked layer.
+    // Dedup filter SELECT: keep rn = 1, forwarding scalar columns and their
+    // codecs from the ranked layer.
     const dedupFilter = SelectAst.from(DerivedTableSource.as('related__ranked', ranked))
       .withProjection([
-        ProjectionItem.of('id', ColumnRef.of('related__ranked', 'id')),
-        ProjectionItem.of('name', ColumnRef.of('related__ranked', 'name')),
-        ProjectionItem.of('tenant_id', ColumnRef.of('related__ranked', 'tenant_id')),
+        proj('id', 'related__ranked', 'id', 'projects'),
+        proj('name', 'related__ranked', 'name', 'projects'),
+        proj('tenant_id', 'related__ranked', 'tenant_id', 'projects'),
       ])
       .withWhere(
         BinaryExpr.eq(ColumnRef.of('related__ranked', '__prisma_distinct_rn'), LiteralExpr.of(1)),
@@ -896,12 +967,26 @@ describe('M:N include correlated subquery', () => {
       ProjectionItem.of(
         'related',
         JsonArrayAggExpr.of(
-          JsonObjectExpr.fromEntries([
-            JsonObjectExpr.entry('id', ColumnRef.of('related__rows', 'id')),
-            JsonObjectExpr.entry('name', ColumnRef.of('related__rows', 'name')),
-            JsonObjectExpr.entry('tenant_id', ColumnRef.of('related__rows', 'tenant_id')),
-            JsonObjectExpr.entry('related', ColumnRef.of('related__rows', 'related')),
-          ]),
+          new NativeJsonValueProjection(
+            JsonObjectExpr.fromEntries([
+              JsonObjectExpr.entry(
+                'id',
+                new NativeJsonValueProjection(ColumnRef.of('related__rows', 'id')),
+              ),
+              JsonObjectExpr.entry(
+                'name',
+                new NativeJsonValueProjection(ColumnRef.of('related__rows', 'name')),
+              ),
+              JsonObjectExpr.entry(
+                'tenant_id',
+                new NativeJsonValueProjection(ColumnRef.of('related__rows', 'tenant_id')),
+              ),
+              JsonObjectExpr.entry(
+                'related',
+                new NativeJsonValueProjection(ColumnRef.of('related__rows', 'related')),
+              ),
+            ]),
+          ),
           'emptyArray',
         ),
       ),
@@ -963,7 +1048,7 @@ describe('compileSelect MTI JOINs', () => {
     ColumnRef.of('features', 'id'),
   );
 
-  it('base query LEFT JOINs MTI variant tables with table-qualified aliases', () => {
+  it('explicit selection controls MTI projections while implicit selection retains them', () => {
     const contract = buildMixedPolyContract();
     const tasksBaseProjection = projectionFor(contract, 'tasks', [
       'id',
@@ -987,9 +1072,23 @@ describe('compileSelect MTI JOINs', () => {
       ),
     ];
 
-    const plan = compileSelect(contract, 'public', 'tasks', emptyState(), 'Task');
+    const implicitPlan = compileSelect(contract, 'public', 'tasks', emptyState(), 'Task');
+    const omittedMtiPlan = compileSelect(
+      contract,
+      'public',
+      'tasks',
+      { ...emptyState(), selectedFields: ['id', 'title'] },
+      'Task',
+    );
+    const selectedMtiPlan = compileSelect(
+      contract,
+      'public',
+      'tasks',
+      { ...emptyState(), selectedFields: ['id', 'priority'] },
+      'Task',
+    );
 
-    expect(plan.ast).toEqual(
+    expect(implicitPlan.ast).toEqual(
       SelectAst.from(TableSource.named('tasks', undefined, 'public'))
         .withProjection([...tasksBaseProjection, ...featuresMtiProjection])
         .withSelectAllIntent({ table: 'tasks' })
@@ -997,6 +1096,20 @@ describe('compileSelect MTI JOINs', () => {
           JoinAst.left(TableSource.named('features', undefined, 'public'), featuresJoinOn),
         ]),
     );
+
+    expectSelectAst(omittedMtiPlan.ast);
+    expect(
+      omittedMtiPlan.ast.projection
+        .map((item) => item.alias)
+        .filter((alias) => alias.startsWith('features__')),
+    ).toEqual([]);
+
+    expectSelectAst(selectedMtiPlan.ast);
+    const selectedAliases = selectedMtiPlan.ast.projection.map((item) => item.alias);
+    expect(selectedAliases.filter((alias) => alias.startsWith('features__'))).toEqual([
+      'features__priority',
+    ]);
+    expect(selectedAliases).not.toContain('priority');
   });
 
   it('variant query INNER JOINs the specific MTI variant table', () => {
@@ -1126,24 +1239,73 @@ describe('compileSelectWithIncludes polymorphic targets', () => {
     expect(aliases).toContain('plan');
   });
 
-  it('MTI-target include left-joins variant tables and projects variant_table__column', () => {
+  it('MTI-target include selection controls variant projections while implicit selection retains them', () => {
     const contract = buildMixedPolyContract();
-    const state = stateWithInclude(includeFor(contract, 'Project', 'tasks'));
+    const implicitState = stateWithInclude(includeFor(contract, 'Project', 'tasks'));
+    const omittedMtiState = stateWithInclude(
+      includeFor(contract, 'Project', 'tasks', {
+        ...emptyState(),
+        selectedFields: ['id', 'title'],
+      }),
+    );
+    const selectedMtiState = stateWithInclude(
+      includeFor(contract, 'Project', 'tasks', {
+        ...emptyState(),
+        selectedFields: ['id', 'priority'],
+      }),
+    );
 
-    const plan = compileSelectWithIncludes(contract, 'public', 'projects_tbl', state, 'Project');
-    const childRows = childRowsSelectFor(plan, 'tasks');
+    const implicitPlan = compileSelectWithIncludes(
+      contract,
+      'public',
+      'projects_tbl',
+      implicitState,
+      'Project',
+    );
+    const implicitChildRows = childRowsSelectFor(implicitPlan, 'tasks');
 
-    expect(childRows.joins).toEqual([
+    expect(implicitChildRows.joins).toEqual([
       JoinAst.left(
         TableSource.named('features', undefined, 'public'),
         EqColJoinOn.of(ColumnRef.of('tasks', 'id'), ColumnRef.of('features', 'id')),
       ),
     ]);
+    expect(projectionAliases(implicitChildRows)).toEqual([
+      'id',
+      'title',
+      'type',
+      'severity',
+      'project_id',
+      'parent_id',
+      'assignee_id',
+      'features__priority',
+      'features__assignee_id',
+    ]);
 
-    const aliases = projectionAliases(childRows);
-    expect(aliases).toContain('type');
-    expect(aliases).toContain('severity');
-    expect(aliases).toContain('features__priority');
+    const omittedMtiPlan = compileSelectWithIncludes(
+      contract,
+      'public',
+      'projects_tbl',
+      omittedMtiState,
+      'Project',
+    );
+    const omittedMtiChildRows = childRowsSelectFor(omittedMtiPlan, 'tasks');
+    expect(
+      projectionAliases(omittedMtiChildRows).filter((alias) => alias.startsWith('features__')),
+    ).toEqual([]);
+
+    const selectedMtiPlan = compileSelectWithIncludes(
+      contract,
+      'public',
+      'projects_tbl',
+      selectedMtiState,
+      'Project',
+    );
+    const selectedMtiAliases = projectionAliases(childRowsSelectFor(selectedMtiPlan, 'tasks'));
+    expect(selectedMtiAliases.filter((alias) => alias.startsWith('features__'))).toEqual([
+      'features__priority',
+    ]);
+    expect(selectedMtiAliases).not.toContain('priority');
   });
 
   it('variant-narrowed MTI-target include inner-joins only the named variant', () => {

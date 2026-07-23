@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { contractSnapshotDir, writeContractSnapshot } from '../src/contract-snapshot-store';
 import { MigrationToolsError } from '../src/errors';
 import {
   copyFilesWithRename,
@@ -21,6 +22,24 @@ function expectMigrationError(error: unknown, code: string) {
   expect(mte.fix).toBeTruthy();
 }
 
+/**
+ * Write a contract snapshot store entry for `storageHash`, returning the
+ * exact JSON value stored (the `storage.storageHash` field the store
+ * requires, merged with `extra`).
+ */
+async function writeEndContractSnapshot(
+  migrationsDir: string,
+  storageHash: string,
+  extra: Record<string, unknown> = {},
+): Promise<Record<string, unknown>> {
+  const contractJson = { ...extra, storage: { storageHash } };
+  await writeContractSnapshot(migrationsDir, storageHash, {
+    contractJson,
+    contractDts: 'export type Contract = unknown;\n',
+  });
+  return contractJson;
+}
+
 describe('writeMigrationPackage + readMigrationPackage', () => {
   let tmpDir: string;
 
@@ -36,7 +55,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     const dir = join(tmpDir, '20260225T1430_add_users');
     const { metadata, ops } = await writeTestPackage(dir);
 
-    const pkg = await readMigrationPackage(dir);
+    const pkg = await readMigrationPackage(dir, { migrationsDir: tmpDir });
 
     expect(JSON.stringify(pkg.metadata)).toBe(JSON.stringify(metadata));
     expect(JSON.stringify(pkg.ops)).toBe(JSON.stringify(ops));
@@ -51,40 +70,43 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
     expect(relativeDir.startsWith('/')).toBe(false);
 
-    const pkg = await readMigrationPackage(relativeDir);
+    const pkg = await readMigrationPackage(relativeDir, { migrationsDir: tmpDir });
 
     expect(pkg.dirPath).toBe(absoluteDir);
   });
 
-  it('reads the end contract snapshot when end-contract.json is present', async () => {
+  it('reads the end contract snapshot from the store, keyed by metadata.to', async () => {
     const dir = join(tmpDir, '20260225T1430_snapshots');
-    await writeTestPackage(dir);
-    await writeFile(join(dir, 'end-contract.json'), JSON.stringify({ marker: 'end' }));
+    const toHash = 'e'.repeat(64);
+    const { metadata } = await writeTestPackage(dir, { to: toHash });
+    const endJson = await writeEndContractSnapshot(tmpDir, metadata.to, { marker: 'end' });
 
-    const pkg = await readMigrationPackage(dir);
+    const pkg = await readMigrationPackage(dir, { migrationsDir: tmpDir });
 
-    expect(pkg.endContractJson).toEqual({ marker: 'end' });
+    expect(pkg.endContractJson).toEqual(endJson);
   });
 
-  it('ignores a sibling start-contract.json — only the end snapshot is loaded', async () => {
+  it('reads only the store entry keyed by metadata.to, not the from-hash entry', async () => {
     // The edge's before-state is the predecessor's end snapshot by chain
-    // construction, so the loader never surfaces start-contract.json.
+    // construction, so the loader never surfaces the from-hash's entry.
     const dir = join(tmpDir, '20260225T1430_start_ignored');
-    await writeTestPackage(dir);
-    await writeFile(join(dir, 'start-contract.json'), JSON.stringify({ marker: 'start' }));
-    await writeFile(join(dir, 'end-contract.json'), JSON.stringify({ marker: 'end' }));
+    const fromHash = '5'.repeat(64);
+    const toHash = '6'.repeat(64);
+    const { metadata } = await writeTestPackage(dir, { from: fromHash, to: toHash });
+    await writeEndContractSnapshot(tmpDir, fromHash, { marker: 'start' });
+    const endJson = await writeEndContractSnapshot(tmpDir, metadata.to, { marker: 'end' });
 
-    const pkg = await readMigrationPackage(dir);
+    const pkg = await readMigrationPackage(dir, { migrationsDir: tmpDir });
 
-    expect(pkg.endContractJson).toEqual({ marker: 'end' });
+    expect(pkg.endContractJson).toEqual(endJson);
     expect('startContractJson' in pkg).toBe(false);
   });
 
-  it('omits endContractJson when no snapshot file exists', async () => {
+  it('omits endContractJson when no store entry exists', async () => {
     const dir = join(tmpDir, '20260225T1430_bare');
     await writeTestPackage(dir);
 
-    const pkg = await readMigrationPackage(dir);
+    const pkg = await readMigrationPackage(dir, { migrationsDir: tmpDir });
 
     expect(pkg.endContractJson).toBeUndefined();
     expect('endContractJson' in pkg).toBe(false);
@@ -92,10 +114,13 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
   it('treats a malformed end snapshot as absent instead of failing the load', async () => {
     const dir = join(tmpDir, '20260225T1430_bad_snapshot');
-    await writeTestPackage(dir);
-    await writeFile(join(dir, 'end-contract.json'), 'not json');
+    const toHash = '7'.repeat(64);
+    const { metadata } = await writeTestPackage(dir, { to: toHash });
+    const snapshotDir = contractSnapshotDir(tmpDir, metadata.to);
+    await mkdir(snapshotDir, { recursive: true });
+    await writeFile(join(snapshotDir, 'contract.json'), 'not json');
 
-    const pkg = await readMigrationPackage(dir);
+    const pkg = await readMigrationPackage(dir, { migrationsDir: tmpDir });
 
     expect(pkg.endContractJson).toBeUndefined();
   });
@@ -104,10 +129,13 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     // `undefined` is the single "no snapshot" sentinel downstream; a null
     // contract is not a storable state.
     const dir = join(tmpDir, '20260225T1430_null_snapshot');
-    await writeTestPackage(dir);
-    await writeFile(join(dir, 'end-contract.json'), 'null');
+    const toHash = '8'.repeat(64);
+    const { metadata } = await writeTestPackage(dir, { to: toHash });
+    const snapshotDir = contractSnapshotDir(tmpDir, metadata.to);
+    await mkdir(snapshotDir, { recursive: true });
+    await writeFile(join(snapshotDir, 'contract.json'), 'null');
 
-    const pkg = await readMigrationPackage(dir);
+    const pkg = await readMigrationPackage(dir, { migrationsDir: tmpDir });
 
     expect('endContractJson' in pkg).toBe(false);
   });
@@ -127,7 +155,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     await writeFile(join(dir, 'migration.json'), 'not json');
     await writeFile(join(dir, 'ops.json'), '[]');
 
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.INVALID_JSON');
       return true;
     });
@@ -138,7 +166,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, 'migration.json'), JSON.stringify(createTestMetadata()));
 
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.FILE_MISSING');
       expect((e as MigrationToolsError).details).toHaveProperty('file', 'ops.json');
       return true;
@@ -150,7 +178,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, 'ops.json'), '[]');
 
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.FILE_MISSING');
       expect((e as MigrationToolsError).details).toHaveProperty('file', 'migration.json');
       return true;
@@ -163,7 +191,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     await writeFile(join(dir, 'migration.json'), JSON.stringify({ from: 'x' }));
     await writeFile(join(dir, 'ops.json'), '[]');
 
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
       return true;
     });
@@ -176,7 +204,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     await writeFile(join(dir, 'migration.json'), JSON.stringify(metadataWithoutHash));
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
 
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
       return true;
     });
@@ -189,7 +217,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     await writeFile(join(dir, 'migration.json'), JSON.stringify(metadata));
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
 
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
       return true;
     });
@@ -202,7 +230,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     await writeFile(join(dir, 'migration.json'), JSON.stringify(metadata));
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
 
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
       return true;
     });
@@ -215,7 +243,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     await writeFile(join(dir, 'migration.json'), JSON.stringify(metadata));
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
 
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
       return true;
     });
@@ -231,7 +259,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     await writeFile(join(dir, 'migration.json'), JSON.stringify(metadata));
     await writeFile(join(dir, 'ops.json'), JSON.stringify([]));
 
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
       return true;
     });
@@ -244,17 +272,17 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     await writeFile(join(dir, 'migration.json'), JSON.stringify(metadata));
     await writeFile(join(dir, 'ops.json'), JSON.stringify([]));
 
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
       return true;
     });
   });
 
   it('loads a package whose directory holds only migration.json + ops.json', async () => {
-    // Runner-side independence: the migration loader must not require
-    // sibling `start-contract.json` / `end-contract.json` files to be
-    // present on disk. Contracts are author-time conveniences, not
-    // structural inputs to the runner. The stored manifest carries the
+    // Runner-side independence: the migration loader must not require a
+    // resolvable snapshot store entry to be present on disk. Contracts
+    // are author-time conveniences, not structural inputs to the runner.
+    // The stored manifest carries the
     // storage-hash bookends (`from`, `to`) which is all the runner needs
     // to walk the migration graph.
     const { readdir } = await import('node:fs/promises');
@@ -263,7 +291,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
     expect((await readdir(dir)).sort()).toEqual(['migration.json', 'ops.json']);
 
-    const pkg = await readMigrationPackage(dir);
+    const pkg = await readMigrationPackage(dir, { migrationsDir: tmpDir });
     expect(pkg.dirName).toBe('20260225T1430_runner_independent');
     expect(pkg.metadata.migrationHash).toBeDefined();
   });
@@ -274,7 +302,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     await writeTestPackage(baselineDir);
     await writeTestPackage(followupDir);
 
-    const { packages } = await readMigrationsDir(tmpDir);
+    const { packages } = await readMigrationsDir(tmpDir, { migrationsDir: tmpDir });
     expect(packages.map((p) => p.dirName).sort()).toEqual(['20260225T1430_a', '20260225T1500_b']);
   });
 
@@ -282,7 +310,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     const dir = join(tmpDir, '20260225T1430_baseline');
     await writeTestPackage(dir, { from: null });
 
-    const pkg = await readMigrationPackage(dir);
+    const pkg = await readMigrationPackage(dir, { migrationsDir: tmpDir });
     expect(pkg.metadata.from).toBeNull();
   });
 
@@ -293,7 +321,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     await writeFile(join(dir, 'migration.json'), JSON.stringify(metadata));
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
 
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
       return true;
     });
@@ -306,7 +334,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     await writeFile(join(dir, 'migration.json'), JSON.stringify(metadataWithout));
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
 
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
       return true;
     });
@@ -318,7 +346,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     await writeFile(join(dir, 'migration.json'), JSON.stringify(createTestMetadata()));
     await writeFile(join(dir, 'ops.json'), JSON.stringify({ not: 'an array' }));
 
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
       return true;
     });
@@ -330,7 +358,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     await writeFile(join(dir, 'migration.json'), JSON.stringify(createTestMetadata()));
     await writeFile(join(dir, 'ops.json'), JSON.stringify([{ id: 'x' }]));
 
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
       return true;
     });
@@ -343,7 +371,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     await writeFile(join(dir, 'migration.json'), JSON.stringify(metadata));
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
 
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
       return true;
     });
@@ -366,7 +394,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     const dir = join(tmpDir, 'nested', '20260225T1430_nested');
     await writeTestPackage(dir);
 
-    const pkg = await readMigrationPackage(dir);
+    const pkg = await readMigrationPackage(dir, { migrationsDir: tmpDir });
     expect(pkg.dirName).toBe('20260225T1430_nested');
   });
 
@@ -376,7 +404,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     await mkdir(join(dir, 'migration.json'));
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
 
-    await expect(readMigrationPackage(dir)).rejects.toMatchObject({
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toMatchObject({
       code: 'EISDIR',
     });
   });
@@ -391,7 +419,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     ];
     await writeFile(join(dir, 'ops.json'), JSON.stringify(tamperedOps, null, 2));
 
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.HASH_MISMATCH');
       const mte = e as MigrationToolsError;
       expect(mte.details).toMatchObject({
@@ -418,7 +446,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     content.createdAt = '2024-01-01T00:00:00.000Z';
     await writeFile(manifestPath, JSON.stringify(content, null, 2));
 
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.HASH_MISMATCH');
       const mte = e as MigrationToolsError;
       expect(mte.details).toMatchObject({
@@ -469,7 +497,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     content.migrationHash = computeMigrationHash(content, ops);
     await writeFile(manifestPath, JSON.stringify(content, null, 2));
 
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.PROVIDED_INVARIANTS_MISMATCH');
       const mte = e as MigrationToolsError;
       expect(mte.details).toMatchObject({
@@ -515,7 +543,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     content.migrationHash = computeMigrationHash(content, ops);
     await writeFile(manifestPath, JSON.stringify(content, null, 2));
 
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.PROVIDED_INVARIANTS_MISMATCH');
       const mte = e as MigrationToolsError;
       expect(mte.why).toContain('different order');
@@ -556,7 +584,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     );
     await writeFile(join(dir, 'ops.json'), JSON.stringify(ops, null, 2));
 
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.INVALID_INVARIANT_ID');
       const mte = e as MigrationToolsError;
       expect(mte.details).toEqual({ invariantId: badId });
@@ -601,7 +629,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     );
     await writeFile(join(dir, 'ops.json'), JSON.stringify(ops, null, 2));
 
-    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+    await expect(readMigrationPackage(dir, { migrationsDir: tmpDir })).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.DUPLICATE_INVARIANT_IN_EDGE');
       const mte = e as MigrationToolsError;
       expect(mte.details).toEqual({ invariantId: 'shared' });
@@ -629,7 +657,7 @@ describe('readMigrationsDir', () => {
       createdAt: '2026-02-25T15:00:00.000Z',
     });
 
-    const { packages } = await readMigrationsDir(tmpDir);
+    const { packages } = await readMigrationsDir(tmpDir, { migrationsDir: tmpDir });
     expect(packages).toHaveLength(2);
     expect(packages[0]!.dirName).toBe('20260225T1400_first');
     expect(packages[1]!.dirName).toBe('20260225T1500_second');
@@ -640,13 +668,13 @@ describe('readMigrationsDir', () => {
     await mkdir(join(tmpDir, 'README'), { recursive: true });
     await writeFile(join(tmpDir, 'README', 'content.md'), '# readme');
 
-    const { packages } = await readMigrationsDir(tmpDir);
+    const { packages } = await readMigrationsDir(tmpDir, { migrationsDir: tmpDir });
     expect(packages).toHaveLength(1);
     expect(packages[0]!.dirName).toBe('20260225T1400_valid');
   });
 
   it('returns empty packages and problems arrays for an empty directory (pre-ENOENT path)', async () => {
-    const { packages, problems } = await readMigrationsDir(tmpDir);
+    const { packages, problems } = await readMigrationsDir(tmpDir, { migrationsDir: tmpDir });
     expect(packages).toHaveLength(0);
     expect(problems).toHaveLength(0);
   });
@@ -655,28 +683,34 @@ describe('readMigrationsDir', () => {
     const notADirectory = join(tmpDir, 'not-a-directory.txt');
     await writeFile(notADirectory, 'content');
 
-    await expect(readMigrationsDir(notADirectory)).rejects.toMatchObject({
-      code: 'ENOTDIR',
-    });
+    await expect(readMigrationsDir(notADirectory, { migrationsDir: tmpDir })).rejects.toMatchObject(
+      {
+        code: 'ENOTDIR',
+      },
+    );
   });
 
   it('skips files (not directories) in root', async () => {
     await writeFile(join(tmpDir, '.gitkeep'), '');
-    const { packages } = await readMigrationsDir(tmpDir);
+    const { packages } = await readMigrationsDir(tmpDir, { migrationsDir: tmpDir });
     expect(packages).toHaveLength(0);
   });
 
   it('returns a hashMismatch problem and retains the package when a child package is tampered', async () => {
     const intactDir = join(tmpDir, '20260225T1400_intact');
     const tamperedDir = join(tmpDir, '20260225T1500_tampered');
+    const intactHash = '1'.repeat(64);
+    const tamperedHash = '2'.repeat(64);
 
-    await writeTestPackage(intactDir);
-    await writeTestPackage(tamperedDir);
+    await writeTestPackage(intactDir, { to: intactHash });
+    await writeTestPackage(tamperedDir, { to: tamperedHash });
     await writeFile(join(tamperedDir, 'ops.json'), JSON.stringify([], null, 2));
-    await writeFile(join(intactDir, 'end-contract.json'), JSON.stringify({ marker: 'intact' }));
-    await writeFile(join(tamperedDir, 'end-contract.json'), JSON.stringify({ marker: 'tampered' }));
+    const intactJson = await writeEndContractSnapshot(tmpDir, intactHash, {
+      marker: 'intact',
+    });
+    await writeEndContractSnapshot(tmpDir, tamperedHash, { marker: 'tampered' });
 
-    const { packages, problems } = await readMigrationsDir(tmpDir);
+    const { packages, problems } = await readMigrationsDir(tmpDir, { migrationsDir: tmpDir });
     // Both packages are retained (hashMismatch is recoverable)
     expect(packages).toHaveLength(2);
     expect(packages.map((p) => p.dirName).sort()).toEqual([
@@ -688,7 +722,7 @@ describe('readMigrationsDir', () => {
     // contract store), while the intact package keeps its snapshot.
     const intact = packages.find((p) => p.dirName === '20260225T1400_intact');
     const tampered = packages.find((p) => p.dirName === '20260225T1500_tampered');
-    expect(intact?.endContractJson).toEqual({ marker: 'intact' });
+    expect(intact?.endContractJson).toEqual(intactJson);
     expect(tampered && 'endContractJson' in tampered).toBe(false);
     // One problem: hashMismatch on the tampered package
     expect(problems).toHaveLength(1);
@@ -727,7 +761,7 @@ describe('readMigrationsDir', () => {
     content.migrationHash = computeMigrationHash(content, ops);
     await writeFile(manifestPath, JSON.stringify(content, null, 2));
 
-    const { packages, problems } = await readMigrationsDir(tmpDir);
+    const { packages, problems } = await readMigrationsDir(tmpDir, { migrationsDir: tmpDir });
     // Package is retained despite the mismatch
     expect(packages).toHaveLength(1);
     expect(packages[0]!.dirName).toBe('20260225T1400_invariants_mismatch');
@@ -751,7 +785,7 @@ describe('readMigrationsDir', () => {
     await writeFile(join(brokenDir, 'migration.json'), 'not json at all');
     await writeFile(join(brokenDir, 'ops.json'), '[]');
 
-    const { packages, problems } = await readMigrationsDir(tmpDir);
+    const { packages, problems } = await readMigrationsDir(tmpDir, { migrationsDir: tmpDir });
     // Only the valid package is in packages
     expect(packages).toHaveLength(1);
     expect(packages[0]!.dirName).toBe('20260225T1400_valid');
@@ -771,7 +805,7 @@ describe('readMigrationsDir', () => {
     await writeFile(join(dir, 'migration.json'), JSON.stringify({ from: 'x' }));
     await writeFile(join(dir, 'ops.json'), '[]');
 
-    const { packages, problems } = await readMigrationsDir(tmpDir);
+    const { packages, problems } = await readMigrationsDir(tmpDir, { migrationsDir: tmpDir });
     expect(packages).toHaveLength(0);
     expect(problems).toHaveLength(1);
     expect(problems[0]!.kind).toBe('packageUnloadable');
@@ -788,7 +822,7 @@ describe('readMigrationsDir', () => {
     await writeFile(join(dir2, 'migration.json'), 'not json');
     await writeFile(join(dir2, 'ops.json'), '[]');
 
-    const { packages, problems } = await readMigrationsDir(tmpDir);
+    const { packages, problems } = await readMigrationsDir(tmpDir, { migrationsDir: tmpDir });
     // tampered package is retained (hashMismatch), broken one is omitted (packageUnloadable)
     expect(packages).toHaveLength(1);
     expect(packages[0]!.dirName).toBe('20260225T1400_tampered');
@@ -830,7 +864,7 @@ describe('copyFilesWithRename', () => {
     expect(await readFile(join(destDir, 'contract.d.ts'), 'utf-8')).toBe(dtsPayload);
   });
 
-  it('renames destination filenames according to destName (source → start-contract.*)', async () => {
+  it('renames destination filenames according to destName (source → renamed.*)', async () => {
     const sourceDir = join(tmpDir, 'src/prisma');
     await mkdir(sourceDir, { recursive: true });
     const sourceJson = join(sourceDir, 'contract.json');
@@ -841,12 +875,12 @@ describe('copyFilesWithRename', () => {
     const destDir = join(tmpDir, 'migrations/20260225T1430_renamed');
 
     await copyFilesWithRename(destDir, [
-      { sourcePath: sourceJson, destName: 'start-contract.json' },
-      { sourcePath: sourceDts, destName: 'start-contract.d.ts' },
+      { sourcePath: sourceJson, destName: 'renamed.json' },
+      { sourcePath: sourceDts, destName: 'renamed.d.ts' },
     ]);
 
-    expect(await readFile(join(destDir, 'start-contract.json'), 'utf-8')).toBe('{"renamed":true}');
-    expect(await readFile(join(destDir, 'start-contract.d.ts'), 'utf-8')).toBe('// dts');
+    expect(await readFile(join(destDir, 'renamed.json'), 'utf-8')).toBe('{"renamed":true}');
+    expect(await readFile(join(destDir, 'renamed.d.ts'), 'utf-8')).toBe('// dts');
   });
 
   it('creates the destination directory if it does not already exist', async () => {
@@ -877,7 +911,9 @@ describe('copyFilesWithRename', () => {
 
     await copyFilesWithRename(destDir, []);
 
-    const { packages: entries } = await readMigrationsDir(join(tmpDir, 'migrations'));
+    const { packages: entries } = await readMigrationsDir(join(tmpDir, 'migrations'), {
+      migrationsDir: join(tmpDir, 'migrations'),
+    });
     expect(entries).toHaveLength(0);
   });
 });

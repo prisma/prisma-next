@@ -5,9 +5,11 @@ import type { Contract, ControlPolicy } from '@prisma-next/contract/types';
 import type { TargetPackRef } from '@prisma-next/framework-components/components';
 import type { SqlNamespaceBase, SqlNamespaceInput } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import { ok } from '@prisma-next/utils/result';
 import { extname } from 'pathe';
 import { buildSqlContractFromDefinition } from './build-contract';
+import { contractError } from './contract-errors';
 
 /**
  * Derives the emit output path from the TS contract input so artefacts land
@@ -76,15 +78,17 @@ export function typescriptContractFromPath(
       load: async (context) => {
         const [absolutePath] = context.resolvedInputs;
         if (absolutePath === undefined) {
-          throw new Error(
+          throw new InternalError(
             'typescriptContractFromPath: context.resolvedInputs is empty. The CLI config loader should populate it positional-matched with source.inputs.',
           );
         }
         const mod = await import(pathToFileURL(absolutePath).href);
         const contract: Contract | undefined = mod.default ?? mod.contract;
         if (contract === undefined) {
-          throw new Error(
+          throw contractError(
+            'CONTRACT.MODULE_EXPORT_MISSING',
             `typescriptContractFromPath: module at "${absolutePath}" has no "default" or "contract" export.`,
+            { meta: { path: absolutePath } },
           );
         }
         return ok(applySpecifierDefaultControlPolicy(contract, options?.defaultControlPolicy));

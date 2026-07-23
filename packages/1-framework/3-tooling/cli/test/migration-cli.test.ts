@@ -186,7 +186,7 @@ describe('MigrationCLI.run', () => {
     expect(stdout.text).toContain('--- ops.json ---');
   });
 
-  it('emits PN-MIG-2006 with both target ids when migration target ≠ config target', async () => {
+  it('emits MIGRATION.TARGET_MISMATCH with both target ids when migration target ≠ config target', async () => {
     loadConfigMock.mockResolvedValue(okConfig);
     createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
     const stdout = new BufferStream();
@@ -403,7 +403,7 @@ describe('MigrationCLI.run', () => {
     expect(onDisk).toBe(malformed);
   });
 
-  it('rejects --config when followed by another flag with PN-CLI-4012 and exit 2', async () => {
+  it('rejects --config when followed by another flag with CLI.CONFIG_ARG_MISSING_PATH and exit 2', async () => {
     const stdout = new BufferStream();
     const stderr = new BufferStream();
 
@@ -415,12 +415,12 @@ describe('MigrationCLI.run', () => {
 
     expect(exitCode).toBe(2);
     expect(loadConfigMock).not.toHaveBeenCalled();
-    expect(stderr.text).toContain('PN-CLI-4012');
+    expect(stderr.text).toContain('CLI.CONFIG_ARG_MISSING_PATH');
     expect(stderr.text).toContain('--config');
     expect(stderr.text).toContain('--dry-run');
   });
 
-  it('rejects a bare trailing --config with PN-CLI-4012 and exit 2', async () => {
+  it('rejects a bare trailing --config with CLI.CONFIG_ARG_MISSING_PATH and exit 2', async () => {
     const stdout = new BufferStream();
     const stderr = new BufferStream();
 
@@ -432,15 +432,15 @@ describe('MigrationCLI.run', () => {
 
     expect(exitCode).toBe(2);
     expect(loadConfigMock).not.toHaveBeenCalled();
-    expect(stderr.text).toContain('PN-CLI-4012');
+    expect(stderr.text).toContain('CLI.CONFIG_ARG_MISSING_PATH');
     expect(stderr.text).toContain('--config');
   });
 
   // `--config=` (equals form, empty value) is a usage error: the user
   // expressed intent to override the config path but the override is
   // empty. Loader behaviour for an empty path is implementation-defined
-  // and worse for the user than a structured PN-CLI-4012.
-  it('rejects --config= (equals form, empty value) with PN-CLI-4012 and exit 2', async () => {
+  // and worse for the user than a structured CLI.CONFIG_ARG_MISSING_PATH.
+  it('rejects --config= (equals form, empty value) with CLI.CONFIG_ARG_MISSING_PATH and exit 2', async () => {
     const stdout = new BufferStream();
     const stderr = new BufferStream();
 
@@ -452,14 +452,14 @@ describe('MigrationCLI.run', () => {
 
     expect(exitCode).toBe(2);
     expect(loadConfigMock).not.toHaveBeenCalled();
-    expect(stderr.text).toContain('PN-CLI-4012');
+    expect(stderr.text).toContain('CLI.CONFIG_ARG_MISSING_PATH');
   });
 
   // `--config ""` (separated form, empty string token) is the same kind
   // of usage error as `--config=`. Shells expand `""` into a real
   // (empty) argv token, so this is what an author hits in practice
   // when scripting `--config "$MAYBE_UNSET_VAR"`.
-  it('rejects --config "" (separated form, empty string) with PN-CLI-4012 and exit 2', async () => {
+  it('rejects --config "" (separated form, empty string) with CLI.CONFIG_ARG_MISSING_PATH and exit 2', async () => {
     const stdout = new BufferStream();
     const stderr = new BufferStream();
 
@@ -471,7 +471,7 @@ describe('MigrationCLI.run', () => {
 
     expect(exitCode).toBe(2);
     expect(loadConfigMock).not.toHaveBeenCalled();
-    expect(stderr.text).toContain('PN-CLI-4012');
+    expect(stderr.text).toContain('CLI.CONFIG_ARG_MISSING_PATH');
   });
 
   it('rejects target-mismatched migrations before any stack-driven construction', async () => {
@@ -493,7 +493,7 @@ describe('MigrationCLI.run', () => {
     expect(adapterCreate).not.toHaveBeenCalled();
   });
 
-  it('rejects unknown flags with PN-CLI-4013 and exit 2', async () => {
+  it('rejects unknown flags with CLI.UNKNOWN_FLAG and exit 2', async () => {
     const stdout = new BufferStream();
     const stderr = new BufferStream();
 
@@ -505,7 +505,7 @@ describe('MigrationCLI.run', () => {
 
     expect(exitCode).toBe(2);
     expect(loadConfigMock).not.toHaveBeenCalled();
-    expect(stderr.text).toContain('PN-CLI-4013');
+    expect(stderr.text).toContain('CLI.UNKNOWN_FLAG');
     expect(stderr.text).toContain('--frobnicate');
     // The known-flag list should be rendered for copy-pastability so
     // the user can spot the typo without `--help`.

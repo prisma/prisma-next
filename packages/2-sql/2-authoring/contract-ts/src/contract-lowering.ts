@@ -11,6 +11,7 @@ import {
 } from '@prisma-next/sql-contract/entity-handle-lowering-hook';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import type {
   AttachedEntities,
   ContractDefinition,
@@ -39,6 +40,7 @@ import {
   type SqlStageSpec,
   type UniqueConstraint,
 } from './contract-dsl';
+import { contractError } from './contract-errors';
 import {
   emitTypedCrossModelFallbackWarnings,
   emitTypedNamedTypeFallbackWarnings,
@@ -106,15 +108,19 @@ function resolveFieldDescriptor(
         : storageTypeReverseLookup.get(fieldState.typeRef as StorageTypeInstance);
 
     if (!typeRef) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.TYPE_UNKNOWN',
         `Field "${modelName}.${fieldName}" references a storage type instance that is not present in definition.types`,
+        { meta: { modelName, fieldName, reason: 'instance-not-in-definition-types' } },
       );
     }
 
     const referencedType = storageTypes[typeRef];
     if (!referencedType) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.TYPE_UNKNOWN',
         `Field "${modelName}.${fieldName}" references unknown storage type "${typeRef}"`,
+        { meta: { modelName, fieldName, typeRef } },
       );
     }
 
@@ -125,7 +131,11 @@ function resolveFieldDescriptor(
     };
   }
 
-  throw new Error(`Field "${modelName}.${fieldName}" does not resolve to a storage descriptor`);
+  throw contractError(
+    'CONTRACT.TYPE_UNKNOWN',
+    `Field "${modelName}.${fieldName}" does not resolve to a storage descriptor`,
+    { meta: { modelName, fieldName, reason: 'unresolved-storage-descriptor' } },
+  );
 }
 
 function mapFieldNamesToColumnNames(
@@ -136,7 +146,11 @@ function mapFieldNamesToColumnNames(
   return fieldNames.map((fieldName) => {
     const columnName = fieldToColumn[fieldName];
     if (!columnName) {
-      throw new Error(`Unknown field "${modelName}.${fieldName}" in contract definition`);
+      throw contractError(
+        'CONTRACT.FIELD_UNKNOWN',
+        `Unknown field "${modelName}.${fieldName}" in contract definition`,
+        { meta: { modelName, fieldName } },
+      );
     }
     return columnName;
   });
@@ -154,8 +168,16 @@ function assertRelationFieldArity(params: {
     return;
   }
 
-  throw new Error(
+  throw contractError(
+    'CONTRACT.RELATION_INVALID',
     `Relation "${params.modelName}.${params.relationName}" maps ${params.leftFields.length} ${params.leftLabel} field(s) to ${params.rightFields.length} ${params.rightLabel} field(s).`,
+    {
+      meta: {
+        modelName: params.modelName,
+        relationName: params.relationName,
+        reason: 'field-count-mismatch',
+      },
+    },
   );
 }
 
@@ -182,8 +204,12 @@ function resolveInlineIdConstraint(
   }
 
   if (inlineIdFields.length > 1) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.IDENTITY_INVALID',
       `Model "${spec.modelName}" marks multiple fields with .id(). Use .attributes(...) for compound identities.`,
+      {
+        meta: { modelName: spec.modelName, reason: 'multiple-inline-ids', fields: inlineIdFields },
+      },
     );
   }
 
@@ -225,14 +251,20 @@ function resolveModelIdConstraint(
   const attributeId = spec.attributesSpec?.id;
 
   if (inlineId && attributeId) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.IDENTITY_INVALID',
       `Model "${spec.modelName}" defines identity both inline and in .attributes(...). Pick one identity style.`,
+      { meta: { modelName: spec.modelName, reason: 'inline-and-attributes' } },
     );
   }
 
   const resolvedId = attributeId ?? inlineId;
   if (resolvedId && resolvedId.fields.length === 0) {
-    throw new Error(`Model "${spec.modelName}" defines an empty identity. Add at least one field.`);
+    throw contractError(
+      'CONTRACT.IDENTITY_INVALID',
+      `Model "${spec.modelName}" defines an empty identity. Add at least one field.`,
+      { meta: { modelName: spec.modelName, reason: 'empty-identity' } },
+    );
   }
 
   return resolvedId;
@@ -242,8 +274,10 @@ function resolveModelUniqueConstraints(spec: RuntimeModelSpec): readonly UniqueC
   const attributeUniques = spec.attributesSpec?.uniques ?? [];
   for (const unique of attributeUniques) {
     if (unique.fields.length === 0) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.CONSTRAINT_INVALID',
         `Model "${spec.modelName}" defines an empty unique constraint. Add at least one field.`,
+        { meta: { modelName: spec.modelName } },
       );
     }
   }
@@ -300,8 +334,10 @@ function resolveRelationForeignKeys(
     }
 
     if (!allSpecs.has(targetModelName)) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.MODEL_UNKNOWN',
         `Relation "${spec.modelName}.${relationName}" references unknown model "${targetModelName}"`,
+        { meta: { sourceModel: spec.modelName, relationName, targetModel: targetModelName } },
       );
     }
 
@@ -344,8 +380,10 @@ function resolveRelationAnchorFields(spec: RuntimeModelSpec): readonly string[] 
     return ['id'];
   }
 
-  throw new Error(
+  throw contractError(
+    'CONTRACT.IDENTITY_INVALID',
     `Model "${spec.modelName}" needs an explicit id or an "id" field to anchor non-owning relations`,
+    { meta: { modelName: spec.modelName, reason: 'missing-anchor-id' } },
   );
 }
 
@@ -406,8 +444,10 @@ function lowerBelongsToRelation(
 
   const targetSpec = allSpecs.get(targetModelName);
   if (!targetSpec) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.MODEL_UNKNOWN',
       `Relation "${currentSpec.modelName}.${relationName}" references unknown model "${targetModelName}"`,
+      { meta: { sourceModel: currentSpec.modelName, relationName, targetModel: targetModelName } },
     );
   }
 
@@ -442,8 +482,10 @@ function lowerHasOwnershipRelation(
   const targetModelName = resolveRelationModelName(relation.toModel);
   const targetSpec = allSpecs.get(targetModelName);
   if (!targetSpec) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.MODEL_UNKNOWN',
       `Relation "${currentSpec.modelName}.${relationName}" references unknown model "${targetModelName}"`,
+      { meta: { sourceModel: currentSpec.modelName, relationName, targetModel: targetModelName } },
     );
   }
 
@@ -489,16 +531,20 @@ function lowerManyToManyRelation(
   const targetModelName = resolveRelationModelName(relation.toModel);
   const targetSpec = allSpecs.get(targetModelName);
   if (!targetSpec) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.MODEL_UNKNOWN',
       `Relation "${currentSpec.modelName}.${relationName}" references unknown model "${targetModelName}"`,
+      { meta: { sourceModel: currentSpec.modelName, relationName, targetModel: targetModelName } },
     );
   }
 
   const throughModelName = resolveRelationModelName(relation.through);
   const throughSpec = allSpecs.get(throughModelName);
   if (!throughSpec) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.MODEL_UNKNOWN',
       `Relation "${currentSpec.modelName}.${relationName}" references unknown through model "${throughModelName}"`,
+      { meta: { sourceModel: currentSpec.modelName, relationName, targetModel: throughModelName } },
     );
   }
 
@@ -510,8 +556,16 @@ function lowerManyToManyRelation(
     currentAnchorFields.length !== throughFromFields.length ||
     targetAnchorFields.length !== throughToFields.length
   ) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.RELATION_INVALID',
       `Relation "${currentSpec.modelName}.${relationName}" has mismatched many-to-many field counts.`,
+      {
+        meta: {
+          modelName: currentSpec.modelName,
+          relationName,
+          reason: 'many-to-many-field-count-mismatch',
+        },
+      },
     );
   }
 
@@ -644,8 +698,10 @@ function assertKnownExtensionPack(
   if (extensionPacks !== undefined && Object.hasOwn(extensionPacks, spaceId)) {
     return;
   }
-  throw new Error(
+  throw contractError(
+    'CONTRACT.PACK_MISSING',
     `${context} references contract space "${spaceId}" but "${spaceId}" is not declared in extensionPacks. Add the pack to extensionPacks.`,
+    { meta: { spaceId, context } },
   );
 }
 
@@ -671,8 +727,10 @@ function resolveForeignKeyNodes(
 
     const targetSpec = allSpecs.get(foreignKey.targetModel);
     if (!targetSpec) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.MODEL_UNKNOWN',
         `Foreign key on "${spec.modelName}" references unknown model "${foreignKey.targetModel}"`,
+        { meta: { sourceModel: spec.modelName, targetModel: foreignKey.targetModel } },
       );
     }
 
@@ -694,8 +752,10 @@ function resolveForeignKeyNodes(
 
     const targetSpec = allSpecs.get(foreignKey.targetModel);
     if (!targetSpec) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.MODEL_UNKNOWN',
         `Foreign key on "${spec.modelName}" references unknown model "${foreignKey.targetModel}"`,
+        { meta: { sourceModel: spec.modelName, targetModel: foreignKey.targetModel } },
       );
     }
 
@@ -725,7 +785,7 @@ function resolveModelNode(
     );
     const columnName = spec.fieldToColumn[fieldName];
     if (!columnName) {
-      throw new Error(`Column name resolution failed for "${spec.modelName}.${fieldName}"`);
+      throw new InternalError(`Column name resolution failed for "${spec.modelName}.${fieldName}"`);
     }
 
     const enumHandle =
@@ -798,8 +858,10 @@ function collectRuntimeModelSpecs(definition: ContractInput): RuntimeCollection 
   for (const [modelName, modelDefinition] of Object.entries(models)) {
     const tokenModelName = modelDefinition.stageOne.modelName;
     if (tokenModelName && tokenModelName !== modelName) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.MODEL_TOKEN_INVALID',
         `Model token "${tokenModelName}" must be assigned to models.${tokenModelName}. Received models.${modelName}.`,
+        { meta: { tokenModelName, assignedKey: modelName } },
       );
     }
 
@@ -812,8 +874,10 @@ function collectRuntimeModelSpecs(definition: ContractInput): RuntimeCollection 
     const tableKey = JSON.stringify([namespaceId, tableName]);
     const existingModel = tableOwners.get(tableKey);
     if (existingModel) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.NAME_DUPLICATE',
         `Models "${existingModel}" and "${modelName}" both map to table "${tableName}".`,
+        { meta: { kind: 'table', name: tableName, first: existingModel, second: modelName } },
       );
     }
     tableOwners.set(tableKey, modelName);
@@ -827,8 +891,10 @@ function collectRuntimeModelSpecs(definition: ContractInput): RuntimeCollection 
         fieldState.columnName ?? applyNaming(fieldName, definition.naming?.columns);
       const existingField = columnOwners.get(columnName);
       if (existingField) {
-        throw new Error(
+        throw contractError(
+          'CONTRACT.NAME_DUPLICATE',
           `Model "${modelName}" maps both "${existingField}" and "${fieldName}" to column "${columnName}".`,
+          { meta: { kind: 'column', name: columnName, first: existingField, second: fieldName } },
         );
       }
       columnOwners.set(columnName, fieldName);
@@ -976,8 +1042,10 @@ function lowerPackEntityHandles(
   for (const handle of entities) {
     const component = owningComponent.get(handle.entityKind);
     if (component === undefined) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.ENTITY_KIND_UNKNOWN',
         `defineContract: entities contains a handle with entityKind "${handle.entityKind}", which no composed pack registers. Compose a pack whose entityTypes contribution claims "${handle.entityKind}", or remove the handle.`,
+        { meta: { entityKind: handle.entityKind } },
       );
     }
     const refs: Record<string, ResolvedEntityHandleRef> = {};
@@ -994,8 +1062,10 @@ function lowerPackEntityHandles(
     const authoring = component.authoring;
     if (!providesEntityHandleLowering(authoring)) {
       const kinds = [...new Set(handles.map((entry) => entry.handle.entityKind))].sort();
-      throw new Error(
+      throw contractError(
+        'CONTRACT.PACK_CONTRIBUTION_INVALID',
         `defineContract: entityKind(s) ${kinds.map((kind) => `"${kind}"`).join(', ')} are registered by a pack that does not implement entity-handle lowering (no lowerEntityHandles on its authoring contributions).`,
+        { meta: { entityKinds: kinds, reason: 'missing-lowerEntityHandles' } },
       );
     }
     for (const row of authoring.lowerEntityHandles({ handles, defaultNamespaceId })) {
@@ -1005,8 +1075,10 @@ function lowerPackEntityHandles(
       forNamespace[row.entityKind] = forKind;
       const existing = forKind[row.key];
       if (existing !== undefined && existing !== row.entity) {
-        throw new Error(
+        throw contractError(
+          'CONTRACT.NAME_DUPLICATE',
           `defineContract: two different "${row.entityKind}" entities named "${row.key}" in namespace "${row.namespaceId}" — pack-entity names must be unique per namespace.`,
+          { meta: { kind: row.entityKind, name: row.key, namespaceId: row.namespaceId } },
         );
       }
       forKind[row.key] = row.entity;

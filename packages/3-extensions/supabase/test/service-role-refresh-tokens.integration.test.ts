@@ -1,7 +1,7 @@
 /**
  * Integration test — service_role reads `auth.refresh_tokens` through the
  * `.supabase` secondary root (see
- * examples/supabase/test/explicit-namespace-query.integration.test.ts for
+ * ./explicit-namespace-query.integration.test.ts for
  * the `auth.users` coverage this mirrors). `refresh_tokens` comes from the
  * introspection-generated complete contract, so this extends that coverage
  * beyond the handful of originally hand-declared tables.
@@ -18,7 +18,7 @@ import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import supabasePack from '../src/exports/pack';
 import supabase from '../src/runtime/supabase';
-import { bootstrapSupabaseShim } from './supabase-bootstrap';
+import { setUpSupabaseMockSchema } from './fixtures/supabase-reference/set-up-mock-schema';
 
 const pgUuid = { codecId: 'pg/uuid@1', nativeType: 'uuid', nullable: false } as const;
 const fixtureJwt = 'fixture-jwt-signing-input-not-a-real-credential';
@@ -53,7 +53,12 @@ describe('service_role reads auth.refresh_tokens via the .supabase secondary roo
       const { connectionString } = database;
 
       await withClient(connectionString, async (pg) => {
-        await bootstrapSupabaseShim(pg);
+        await setUpSupabaseMockSchema(pg);
+        // The narrow grant a real project needs for admin reads through the
+        // `.supabase` secondary root: real Supabase gives service_role no
+        // table privileges on auth.* (the shim matches those defaults).
+        await pg.query('GRANT USAGE ON SCHEMA auth TO service_role');
+        await pg.query('GRANT SELECT ON TABLE auth.refresh_tokens TO service_role');
       });
 
       const token = `refresh-token-${crypto.randomUUID()}`;

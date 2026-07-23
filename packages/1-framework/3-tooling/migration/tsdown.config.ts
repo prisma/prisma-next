@@ -7,6 +7,7 @@ export default defineConfig({
     'exports/graph': 'src/exports/graph.ts',
     'exports/errors': 'src/exports/errors.ts',
     'exports/io': 'src/exports/io.ts',
+    'exports/contract-snapshot-store': 'src/exports/contract-snapshot-store.ts',
     'exports/hash': 'src/exports/hash.ts',
     'exports/invariants': 'src/exports/invariants.ts',
     'exports/migration-graph': 'src/exports/migration-graph.ts',

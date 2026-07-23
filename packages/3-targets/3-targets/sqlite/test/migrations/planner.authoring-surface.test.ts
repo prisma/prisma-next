@@ -19,13 +19,17 @@ const stubLowerer: ExecuteRequestLowerer = {
   lowerToExecuteRequest: async () => ({ sql: '', params: [] }),
 };
 
+const SNAPSHOTS_IMPORT_PATH = '../../snapshots';
+const TO_STORAGE_HASH = 'b'.repeat(64);
+const FROM_STORAGE_HASH = 'a'.repeat(64);
+
 function createContract(): Contract<SqlStorage> {
   return {
     target: 'sqlite',
     targetFamily: 'sql',
     profileHash: profileHash('profile'),
     storage: new SqlStorage({
-      storageHash: coreHash('to'),
+      storageHash: coreHash(TO_STORAGE_HASH),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: sqliteCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -74,9 +78,10 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         contract: createContract(),
         schema: emptySchema,
         policy: { allowedOperationClasses: ['additive'] },
-        fromContract: fromContractWithHash('from-hash-stub'),
+        fromContract: fromContractWithHash(FROM_STORAGE_HASH),
         frameworkComponents: [],
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
       });
 
       expect(result.kind).toBe('success');
@@ -87,7 +92,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
     it('describe() returns the supplied from/to meta derived from fromContract', () => {
       const planner = createSqliteMigrationPlanner(stubLowerer);
       const contract = createContract();
-      const fromContract = fromContractWithHash('from-hash-stub');
+      const fromContract = fromContractWithHash(FROM_STORAGE_HASH);
       const result = planner.plan({
         contract: contract,
         schema: emptySchema,
@@ -95,6 +100,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         fromContract,
         frameworkComponents: [],
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
       });
 
       if (result.kind !== 'success') throw new Error('expected success');
@@ -112,6 +118,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         fromContract: null,
         frameworkComponents: [],
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
       });
 
       if (result.kind !== 'success') throw new Error('expected success');
@@ -128,6 +135,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         fromContract: null,
         frameworkComponents: [],
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
       });
 
       if (result.kind !== 'success') throw new Error('expected success');
@@ -146,6 +154,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         fromContract: null,
         frameworkComponents: [],
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
       });
 
       if (result.kind !== 'success') throw new Error('expected success');
@@ -161,9 +170,10 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         contract: createContract(),
         schema: emptySchema,
         policy: { allowedOperationClasses: ['additive'] },
-        fromContract: fromContractWithHash('from-hash-stub'),
+        fromContract: fromContractWithHash(FROM_STORAGE_HASH),
         frameworkComponents: [],
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
       });
 
       if (result.kind !== 'success') throw new Error('expected success');
@@ -177,7 +187,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
       expect(source).toContain('override readonly startContractJson = startContract;');
       expect(source).toContain('override readonly endContractJson = endContract;');
       expect(source).not.toContain('describe()');
-      expect(source).not.toContain(coreHash('from-hash-stub'));
+      expect(source).not.toContain(coreHash(FROM_STORAGE_HASH));
       expect(source).toContain('this.createTable(');
     });
   });
@@ -189,7 +199,8 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         {
           packageDir: '/tmp/migration-pkg',
           fromHash: null,
-          toHash: 'to-hash-stub',
+          toHash: 'to',
+          snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
         },
         APP_SPACE_ID,
       );
@@ -204,8 +215,9 @@ describe('SqliteMigrationPlanner authoring surface', () => {
       const empty = planner.emptyMigration(
         {
           packageDir: '/tmp/migration-pkg',
-          fromHash: 'from-hash-stub',
-          toHash: 'to-hash-stub',
+          fromHash: FROM_STORAGE_HASH,
+          toHash: TO_STORAGE_HASH,
+          snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
         },
         APP_SPACE_ID,
       );
@@ -217,8 +229,8 @@ describe('SqliteMigrationPlanner authoring surface', () => {
       expect(source).toContain('export default class M extends Migration<Start, End>');
       expect(source).toContain('override readonly endContractJson = endContract;');
       expect(source).not.toContain('describe()');
-      expect(source).not.toContain('"from-hash-stub"');
-      expect(source).not.toContain('"to-hash-stub"');
+      expect(source).not.toContain(`"${FROM_STORAGE_HASH}"`);
+      expect(source).not.toContain(`"${TO_STORAGE_HASH}"`);
       expect(source).toContain('override get operations()');
     });
   });
@@ -233,6 +245,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         fromContract: null,
         frameworkComponents: [],
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
       });
 
       expect(result.kind).toBe('failure');

@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
+import { writeContractSnapshot } from '@prisma-next/migration-tools/contract-snapshot-store';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
@@ -497,8 +498,12 @@ describe('migrate --show (read-only + faithfulness)', () => {
     await writeMigrationPackage(extPkgDir, extMetadata, OPS as MigrationPlanOperation[]);
     // Write head ref for the extension space so aggregate can load it.
     await writeRef(join(extVectorDir, 'refs'), 'head', { hash: EXT_C1, invariants: [] });
-    // Write extension space contract.json (aggregate reads it from disk).
-    await writeFile(join(extVectorDir, 'contract.json'), JSON.stringify(contractEnvelope(EXT_C1)));
+    // Write the extension space's contract into the snapshot store, keyed
+    // by the head ref hash (aggregate resolves it from there).
+    await writeContractSnapshot(join(cwd, 'migrations'), EXT_C1, {
+      contractJson: contractEnvelope(EXT_C1),
+      contractDts: 'export type Contract = unknown;\n',
+    });
 
     await writeFile(join(cwd, 'contract.json'), JSON.stringify(contractEnvelope(C2)));
 
@@ -612,10 +617,10 @@ describe('migrate --show (read-only + faithfulness)', () => {
       OPS as MigrationPlanOperation[],
     );
     await writeRef(join(extMigrationsDir, 'refs'), 'head', { hash: EXT_C1, invariants: [] });
-    await writeFile(
-      join(extMigrationsDir, 'contract.json'),
-      JSON.stringify(contractEnvelope(EXT_C1)),
-    );
+    await writeContractSnapshot(join(cwd, 'migrations'), EXT_C1, {
+      contractJson: contractEnvelope(EXT_C1),
+      contractDts: 'export type Contract = unknown;\n',
+    });
 
     await writeFile(join(cwd, 'contract.json'), JSON.stringify(contractEnvelope(C2)));
 
@@ -742,10 +747,10 @@ describe('migrate --show (read-only + faithfulness)', () => {
       OPS as MigrationPlanOperation[],
     );
     await writeRef(join(extMigrationsDir, 'refs'), 'head', { hash: EXT_C1, invariants: [] });
-    await writeFile(
-      join(extMigrationsDir, 'contract.json'),
-      JSON.stringify(contractEnvelope(EXT_C1)),
-    );
+    await writeContractSnapshot(join(cwd, 'migrations'), EXT_C1, {
+      contractJson: contractEnvelope(EXT_C1),
+      contractDts: 'export type Contract = unknown;\n',
+    });
 
     await writeFile(join(cwd, 'contract.json'), JSON.stringify(contractEnvelope(C2)));
 

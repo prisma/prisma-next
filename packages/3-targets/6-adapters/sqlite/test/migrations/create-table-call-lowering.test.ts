@@ -122,7 +122,6 @@ describe('CreateTableCall lowering output', () => {
           columns: ['author_id'],
           references: { table: 'users', columns: ['id'] },
           onDelete: 'cascade',
-          constraint: true,
         },
       ],
     };

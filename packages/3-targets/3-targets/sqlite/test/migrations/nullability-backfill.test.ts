@@ -39,7 +39,7 @@ function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage
     targetFamily: 'sql',
     profileHash: profileHash('test'),
     storage: new SqlStorage({
-      storageHash: coreHash('contract'),
+      storageHash: coreHash('c'.repeat(64)),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: sqliteCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -108,6 +108,7 @@ describe('nullability-tightening backfill', async () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -127,13 +128,14 @@ describe('nullability-tightening backfill', async () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
     if (result.kind !== 'success') return;
 
     // Accessing operations throws because the DataTransformCall stub's
-    // toOp() unconditionally throws PN-MIG-2001 — the user must fill the
+    // toOp() unconditionally throws MIGRATION.UNFILLED_PLACEHOLDER — the user must fill the
     // rendered migration.ts before the plan is executable. This mirrors
     // Postgres's behavior.
     expect(() => result.plan.operations).toThrowError(/unfilled/i);
@@ -193,6 +195,7 @@ describe('nullability-tightening backfill', async () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');

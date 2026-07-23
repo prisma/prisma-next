@@ -50,8 +50,7 @@ withTempDir(({ createTempDir }) => {
               unknown
             >;
             expect(errorJson).toMatchObject({
-              code: 'PN-CLI-4004',
-              domain: 'CLI',
+              code: 'CLI.FILE_NOT_FOUND',
             });
             expect(String(errorJson['fix'])).toContain('contract emit');
           });
@@ -116,8 +115,7 @@ withTempDir(({ createTempDir }) => {
             >;
 
             expect(errorJson).toMatchObject({
-              code: 'PN-RUN-3000',
-              domain: 'RUN',
+              code: 'CONTRACT.VERIFY_FAILED',
               summary: 'Database connection failed',
               meta: {
                 port: '1',

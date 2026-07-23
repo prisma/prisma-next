@@ -189,8 +189,6 @@
               },
               "foreignKeys": [
                 {
-                  "constraint": true,
-                  "index": true,
                   "source": {
                     "columns": [
                       "authorId"
@@ -207,7 +205,14 @@
                   }
                 }
               ],
-              "indexes": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "authorId"
+                  ],
+                  "name": "posts_authorId_idx"
+                }
+              ],
               "primaryKey": {
                 "columns": [
                   "id"
@@ -257,7 +262,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "5d4af1b8bf4aac47e6f21aa0231d29df70b7e945497c45002a63ed732e441c8d"
+    "storageHash": "2b66af08f9f0296461eae1b3715aeec3beafb3e3d0cdcbc4bede4de5112fb52a"
   },
   "capabilities": {
     "postgres": {

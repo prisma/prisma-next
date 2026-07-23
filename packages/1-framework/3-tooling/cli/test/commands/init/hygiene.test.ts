@@ -81,12 +81,25 @@ describe('requiredGitattributesLines (FR3.4)', () => {
     expect(lines).toContain('src/prisma/contract.d.ts linguist-generated');
   });
 
-  it('includes forward-looking artefacts (Decision 5)', () => {
+  it('includes forward-looking artifacts (Decision 5)', () => {
     const lines = requiredGitattributesLines('prisma', 'postgres');
-    expect(lines).toContain('prisma/end-contract.json linguist-generated');
-    expect(lines).toContain('prisma/start-contract.d.ts linguist-generated');
     expect(lines).toContain('prisma/ops.json linguist-generated');
     expect(lines).toContain('prisma/migration.json linguist-generated');
+  });
+
+  it('includes migrations-root-anchored lines for the contract snapshot store', () => {
+    const lines = requiredGitattributesLines('prisma', 'postgres');
+    expect(lines).toContain('migrations/snapshots/**/contract.json linguist-generated');
+    expect(lines).toContain('migrations/snapshots/**/contract.d.ts linguist-generated');
+  });
+
+  it('keeps the store lines migrations-root-anchored regardless of schema dir', () => {
+    const lines = requiredGitattributesLines('src/prisma', 'mongo');
+    expect(lines).toContain('migrations/snapshots/**/contract.json linguist-generated');
+    expect(lines).toContain('migrations/snapshots/**/contract.d.ts linguist-generated');
+    expect(lines).not.toContain(
+      'src/prisma/migrations/snapshots/**/contract.json linguist-generated',
+    );
   });
 
   it('respects a non-default schema directory', () => {

@@ -83,16 +83,19 @@ withTempDir(({ createTempDir }) => {
         expect(tableOp, 'H.02: has user table operation').toBeDefined();
 
         // H.03: verify attestation on disk
-        const migrationsDir = join(ctx.testDir, 'migrations', 'app');
-        const { packages } = await readMigrationsDir(migrationsDir);
+        const migrationsRoot = join(ctx.testDir, 'migrations');
+        const appSpaceDir = join(migrationsRoot, 'app');
+        const { packages } = await readMigrationsDir(appSpaceDir, {
+          migrationsDir: migrationsRoot,
+        });
         expect(packages, 'H.03: one migration package').toHaveLength(1);
 
         // `readMigrationPackage`'s load boundary integrates verification:
         // a successful read is proof of attestation, and any tamper throws
         // MIGRATION.HASH_MISMATCH.
-        const pkgDir = join(migrationsDir, packages[0]!.dirName);
+        const pkgDir = join(appSpaceDir, packages[0]!.dirName);
         await expect(
-          readMigrationPackage(pkgDir),
+          readMigrationPackage(pkgDir, { migrationsDir: migrationsRoot }),
           'H.03: attestation passes',
         ).resolves.toBeDefined();
 
@@ -161,8 +164,10 @@ withTempDir(({ createTempDir }) => {
         expect(dropEmitResult.exitCode, `I.03: emit drop-email: ${dropEmitResult.stderr}`).toBe(0);
 
         // I.04: verify destructive operation class on disk
-        const migrationsDir = join(ctx.testDir, 'migrations', 'app');
-        const { packages } = await readMigrationsDir(migrationsDir);
+        const migrationsRoot = join(ctx.testDir, 'migrations');
+        const { packages } = await readMigrationsDir(join(migrationsRoot, 'app'), {
+          migrationsDir: migrationsRoot,
+        });
         expect(packages, 'I.04: two migration packages').toHaveLength(2);
 
         const destructivePkg = packages.find((p) => p.metadata.from !== null)!;

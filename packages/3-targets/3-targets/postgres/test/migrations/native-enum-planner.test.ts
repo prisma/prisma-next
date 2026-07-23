@@ -257,6 +257,38 @@ describe('unclaimed enum drop lowering + ordering', () => {
       factoryNames.indexOf('dropNativeEnumType'),
     );
   });
+
+  // The enum type has no column→type edge in the graph this slice (the column
+  // issue is coalesced under the whole-table drop), so ordering falls to the
+  // `dropType` call bucket, which follows the general drop bucket. Names chosen
+  // adversarially — `aaa_status` sorts before `zzz_widget` — so a bare path
+  // tiebreak would drop the type first and error (type still in use).
+  it('drops a table before a native enum even when the enum name sorts first', () => {
+    const contract = makeContract({ withEnum: false });
+    const zzzWidget = new PostgresTableSchemaNode({
+      name: 'zzz_widget',
+      columns: {
+        id: { name: 'id', nativeType: 'int4', nullable: false, resolvedNativeType: 'int4' },
+      },
+      primaryKey: { columns: ['id'] },
+      foreignKeys: [],
+      uniques: [],
+      indexes: [],
+      policies: [],
+      rlsEnabled: false,
+    });
+    const actual = liveTree({
+      tables: { orders: ordersTableNode({ withStatusColumn: false }), zzz_widget: zzzWidget },
+      nativeEnums: [{ typeName: 'aaa_status', values: [...MEMBERS] }],
+    });
+
+    const factoryNames = callsFor(contract, actual).map((c) => c.factoryName);
+    expect(factoryNames).toContain('dropNativeEnumType');
+    expect(factoryNames).toContain('dropTable');
+    expect(factoryNames.indexOf('dropTable')).toBeLessThan(
+      factoryNames.indexOf('dropNativeEnumType'),
+    );
+  });
 });
 
 function legacyTable() {
@@ -358,6 +390,7 @@ describe('planner ownership + policy for enum extras', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
       ...(ownership !== undefined ? { ownership } : {}),
     });
   }
@@ -512,6 +545,7 @@ describe('D2-F1: enum drop-safety resolves ownership by physical type name', () 
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
       ownership: twoSpaceOwnership(app.storage, packStorageDeclaringRenamedEnum()),
     });
 
@@ -534,6 +568,7 @@ describe('D2-F1: enum drop-safety resolves ownership by physical type name', () 
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
       ownership: twoSpaceOwnership(app.storage, packStorageDeclaringRenamedEnum()),
     });
 

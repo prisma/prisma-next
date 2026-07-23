@@ -684,7 +684,7 @@ describe('RawSqlCall', () => {
 });
 
 describe('DataTransformCall', () => {
-  it('toOp() always throws PN-MIG-2001 for the unfilled placeholder', () => {
+  it('toOp() always throws MIGRATION.UNFILLED_PLACEHOLDER for the unfilled placeholder', () => {
     const call = new DataTransformCall(
       'Backfill status',
       'backfill-status:check',
@@ -692,8 +692,7 @@ describe('DataTransformCall', () => {
     );
     expect(() => call.toOp()).toThrow(
       expect.objectContaining({
-        code: '2001',
-        domain: 'MIG',
+        code: 'MIGRATION.UNFILLED_PLACEHOLDER',
         meta: { slot: 'Backfill status' },
       }),
     );
@@ -722,16 +721,10 @@ describe('DataTransformCall', () => {
     expect(ts).toContain('run: () => placeholder("backfill-status:run")');
   });
 
-  it('importRequirements() references placeholder and the generated end-contract JSON', () => {
+  it('importRequirements() references only the placeholder facade import (endContract comes from the scaffold)', () => {
     const call = new DataTransformCall('Backfill status', 'check', 'run');
     expect(call.importRequirements()).toEqual([
       { moduleSpecifier: '@prisma-next/postgres/migration', symbol: 'placeholder' },
-      {
-        moduleSpecifier: './end-contract.json',
-        symbol: 'endContract',
-        kind: 'default',
-        attributes: { type: 'json' },
-      },
     ]);
   });
 });
@@ -760,12 +753,12 @@ describe('EnableRowLevelSecurityCall', () => {
     await expect(async () => call.toOp()).rejects.toThrow('createPostgresMigrationPlanner');
   });
 
-  it('renders enableRowLevelSecurity(...) requiring the facade factory import', () => {
+  it('renders this.enableRowLevelSecurity(...) with no facade import', () => {
     const call = new EnableRowLevelSecurityCall('public', 'post');
-    expect(call.renderTypeScript()).toBe('enableRowLevelSecurity("public", "post")');
-    expect(call.importRequirements()).toEqual([
-      { moduleSpecifier: '@prisma-next/postgres/migration', symbol: 'enableRowLevelSecurity' },
-    ]);
+    expect(call.renderTypeScript()).toBe(
+      'this.enableRowLevelSecurity({ schema: "public", table: "post" })',
+    );
+    expect(call.importRequirements()).toEqual([]);
   });
 });
 
@@ -789,12 +782,12 @@ describe('DisableRowLevelSecurityCall', () => {
     await expect(async () => call.toOp()).rejects.toThrow('createPostgresMigrationPlanner');
   });
 
-  it('renders disableRowLevelSecurity(...) requiring the facade factory import', () => {
+  it('renders this.disableRowLevelSecurity(...) with no facade import', () => {
     const call = new DisableRowLevelSecurityCall('public', 'post');
-    expect(call.renderTypeScript()).toBe('disableRowLevelSecurity("public", "post")');
-    expect(call.importRequirements()).toEqual([
-      { moduleSpecifier: '@prisma-next/postgres/migration', symbol: 'disableRowLevelSecurity' },
-    ]);
+    expect(call.renderTypeScript()).toBe(
+      'this.disableRowLevelSecurity({ schema: "public", table: "post" })',
+    );
+    expect(call.importRequirements()).toEqual([]);
   });
 });
 
@@ -842,12 +835,16 @@ describe('CreatePostgresRlsPolicyCall', () => {
     await expect(async () => call.toOp()).rejects.toThrow('createPostgresMigrationPlanner');
   });
 
-  it('renders createRlsPolicy(...) with the policy serialized as a JSON literal', () => {
+  it('renders this.createRlsPolicy(...) with the policy input serialized as a JSON literal', () => {
     const call = new CreatePostgresRlsPolicyCall('public', 'post', makePolicy());
     const ts = call.renderTypeScript();
-    expect(ts.startsWith('createRlsPolicy("public", "post", {')).toBe(true);
+    expect(ts.startsWith('this.createRlsPolicy({ schema: "public", table: "post", policy: {')).toBe(
+      true,
+    );
     expect(ts).toContain('name: "post_owner_a1b2c3d4"');
     expect(ts).toContain('operation: "select"');
+    expect(ts).not.toContain('kind:');
+    expect(call.importRequirements()).toEqual([]);
   });
 });
 
@@ -877,12 +874,12 @@ describe('DropPostgresRlsPolicyCall', () => {
     await expect(async () => call.toOp()).rejects.toThrow('createPostgresMigrationPlanner');
   });
 
-  it('renders dropRlsPolicy(...) requiring the facade factory import', () => {
+  it('renders this.dropRlsPolicy(...) with no facade import', () => {
     const call = new DropPostgresRlsPolicyCall('public', 'post', 'post_owner_a1b2c3d4');
-    expect(call.renderTypeScript()).toBe('dropRlsPolicy("public", "post", "post_owner_a1b2c3d4")');
-    expect(call.importRequirements()).toEqual([
-      { moduleSpecifier: '@prisma-next/postgres/migration', symbol: 'dropRlsPolicy' },
-    ]);
+    expect(call.renderTypeScript()).toBe(
+      'this.dropRlsPolicy({ schema: "public", table: "post", policy: "post_owner_a1b2c3d4" })',
+    );
+    expect(call.importRequirements()).toEqual([]);
   });
 });
 
@@ -934,7 +931,7 @@ describe('RenamePostgresRlsPolicyCall', () => {
     await expect(async () => call.toOp()).rejects.toThrow('createPostgresMigrationPlanner');
   });
 
-  it('renders renameRlsPolicy(...) requiring the facade factory import', () => {
+  it('renders this.renameRlsPolicy(...) with no facade import', () => {
     const call = new RenamePostgresRlsPolicyCall(
       'public',
       'post',
@@ -942,10 +939,8 @@ describe('RenamePostgresRlsPolicyCall', () => {
       'post_owner_e5f6g7h8',
     );
     expect(call.renderTypeScript()).toBe(
-      'renameRlsPolicy("public", "post", "post_owner_a1b2c3d4", "post_owner_e5f6g7h8")',
+      'this.renameRlsPolicy({ schema: "public", table: "post", from: "post_owner_a1b2c3d4", to: "post_owner_e5f6g7h8" })',
     );
-    expect(call.importRequirements()).toEqual([
-      { moduleSpecifier: '@prisma-next/postgres/migration', symbol: 'renameRlsPolicy' },
-    ]);
+    expect(call.importRequirements()).toEqual([]);
   });
 });

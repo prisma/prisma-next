@@ -16,6 +16,7 @@ import type { SourceFile } from '@prisma-next/psl-parser/syntax';
 import type { EnumTypeHandle } from '@prisma-next/sql-contract-ts/contract-builder';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import { getAttribute, lowerFirst } from './psl-attribute-parsing';
 import type { ColumnDescriptor, FieldPresetContributions } from './psl-column-resolution';
 import {
@@ -198,7 +199,7 @@ const REMOVED_ATTRIBUTE_RULES: ReadonlyMap<string, RemovedAttributeRule> = new M
     BUILTIN_FIELD_ATTRIBUTE_NAMES.has(name),
   );
   if (overlap.length > 0) {
-    throw new Error(
+    throw new InternalError(
       `BUILTIN_FIELD_ATTRIBUTE_NAMES and REMOVED_ATTRIBUTE_RULES must not overlap. Names in both: ${overlap.join(', ')}`,
     );
   }
@@ -345,6 +346,13 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     // local model fields, but they carry a @relation attribute and should be skipped here.
     // Their FK and RelationNode lowering is handled separately in the interpreter.
     if (field.typeContractSpaceId !== undefined && relationAttribute) {
+      continue;
+    }
+    // A model-typed, non-list field with no `@relation` is the back side of a
+    // 1:1 relation — the owning side always carries `@relation(fields: [...],
+    // references: [...])`. It is lowered separately, via the interpreter's
+    // backrelation-candidate matching, not as a scalar column here.
+    if (isModelField) {
       continue;
     }
 

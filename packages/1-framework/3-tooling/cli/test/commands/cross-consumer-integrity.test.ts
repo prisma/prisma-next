@@ -23,16 +23,16 @@ import { executeCommand, getExitCode, setupCommandMocks } from '../utils/test-he
  *     tolerate-and-render — the self-edge is shown, the command does not
  *     crash, exit 0.
  *   - **`migration check`** (report-all): renders the FULL violation set in
- *     one invocation — hash-mismatch (`PN-MIG-CHECK-001`), self-edge
+ *     one invocation — hash-mismatch (`MIGRATION.CHECK_HASH_MISMATCH`), self-edge
  *     (`-007`), and orphan-dir (`-008`) all surface together.
- *   - **`migration status` pin**: refuses with the `PN-MIG-5002` integrity
+ *   - **`migration status` pin**: refuses with the `MIGRATION.CONTRACT_SPACE_VIOLATION` integrity
  *     envelope on the package-corruption kinds (hash mismatch), while
  *     tolerating the self-edge and other non-corruption drift silently.
  *   - **apply** (`migrate`): refuses with the contract-space integrity
  *     envelope. Precedence is exercised with two fixtures — the all-three
- *     fixture refuses `PN-MIG-5001` (orphan / layout drift wins), and an
+ *     fixture refuses `MIGRATION.CONTRACT_SPACE_LAYOUT_VIOLATION` (orphan / layout drift wins), and an
  *     integrity-only fixture (hash-mismatch, no orphan, extensions declared
- *     correctly) refuses `PN-MIG-5002` with `meta.violations[]`.
+ *     correctly) refuses `MIGRATION.CONTRACT_SPACE_VIOLATION` with `meta.violations[]`.
  *
  * `migrate`'s gate is a pure offline check that fires before
  * `client.connect()`, so the stub driver is never reached — the refusal is
@@ -256,7 +256,7 @@ async function setupSelfEdgeFixture(): Promise<Fixture> {
 /**
  * Integrity-only fixture: a hash-mismatched package, no orphan, no
  * self-edge, no declared extensions. App head is `B`. apply must refuse
- * `PN-MIG-5002` (no layout drift to take precedence).
+ * `MIGRATION.CONTRACT_SPACE_VIOLATION` (no layout drift to take precedence).
  */
 async function setupIntegrityOnlyFixture(): Promise<Fixture> {
   const cwd = await mkdtemp(join(tmpdir(), 'cross-consumer-integrity-'));
@@ -397,12 +397,12 @@ describe('cross-consumer contract-space integrity matrix', () => {
 
       expect(envelope.ok).toBe(false);
       const codes = (envelope.failures ?? []).map((f) => f.code);
-      expect(codes).toContain('PN-MIG-CHECK-001'); // hash mismatch
-      expect(codes).toContain('PN-MIG-CHECK-007'); // self-edge (sameSourceAndTarget)
-      expect(codes).toContain('PN-MIG-CHECK-008'); // orphan space dir
+      expect(codes).toContain('MIGRATION.CHECK_HASH_MISMATCH'); // hash mismatch
+      expect(codes).toContain('MIGRATION.CHECK_NOOP_SELF_EDGE'); // self-edge (sameSourceAndTarget)
+      expect(codes).toContain('MIGRATION.CHECK_ORPHAN_SPACE_DIR'); // orphan space dir
 
       // The app-space hash mismatch is reported exactly once via checkIntegrity().
-      expect(codes.filter((c) => c === 'PN-MIG-CHECK-001')).toHaveLength(1);
+      expect(codes.filter((c) => c === 'MIGRATION.CHECK_HASH_MISMATCH')).toHaveLength(1);
     },
     timeouts.typeScriptCompilation,
   );
@@ -423,7 +423,9 @@ describe('cross-consumer contract-space integrity matrix', () => {
       // through the shared mapper (no app-only legacy pass):
       // unreported. It now surfaces, located in the extension space.
       expect(envelope.ok).toBe(false);
-      const hashFailures = (envelope.failures ?? []).filter((f) => f.code === 'PN-MIG-CHECK-001');
+      const hashFailures = (envelope.failures ?? []).filter(
+        (f) => f.code === 'MIGRATION.CHECK_HASH_MISMATCH',
+      );
       expect(hashFailures).toHaveLength(1);
       expect(hashFailures[0]?.where).toContain(fixture.extId);
     },
@@ -431,7 +433,7 @@ describe('cross-consumer contract-space integrity matrix', () => {
   );
 
   it(
-    'migrate refuses the all-three fixture with PN-MIG-5001 (orphan/layout precedence)',
+    'migrate refuses the all-three fixture with MIGRATION.CONTRACT_SPACE_LAYOUT_VIOLATION (orphan/layout precedence)',
     async () => {
       const { createMigrateCommand } = await import('../../src/commands/migrate');
       const fixture = await setupAllThreeFixture();
@@ -444,7 +446,7 @@ describe('cross-consumer contract-space integrity matrix', () => {
       const envelope = firstJsonLine<CliErrorEnvelope>(consoleOutput);
 
       expect(exitCode).not.toBe(0);
-      expect(envelope.code).toBe('PN-MIG-5001');
+      expect(envelope.code).toBe('MIGRATION.CONTRACT_SPACE_LAYOUT_VIOLATION');
       const violations = envelope.meta?.violations ?? [];
       expect(violations.some((v) => v['kind'] === 'orphanSpaceDir')).toBe(true);
     },
@@ -452,7 +454,7 @@ describe('cross-consumer contract-space integrity matrix', () => {
   );
 
   it(
-    'migrate refuses the integrity-only fixture with PN-MIG-5002 + meta.violations',
+    'migrate refuses the integrity-only fixture with MIGRATION.CONTRACT_SPACE_VIOLATION + meta.violations',
     async () => {
       const { createMigrateCommand } = await import('../../src/commands/migrate');
       const fixture = await setupIntegrityOnlyFixture();
@@ -465,7 +467,7 @@ describe('cross-consumer contract-space integrity matrix', () => {
       const envelope = firstJsonLine<CliErrorEnvelope>(consoleOutput);
 
       expect(exitCode).not.toBe(0);
-      expect(envelope.code).toBe('PN-MIG-5002');
+      expect(envelope.code).toBe('MIGRATION.CONTRACT_SPACE_VIOLATION');
       const violations = envelope.meta?.violations ?? [];
       expect(violations.length).toBeGreaterThan(0);
       expect(violations.some((v) => v['kind'] === 'hashMismatch' && v['spaceId'] === 'app')).toBe(
@@ -476,7 +478,7 @@ describe('cross-consumer contract-space integrity matrix', () => {
   );
 
   it(
-    'migration status pin refuses PN-MIG-5002 on package corruption (hash mismatch)',
+    'migration status pin refuses MIGRATION.CONTRACT_SPACE_VIOLATION on package corruption (hash mismatch)',
     async () => {
       const { createMigrationStatusCommand } = await import('../../src/commands/migration-status');
       const fixture = await setupAllThreeFixture();
@@ -489,7 +491,7 @@ describe('cross-consumer contract-space integrity matrix', () => {
       const envelope = firstJsonLine<CliErrorEnvelope>(consoleOutput);
 
       expect(exitCode).not.toBe(0);
-      expect(envelope.code).toBe('PN-MIG-5002');
+      expect(envelope.code).toBe('MIGRATION.CONTRACT_SPACE_VIOLATION');
     },
     timeouts.typeScriptCompilation,
   );

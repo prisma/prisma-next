@@ -169,6 +169,7 @@ async function planAndGetFkExecuteSql(contract: Contract<SqlStorage>): Promise<s
     fromContract: null,
     frameworkComponents: [],
     spaceId: APP_SPACE_ID,
+    snapshotsImportPath: '../../snapshots',
   });
 
   expect(result.kind).toBe('success');

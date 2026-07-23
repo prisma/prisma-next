@@ -18,6 +18,7 @@ import type {
   SchemaDiffIssue,
   SchemaOwnership,
 } from '@prisma-next/framework-components/control';
+import { issueOutcome } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { RelationalSchemaNodeKind, type SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { buildSqlitePlanDiff } from './diff-database-schema';
@@ -91,6 +92,12 @@ export class SqliteMigrationPlanner
      * {@link SqlMigrationPlannerPlanOptions.ownership}.
      */
     readonly ownership?: SchemaOwnership;
+    /**
+     * POSIX-relative path from the migration package dir to
+     * `migrations/snapshots` — see
+     * {@link SqlMigrationPlannerPlanOptions.snapshotsImportPath}.
+     */
+    readonly snapshotsImportPath: string;
   }): SqlitePlanResult {
     return this.planSql(options as SqlMigrationPlannerPlanOptions);
   }
@@ -106,6 +113,7 @@ export class SqliteMigrationPlanner
         to: context.toHash,
       },
       spaceId,
+      context.snapshotsImportPath,
       undefined,
       this.#lowerer,
     );
@@ -163,6 +171,7 @@ export class SqliteMigrationPlanner
           to: options.contract.storage.storageHash,
         },
         options.spaceId,
+        options.snapshotsImportPath,
         destination,
         this.#lowerer,
       ),
@@ -229,7 +238,7 @@ export class SqliteMigrationPlanner
     });
     const coalesced = coalesceSubtreeIssues(rawIssues);
     const owned = retainUnownedExtras(coalesced, options.ownership);
-    const issues = strict ? owned : owned.filter((issue) => issue.reason !== 'not-expected');
+    const issues = strict ? owned : owned.filter((issue) => issueOutcome(issue) !== 'not-expected');
     return { expected, actual, issues };
   }
 }
@@ -266,7 +275,7 @@ function retainUnownedExtras(
 ): readonly SchemaDiffIssue[] {
   if (ownership === undefined) return issues;
   return issues.filter((issue) => {
-    if (issue.reason !== 'not-expected') return true;
+    if (issueOutcome(issue) !== 'not-expected') return true;
     const node = issueNode(issue);
     if (node === undefined || node.nodeKind !== RelationalSchemaNodeKind.table) return true;
     const tableName = issue.path[1];

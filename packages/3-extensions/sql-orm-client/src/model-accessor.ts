@@ -17,6 +17,7 @@ import { codecRefForStorageColumn } from '@prisma-next/sql-relational-core/codec
 import type { Expression, ScopeField } from '@prisma-next/sql-relational-core/expression';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { blindCast } from '@prisma-next/utils/casts';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import {
   getFieldToColumnMap,
   resolveFieldToColumn,
@@ -27,6 +28,7 @@ import {
   type VariantColumnRef,
 } from './collection-contract';
 import { and, not } from './filters';
+import { ormError } from './orm-errors';
 import { storageTableForContract, tableSourceForContract } from './storage-resolution';
 import {
   COMPARISON_METHODS_META,
@@ -513,7 +515,7 @@ function remapColumnRefs(
 function firstJoinColumn(columns: readonly string[], label: string): string {
   const first = columns[0];
   if (!first) {
-    throw new Error(`Relation metadata is missing ${label}`);
+    throw new InternalError(`Relation metadata is missing ${label}`);
   }
   return first;
 }
@@ -525,19 +527,19 @@ export function buildPairedColumnExprs(
   rightColumns: readonly string[],
 ): AnyExpression {
   if (leftColumns.length !== rightColumns.length) {
-    throw new Error(
+    throw new InternalError(
       `Relation metadata has mismatched join column counts: ${leftColumns.length} left column(s), ${rightColumns.length} right column(s)`,
     );
   }
   if (leftColumns.length === 0) {
-    throw new Error('Relation metadata is missing join columns');
+    throw new InternalError('Relation metadata is missing join columns');
   }
   const exprs: AnyExpression[] = [];
   for (let i = 0; i < leftColumns.length; i++) {
     const left = leftColumns[i];
     const right = rightColumns[i];
     if (!left || !right) {
-      throw new Error(`Relation metadata is missing a join column pair at index ${i}`);
+      throw new InternalError(`Relation metadata is missing a join column pair at index ${i}`);
     }
     exprs.push(BinaryExpr.eq(ColumnRef.of(leftTable, left), ColumnRef.of(rightTable, right)));
   }
@@ -581,14 +583,16 @@ function toRelationWhereExpr<TContract extends Contract<SqlStorage>>(
     // skip would drop user intent (e.g. a typo'd `nmae: 'Alice'` filter would
     // match every row).
     if (!fieldAccessor) {
-      throw new Error(
+      throw ormError(
+        'ORM.FIELD_UNKNOWN',
         `Shorthand filter on "${relatedModelName}.${fieldName}": field is not defined on the model`,
+        { meta: { model: relatedModelName, field: fieldName } },
       );
     }
 
     if (value === null) {
       if (!fieldAccessor.isNull) {
-        throw new Error(
+        throw new InternalError(
           `Shorthand filter on "${relatedModelName}.${fieldName}": isNull is unexpectedly missing — this is a bug in trait gating`,
         );
       }
@@ -597,8 +601,10 @@ function toRelationWhereExpr<TContract extends Contract<SqlStorage>>(
     }
 
     if (!fieldAccessor.eq) {
-      throw new Error(
+      throw ormError(
+        'ORM.FILTER_UNSUPPORTED',
         `Shorthand filter on "${relatedModelName}.${fieldName}": field does not support equality comparisons`,
+        { meta: { model: relatedModelName, field: fieldName, trait: 'equality' } },
       );
     }
     exprs.push(fieldAccessor.eq(value));
@@ -654,7 +660,7 @@ function buildJoinWhere<TContract extends Contract<SqlStorage>>(
   }
 
   if (joinExprs.length === 0) {
-    throw new Error('Relation metadata is missing join columns');
+    throw new InternalError('Relation metadata is missing join columns');
   }
 
   const firstExpr = joinExprs[0];

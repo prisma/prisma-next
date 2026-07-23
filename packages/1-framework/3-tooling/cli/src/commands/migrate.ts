@@ -831,6 +831,7 @@ async function executeMigrateCommand(
             : await readContractIR(snapshotContractJson, contractPathAbsolute);
         advancedRef = await executeRefAdvancement(
           refsDir,
+          migrationsDir,
           options.advanceRef,
           value.markerHash,
           contractIR,

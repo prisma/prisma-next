@@ -42,7 +42,7 @@ import {
 import { createDevDatabase } from '@prisma-next/test-utils';
 import { Client } from 'pg';
 import { SupabaseRole } from '../src/contract/roles';
-import { restoreSupabaseReference } from '../test/fixtures/supabase-reference/restore';
+import { setUpSupabaseMockSchema } from '../test/fixtures/supabase-reference/set-up-mock-schema';
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -86,58 +86,10 @@ const COLUMN_OMISSIONS: Readonly<Record<string, Readonly<Record<string, readonly
 //     (PSL_INVALID_DEFAULT_VALUE — "null" is not a value literal). Dropping
 //     the default changes nothing observable: the column is still nullable
 //     and still has no enforced default.
-//   - auth.custom_oauth_providers.acceptable_client_ids / .scopes:
-//     `DEFAULT '{}'::text[]` maps to a raw `dbgenerated(...)` default, and
-//     the interpreter has no per-element execution-default semantics for
-//     list fields (PSL_LIST_EXECUTION_DEFAULT_UNSUPPORTED). The column type
-//     (`String[]`) is fully representable; only the default is omitted.
-//   - auth.custom_oauth_providers.attribute_mapping / .authorization_params,
-//     auth.webauthn_credentials.transports, storage.iceberg_namespaces.metadata:
-//     `DEFAULT '{}'::jsonb` / `'[]'::jsonb` prints as
-//     `@default(dbgenerated("'{}'::jsonb"))` — the PSL interpreter keeps a
-//     `dbgenerated(...)` default as a `{ kind: 'function' }` resolved
-//     default verbatim, while live introspection recognizes the same
-//     `'{}'::jsonb ` raw default as a parseable JSON literal and resolves it
-//     to `{ kind: 'literal', value: {} }` — same runtime behaviour, different
-//     resolved shape, so `db verify` reports every such column as
-//     `not-equal`. Omitted until the two sides agree on how a JSON literal
-//     default resolves either way; the column type (`Json`) is unaffected.
 const DEFAULT_OMISSIONS: Readonly<Record<string, Readonly<Record<string, readonly string[]>>>> = {
   auth: {
     users: ['phone'],
-    custom_oauth_providers: [
-      'acceptable_client_ids',
-      'scopes',
-      'attribute_mapping',
-      'authorization_params',
-    ],
-    webauthn_credentials: ['transports'],
   },
-  storage: {
-    iceberg_namespaces: ['metadata'],
-  },
-};
-
-// --- Index omissions (declarative, index-name keyed) ---------------------
-//
-// Fidelity notes:
-//   - auth.one_time_tokens_relates_to_hash_idx / _token_hash_hash_idx: both
-//     `USING hash` indexes. The inferrer now carries a non-default index
-//     access method through as `@@index(..., type: "hash")`, but `hash` is
-//     not a registered index type on this pack's stack (`IndexTypeRegistry`
-//     — see `packages/2-sql/1-core/contract/src/index-types.ts` — is an
-//     opt-in extensibility point a target or extension pack populates, e.g.
-//     `paradedbIndexTypes` for `bm25`; the postgres target itself registers
-//     none). `contract emit` rejects an unregistered type, so these two
-//     indexes are omitted rather than declared. Under `external` control an
-//     undeclared live index is a suppressed extra, so omission is
-//     verify-safe. Registering `hash` as a built-in postgres index type
-//     would let both come back declared; out of scope here.
-// This mechanism also serves as the escape hatch for whatever the *next*
-// unrepresentable index turns out to be, following the same declarative
-// pattern as the column/default omissions above.
-const INDEX_OMISSIONS: Readonly<Record<string, readonly string[]>> = {
-  auth: ['one_time_tokens_relates_to_hash_idx', 'one_time_tokens_token_hash_hash_idx'],
 };
 
 /**
@@ -155,113 +107,6 @@ function parseJsonStringLiteral(raw: string): string {
     );
   }
   return value;
-}
-
-function indexOmissionNameOf(attribute: PslModel['attributes'][number]): string | undefined {
-  const mapArg = attribute.args.find((arg) => arg.kind === 'named' && arg.name === 'map');
-  if (!mapArg) return undefined;
-  return parseJsonStringLiteral(mapArg.value);
-}
-
-/** Drops `@@index`/`@@unique` model attributes named in `omittedNames`. */
-function applyIndexOmissions(
-  namespace: PslNamespace,
-  omittedNames: readonly string[],
-): PslNamespace {
-  if (omittedNames.length === 0) return namespace;
-  let changed = false;
-  const models = namespace.models.map((model) => {
-    const attributes = model.attributes.filter((attribute) => {
-      if (
-        attribute.target !== 'model' ||
-        (attribute.name !== 'index' && attribute.name !== 'unique')
-      ) {
-        return true;
-      }
-      const name = indexOmissionNameOf(attribute);
-      const omit = name !== undefined && omittedNames.includes(name);
-      if (omit) changed = true;
-      return !omit;
-    });
-    return attributes.length === model.attributes.length ? model : { ...model, attributes };
-  });
-
-  if (!changed) return namespace;
-
-  return makePslNamespace({
-    kind: 'namespace',
-    name: namespace.name,
-    entries: makePslNamespaceEntries(
-      models,
-      namespace.compositeTypes,
-      namespacePslExtensionBlocks(namespace),
-    ),
-    span: namespace.span,
-  });
-}
-
-// --- Back-relation field-name corrections (declarative, field-name keyed) --
-//
-// Fidelity note:
-//   - The framework inferrer's `pluralize()`
-//     (packages/2-sql/9-family/src/core/psl-contract-infer/name-transforms.ts)
-//     unconditionally appends `es` to a name that already ends in `s`, `x`,
-//     `z`, `ch`, or `sh`. Supabase's `auth`/`storage` table names are already
-//     plural (e.g. `sessions`, `identities`), so the back-relation field
-//     derived from them comes out double-pluralized (`sessionses`,
-//     `identitieses`). A general inflection fix is deferred to a follow-up
-//     ticket; this table corrects the known-affected names here so the pack
-//     does not ship double-plural public relation names.
-const DOUBLE_PLURALIZED_FIELD_NAMES: ReadonlySet<string> = new Set([
-  'icebergNamespaceses',
-  'icebergTableses',
-  'identitieses',
-  'mfaAmrClaimses',
-  'mfaChallengeses',
-  'mfaFactorses',
-  'oauthAuthorizationses',
-  'oauthConsentses',
-  'objectses',
-  'oneTimeTokenses',
-  'refreshTokenses',
-  's3MultipartUploadsPartses',
-  's3MultipartUploadses',
-  'samlProviderses',
-  'samlRelayStateses',
-  'sessionses',
-  'ssoDomainses',
-  'vectorIndexeses',
-  'webauthnChallengeses',
-  'webauthnCredentialses',
-]);
-
-/** Strips the erroneous trailing `es` from double-pluralized back-relation field names. */
-function applyDoublePluralizationFix(namespace: PslNamespace): PslNamespace {
-  let changed = false;
-  const models = namespace.models.map((model) => {
-    let modelChanged = false;
-    const fields = model.fields.map((field) => {
-      if (!DOUBLE_PLURALIZED_FIELD_NAMES.has(field.name)) return field;
-      modelChanged = true;
-      return { ...field, name: field.name.slice(0, -2) };
-    });
-    if (!modelChanged) return model;
-    changed = true;
-    return { ...model, fields };
-  });
-
-  if (!changed) return namespace;
-
-  return makePslNamespace({
-    kind: 'namespace',
-    name: namespace.name,
-    entries: makePslNamespaceEntries(
-      models,
-      namespace.compositeTypes,
-      namespacePslExtensionBlocks(namespace),
-    ),
-    span: namespace.span,
-  });
 }
 
 // --- Model renames (legacy names referenced by examples + cross-space FKs) -
@@ -623,10 +468,8 @@ async function introspectSchema(
   );
 
   const defaultsFixed = applyDefaultOmissions(namespace, DEFAULT_OMISSIONS[schemaName] ?? {});
-  const indexesFixed = applyIndexOmissions(defaultsFixed, INDEX_OMISSIONS[schemaName] ?? []);
-  const rlsFixed = applyRlsEnablement(indexesFixed, rlsEnabledTables);
-  const pluralizationFixed = applyDoublePluralizationFix(rlsFixed);
-  return { namespace: pluralizationFixed, types: ast.types?.declarations ?? [] };
+  const rlsFixed = applyRlsEnablement(defaultsFixed, rlsEnabledTables);
+  return { namespace: rlsFixed, types: ast.types?.declarations ?? [] };
 }
 
 async function main(): Promise<void> {
@@ -641,7 +484,7 @@ async function main(): Promise<void> {
     const client = new Client({ connectionString });
     await client.connect();
     try {
-      await restoreSupabaseReference(client);
+      await setUpSupabaseMockSchema(client);
     } finally {
       await client.end();
     }

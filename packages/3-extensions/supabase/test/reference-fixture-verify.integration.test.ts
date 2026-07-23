@@ -18,13 +18,13 @@
  *          Supabase FK columns (e.g. `mfa_amr_claims.session_id`) have no
  *          physical index. PSL's `@relation` attribute now takes an `index`
  *          argument (`packages/2-sql/2-authoring/contract-psl/src/psl-relation-resolution.ts`'s
- *          `sqlRelation` spec), and the postgres PSL inferrer
- *          (`packages/3-targets/3-targets/postgres/src/core/psl-infer/infer-psl-contract.ts`)
- *          stamps `index: false` on a relation whose FK columns have no live
- *          backing index, using the same column-exact-match predicate
- *          `contract-to-schema-ir.ts` uses to derive the FK-backing-index
- *          expectation `db verify` checks (shared as
- *          `packages/2-sql/9-family/src/core/foreign-key-index-backing.ts`).
+ *          `sqlRelation` spec), and the postgres PSL inferrer's relation-inference step
+ *          (`packages/2-sql/9-family/src/core/psl-contract-infer/relation-inference.ts`) stamps
+ *          `index: false` on a relation whose FK columns have no live backing index, using the same
+ *          column-exact-match predicate FK1's contract construction now uses to materialize a
+ *          table's FK-backing `indexes[]` entries — the entries `db verify` checks against (shared
+ *          as `@prisma-next/sql-contract/foreign-key-materialization`,
+ *          `packages/2-sql/1-core/contract/src/foreign-key-materialization.ts`).
  *        - `storage.buckets.allowed_mime_types` / `storage.objects.path_tokens`
  *          are nullable `text[]` columns; PSL/Prisma-family list fields have
  *          no nullable-list syntax, so the contract can only declare them
@@ -44,14 +44,15 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { createControlClient } from '@prisma-next/cli/control-api';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
-import { emitContractSpaceArtefacts } from '@prisma-next/migration-tools/spaces';
+import { issueOutcome } from '@prisma-next/framework-components/control';
+import { emitContractSpaceArtifacts } from '@prisma-next/migration-tools/spaces';
 import { defineContract, field, model } from '@prisma-next/postgres/contract-builder';
 import postgres from '@prisma-next/target-postgres/control';
 import { PostgresContractSerializer } from '@prisma-next/target-postgres/runtime';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import supabasePack from '../src/exports/pack';
-import { restoreSupabaseReference } from './fixtures/supabase-reference/restore';
+import { setUpSupabaseMockSchema } from './fixtures/supabase-reference/set-up-mock-schema';
 
 const pgUuid = { codecId: 'pg/uuid@1', nativeType: 'uuid', nullable: false } as const;
 
@@ -87,7 +88,7 @@ describe('reference fixture round-trip verify', () => {
     if (!supabaseSpace) {
       throw new Error('supabasePack must declare a contractSpace');
     }
-    await emitContractSpaceArtefacts(migrationsDir, 'supabase', {
+    await emitContractSpaceArtifacts(migrationsDir, 'supabase', {
       contract: supabaseSpace.contractJson,
       contractDts: '// supabase extension contract space\n',
       headRef: {
@@ -95,7 +96,7 @@ describe('reference fixture round-trip verify', () => {
         invariants: [...supabaseSpace.headRef.invariants],
       },
     });
-    await emitContractSpaceArtefacts(migrationsDir, 'app', {
+    await emitContractSpaceArtifacts(migrationsDir, 'app', {
       contract: appContractJson,
       contractDts: '// synthetic app contract\n',
       headRef: { hash: appStorageHash, invariants: [] },
@@ -108,7 +109,7 @@ describe('reference fixture round-trip verify', () => {
       const { connectionString } = database;
 
       await withClient(connectionString, async (client) => {
-        await restoreSupabaseReference(client);
+        await setUpSupabaseMockSchema(client);
       });
 
       const appContract = buildAppContract();
@@ -161,7 +162,7 @@ describe('reference fixture round-trip verify', () => {
       const { connectionString } = database;
 
       await withClient(connectionString, async (client) => {
-        await restoreSupabaseReference(client);
+        await setUpSupabaseMockSchema(client);
         await client.query('DROP TABLE auth.refresh_tokens CASCADE');
       });
 
@@ -199,7 +200,7 @@ describe('reference fixture round-trip verify', () => {
         const supabaseResult = verifyResult.value.schemaResults.get('supabase');
         expect(supabaseResult?.ok).toBe(false);
         const missingTableIssue = supabaseResult?.schema.issues.find(
-          (issue) => issue.reason === 'not-found' && issue.path.includes('refresh_tokens'),
+          (issue) => issueOutcome(issue) === 'not-found' && issue.path.includes('refresh_tokens'),
         );
         expect(
           missingTableIssue,

@@ -1,8 +1,8 @@
 import type { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { describe, expect, it } from 'vitest';
 import { MongoMigration } from '../src/core/mongo-migration';
-import type { Contract } from './fixtures/migration-end-contract.d';
-import contractJson from './fixtures/migration-end-contract.json' with { type: 'json' };
+import type { Contract } from './fixtures/migration-contract.d';
+import contractJson from './fixtures/migration-contract.json' with { type: 'json' };
 
 const END_HASH = contractJson.storage.storageHash;
 

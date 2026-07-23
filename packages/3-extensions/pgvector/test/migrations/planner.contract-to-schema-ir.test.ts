@@ -193,6 +193,7 @@ function planFromStorages(
     fromContract: null,
     frameworkComponents: [],
     spaceId: APP_SPACE_ID,
+    snapshotsImportPath: '../../snapshots',
   });
 }
 
@@ -229,6 +230,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -268,6 +270,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -336,6 +339,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -392,6 +396,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
       fromContract: null,
       frameworkComponents: [],
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');
@@ -870,8 +875,6 @@ const DEMO_BASE_TABLES = {
           tableName: 'user',
           columns: ['id'],
         },
-        constraint: true,
-        index: true,
       },
     ],
   }),
@@ -956,6 +959,7 @@ describe('incremental migration with full contract surface (enums, FKs)', () => 
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
       ownership: ownsUserTypeEnum,
     });
 
@@ -988,6 +992,7 @@ describe('incremental migration with full contract surface (enums, FKs)', () => 
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
       ownership: ownsUserTypeEnum,
     });
 
@@ -1014,6 +1019,7 @@ describe('incremental migration with full contract surface (enums, FKs)', () => 
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     expect(result.kind).toBe('success');

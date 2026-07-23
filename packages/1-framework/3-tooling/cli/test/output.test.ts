@@ -332,14 +332,17 @@ describe('formatIntrospectJson', () => {
 });
 
 describe('formatSchemaVerifyOutput', () => {
+  // A minimal node to carry presence — the formatter derives the missing/extra/
+  // mismatch label from which sides are set, not from any stored field.
+  const node = { id: 'x', nodeKind: 'x', isEqualTo: () => true, children: () => [] };
   const missingTableIssue: SchemaDiffIssue = {
     path: ['post'],
-    reason: 'not-found',
+    expected: node,
   };
 
   const createResult = (): VerifyDatabaseSchemaResult => ({
     ok: false,
-    code: 'PN-SCHEMA-0001',
+    code: 'CONTRACT.SCHEMA_VERIFICATION_FAILED',
     summary: 'Database schema does not satisfy contract (1 failure)',
     contract: {
       storageHash: 'test',
@@ -375,7 +378,7 @@ describe('formatSchemaVerifyOutput', () => {
   it('renders every issue, each on its own line', () => {
     const diffIssue: SchemaDiffIssue = {
       path: ['public', 'profiles', 'policy_abc'],
-      reason: 'not-found',
+      expected: node,
     };
     const result: VerifyDatabaseSchemaResult = {
       ...createResult(),
@@ -426,7 +429,7 @@ describe('formatSchemaVerifyOutput', () => {
           issues: [
             {
               path: ['database', 'public', 'legacy_jobs'],
-              reason: 'not-found',
+              expected: node,
             },
           ],
         },
@@ -449,7 +452,7 @@ describe('formatSchemaVerifyOutput', () => {
     const output = formatSchemaVerifyOutput(result, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('(PN-SCHEMA-0001)');
+    expect(stripped).toContain('(CONTRACT.SCHEMA_VERIFICATION_FAILED)');
   });
 
   it('renders the issues header first and the summary line last', () => {
@@ -560,7 +563,7 @@ describe('formatSchemaVerifyOutput', () => {
         issues: [
           {
             path: ['public', 'profiles', policyWireName],
-            reason: 'not-found',
+            expected: node,
           },
         ],
       },
@@ -679,7 +682,7 @@ describe('formatSchemaVerifyJson', () => {
   it('includes every issue', () => {
     const result: VerifyDatabaseSchemaResult = {
       ok: false,
-      code: 'PN-SCHEMA-0001',
+      code: 'CONTRACT.SCHEMA_VERIFICATION_FAILED',
       summary: 'Database schema does not satisfy contract',
       contract: {
         storageHash: 'test',
@@ -692,11 +695,9 @@ describe('formatSchemaVerifyJson', () => {
         issues: [
           {
             path: ['post'],
-            reason: 'not-found',
           },
           {
             path: ['public', 'profiles', 'policy_abc'],
-            reason: 'not-found',
           },
         ],
       },
@@ -714,7 +715,7 @@ describe('formatSchemaVerifyJson', () => {
     const parsed = JSON.parse(output) as VerifyDatabaseSchemaResult;
 
     expect(parsed.ok).toBe(false);
-    expect(parsed.code).toBe('PN-SCHEMA-0001');
+    expect(parsed.code).toBe('CONTRACT.SCHEMA_VERIFICATION_FAILED');
     expect(parsed.schema.issues).toHaveLength(2);
     expect(parsed.meta?.strict).toBe(true);
   });
@@ -722,7 +723,7 @@ describe('formatSchemaVerifyJson', () => {
   it('includes the unclaimed list as a top-level field', () => {
     const result: VerifyDatabaseSchemaResult = {
       ok: false,
-      code: 'PN-RUN-3010',
+      code: 'CONTRACT.MARKER_REQUIRED',
       summary: 'Database schema has 1 unclaimed element (not in any contract)',
       contract: {
         storageHash: 'test',

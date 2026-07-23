@@ -116,7 +116,7 @@ withTempDir(({ createTempDir }) => {
         const signError = parseJsonOutput(signJsonFail);
         expect(signError, 'G.05: error envelope').toMatchObject({
           ok: false,
-          code: 'PN-SCHEMA-0001',
+          code: 'CONTRACT.SCHEMA_VERIFICATION_FAILED',
         });
 
         swapPslContract(ctx, 'contract-base');

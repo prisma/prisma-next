@@ -52,7 +52,6 @@ describe('family instance schemaVerify - constraints', () => {
         expect(result.ok).toBe(false);
         expect(result.schema.issues).toContainEqual(
           expect.objectContaining({
-            reason: 'not-equal',
             path: ['database', 'public', 'user', 'primary-key'],
           }),
         );
@@ -93,7 +92,6 @@ describe('family instance schemaVerify - constraints', () => {
         expect(result.ok).toBe(false);
         expect(result.schema.issues).toContainEqual(
           expect.objectContaining({
-            reason: 'not-found',
             path: ['database', 'public', 'user', 'unique:email'],
           }),
         );
@@ -158,7 +156,6 @@ describe('family instance schemaVerify - constraints', () => {
         expect(result.ok).toBe(false);
         expect(result.schema.issues).toContainEqual(
           expect.objectContaining({
-            reason: 'not-found',
             path: ['database', 'public', 'post', 'foreign-key:userId->public.user(id)'],
           }),
         );

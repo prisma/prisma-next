@@ -40,7 +40,6 @@ describe('recreateTableStrategy', () => {
   it('returns no_match when there are no recreate-eligible issues', () => {
     const missingColumn = issue({
       path: ['database', 'user', 'column:x'],
-      reason: 'not-found',
       expected: expectedColumn({ name: 'x', nativeType: 'TEXT', nullable: true }),
     });
     expect(recreateTableStrategy([missingColumn], makeContext()).kind).toBe('no_match');
@@ -49,7 +48,6 @@ describe('recreateTableStrategy', () => {
   it('classifies a pure default drift as widening', () => {
     const defaultDrift = issue({
       path: ['database', 'user', 'column:email', 'default'],
-      reason: 'not-equal',
       expected: expectedColumn({ name: 'email', nativeType: 'TEXT', nullable: true }),
       actual: actualColumn({ name: 'email', nativeType: 'TEXT', nullable: true }),
     });
@@ -71,7 +69,6 @@ describe('recreateTableStrategy', () => {
   it('classifies a column type change as destructive', () => {
     const typeDrift = issue({
       path: ['database', 'user', 'column:email'],
-      reason: 'not-equal',
       expected: expectedColumn({ name: 'email', nativeType: 'TEXT', nullable: true }),
       actual: actualColumn({ name: 'email', nativeType: 'INTEGER', nullable: true }),
     });
@@ -88,13 +85,11 @@ describe('recreateTableStrategy', () => {
   it('destructive wins over widening when both occur on the same table', () => {
     const defaultDrift = issue({
       path: ['database', 'user', 'column:email', 'default'],
-      reason: 'not-equal',
       expected: expectedColumn({ name: 'email', nativeType: 'TEXT', nullable: true }),
       actual: actualColumn({ name: 'email', nativeType: 'TEXT', nullable: true }),
     });
     const pkDrift = issue({
       path: ['database', 'user', 'primary-key'],
-      reason: 'not-equal',
       expected: primaryKey(['id']),
       actual: primaryKey(['id', 'email']),
     });
@@ -117,7 +112,6 @@ describe('recreateTableStrategy', () => {
 
     const relaxing = issue({
       path: ['database', 'user', 'column:email'],
-      reason: 'not-equal',
       expected: expectedColumn({ name: 'email', nativeType: 'TEXT', nullable: true }),
       actual: actualColumn({ name: 'email', nativeType: 'TEXT', nullable: false }),
     });
@@ -128,7 +122,6 @@ describe('recreateTableStrategy', () => {
 
     const tightening = issue({
       path: ['database', 'user', 'column:email'],
-      reason: 'not-equal',
       expected: expectedColumn({ name: 'email', nativeType: 'TEXT', nullable: false }),
       actual: actualColumn({ name: 'email', nativeType: 'TEXT', nullable: true }),
     });
@@ -162,13 +155,11 @@ describe('recreateTableStrategy', () => {
     const issues = [
       issue({
         path: ['database', 'a', 'column:id'],
-        reason: 'not-equal',
         expected: aExpected.columns['id'],
         actual: aActual.columns['id'],
       }),
       issue({
         path: ['database', 'b', 'column:id'],
-        reason: 'not-equal',
         expected: bExpected.columns['id'],
         actual: bActual.columns['id'],
       }),
@@ -185,7 +176,6 @@ describe('recreateTableStrategy', () => {
   it('consumes but emits no call for a table missing from expected/actual (defensive)', () => {
     const ghostIssue = issue({
       path: ['database', 'ghost', 'column:x'],
-      reason: 'not-equal',
       expected: expectedColumn({ name: 'x', nativeType: 'TEXT', nullable: true }),
       actual: actualColumn({ name: 'x', nativeType: 'INTEGER', nullable: true }),
     });
@@ -201,7 +191,6 @@ describe('nullabilityTighteningBackfillStrategy', () => {
   it("returns no_match when policy does not include 'data'", () => {
     const tightening = issue({
       path: ['database', 'user', 'column:email'],
-      reason: 'not-equal',
       expected: expectedColumn({ name: 'email', nativeType: 'TEXT', nullable: false }),
       actual: actualColumn({ name: 'email', nativeType: 'TEXT', nullable: true }),
     });
@@ -215,7 +204,6 @@ describe('nullabilityTighteningBackfillStrategy', () => {
   it("returns no_match for relaxing nullability under 'data' policy", () => {
     const relaxing = issue({
       path: ['database', 'user', 'column:email'],
-      reason: 'not-equal',
       expected: expectedColumn({ name: 'email', nativeType: 'TEXT', nullable: true }),
       actual: actualColumn({ name: 'email', nativeType: 'TEXT', nullable: false }),
     });
@@ -229,7 +217,6 @@ describe('nullabilityTighteningBackfillStrategy', () => {
   it("emits a DataTransformCall per tightened column under 'data' policy without consuming the issue", () => {
     const tightening = issue({
       path: ['database', 'user', 'column:email'],
-      reason: 'not-equal',
       expected: expectedColumn({ name: 'email', nativeType: 'TEXT', nullable: false }),
       actual: actualColumn({ name: 'email', nativeType: 'TEXT', nullable: true }),
     });
@@ -250,7 +237,6 @@ describe('nullabilityTighteningBackfillStrategy', () => {
   it('does not fire for a pure type change carrying no nullability difference', () => {
     const typeDrift = issue({
       path: ['database', 'user', 'column:email'],
-      reason: 'not-equal',
       expected: expectedColumn({ name: 'email', nativeType: 'TEXT', nullable: false }),
       actual: actualColumn({ name: 'email', nativeType: 'INTEGER', nullable: false }),
     });

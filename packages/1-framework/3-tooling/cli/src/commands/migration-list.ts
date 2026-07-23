@@ -9,7 +9,6 @@ import {
   APP_SPACE_ID,
   isValidSpaceId,
   listContractSpaceDirectories,
-  RESERVED_SPACE_SUBDIR_NAMES,
 } from '@prisma-next/migration-tools/spaces';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -81,10 +80,7 @@ export function listRefsByContractHash(
 
 async function orderedOnDiskSpaceIds(projectMigrationsDir: string): Promise<readonly string[]> {
   const candidateDirs = await listContractSpaceDirectories(projectMigrationsDir);
-  return candidateDirs
-    .filter((name) => !RESERVED_SPACE_SUBDIR_NAMES.has(name))
-    .filter(isValidSpaceId)
-    .sort(compareSpaceIds);
+  return candidateDirs.filter(isValidSpaceId).sort(compareSpaceIds);
 }
 
 /**

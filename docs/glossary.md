@@ -213,7 +213,7 @@ Vocabulary that describes how databases move between contracts. The mental-model
 
 ### Migration (noun)
 
-A unit of intent that takes the database from one **contract** to another. On disk, a migration is a directory under `migrations/<space>/` containing `migration.json` (the manifest with `from`/`to` hashes and a content-addressed `migrationHash`), `ops.json` (the operations to execute), `migration.ts` (the editable authoring surface), and bookend contract snapshots (`start-contract.json`, `end-contract.json`).
+A unit of intent that takes the database from one **contract** to another. On disk, a migration is a directory under `migrations/<space>/` containing `migration.json` (the manifest with `from`/`to` hashes and a content-addressed `migrationHash`), `ops.json` (the operations to execute), and `migration.ts` (the editable authoring surface). Its bookend contracts resolve by hash through the shared content-addressed store at `migrations/snapshots/<hex>/contract.json` — the migration directory itself carries no contract copy.
 
 `migration` is **always a noun** — never a verb. The act of advancing a database is `migrate` (see below).
 
@@ -227,7 +227,7 @@ The directed graph of contracts (nodes) connected by migrations (edges). Built b
 
 ### Ref (Contract Ref)
 
-A named pointer at a contract, stored as `migrations/<space>/refs/<name>.json`, optionally with a paired contract snapshot (`<name>.contract.json`). Refs are environment-named (`production`, `staging`) and describe *where CD will `migrate --to` next* in that environment. The default `db` ref records dev-database checkpoint state for offline planning. Managed via `prisma-next ref set|list|delete`. See [ADR 218 — Refs with paired contract snapshots](architecture%20docs/adrs/ADR%20218%20-%20Refs%20with%20paired%20contract%20snapshots%20and%20universal%20graph-node%20invariant.md).
+A named pointer at a contract, stored as `migrations/<space>/refs/<name>.json` (`{hash, invariants}`); the contract it names resolves through the shared content-addressed store at `migrations/snapshots/<hex>/contract.json` by that hash. Refs are environment-named (`production`, `staging`) and describe *where CD will `migrate --to` next* in that environment. The default `db` ref records dev-database checkpoint state for offline planning. Managed via `prisma-next ref set|list|delete`. See [ADR 218 — Refs with paired contract snapshots](architecture%20docs/adrs/ADR%20218%20-%20Refs%20with%20paired%20contract%20snapshots%20and%20universal%20graph-node%20invariant.md) (paired-snapshot part superseded — see its Status note) and [ADR 240 — Contract snapshots live in a content-addressed store](architecture%20docs/adrs/ADR%20240%20-%20Contract%20snapshots%20live%20in%20a%20content-addressed%20store.md).
 
 A ref is a specific kind of [contract reference](#contract-reference) — the named, file-backed, persistent kind.
 
@@ -286,8 +286,8 @@ A read-only filesystem operation that verifies on-disk migration packages are in
 | `PN-MIG-CHECK-002 MANIFEST_INCOMPLETE` | `migration.json` or `ops.json` missing on disk |
 | `PN-MIG-CHECK-003 ORPHAN_MIGRATION` | Migration has no graph-connecting predecessor |
 | `PN-MIG-CHECK-004 DANGLING_REF` | Ref points at a contract hash absent from the graph |
-| `PN-MIG-CHECK-005 EDGE_MISMATCH` | Migration's `metadata.to` disagrees with its `end-contract.json` snapshot |
-| `PN-MIG-CHECK-006 SNAPSHOT_UNREADABLE` | Migration's `end-contract.json` snapshot exists but cannot be parsed |
+| `PN-MIG-CHECK-005 EDGE_MISMATCH` | Migration's `metadata.to` disagrees with its snapshot store entry's `storageHash` |
+| `PN-MIG-CHECK-006 SNAPSHOT_UNREADABLE` | Migration's snapshot store entry exists but cannot be parsed |
 | `PN-MIG-CHECK-007 SELF_EDGE` | Migration's source equals its target (`from === to`) with no data invariant — a true no-op self-edge |
 | `PN-MIG-CHECK-008 ORPHAN_SPACE_DIR` | A contract-space directory exists on disk but no extension declares it |
 | `PN-MIG-CHECK-009 UNMATERIALISED_EXTENSION` | An extension is declared in `extensionPacks` but has no on-disk migrations directory |

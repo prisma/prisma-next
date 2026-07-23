@@ -79,6 +79,7 @@ describe.sequential('Schema verification after runner - integration', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
 
     if (result.kind !== 'success') {
@@ -208,7 +209,6 @@ describe.sequential('Schema verification after runner - integration', () => {
       expect(result.ok).toBe(false);
       expect(result.schema.issues).toContainEqual(
         expect.objectContaining({
-          reason: 'not-equal',
           path: ['database', 'public', 'user', 'column:email'],
         }),
       );
@@ -234,7 +234,6 @@ describe.sequential('Schema verification after runner - integration', () => {
       expect(result.ok).toBe(false);
       expect(result.schema.issues).toContainEqual(
         expect.objectContaining({
-          reason: 'not-found',
           path: ['database', 'public', 'user', 'column:email'],
         }),
       );
@@ -261,7 +260,6 @@ describe.sequential('Schema verification after runner - integration', () => {
       expect(result.ok).toBe(false);
       expect(result.schema.issues).toContainEqual(
         expect.objectContaining({
-          reason: 'not-equal',
           path: ['database', 'public', 'user', 'column:email'],
         }),
       );

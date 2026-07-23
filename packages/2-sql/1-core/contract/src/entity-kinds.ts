@@ -2,6 +2,7 @@ import type {
   AnyEntityKindDescriptor,
   EntityKindDescriptor,
 } from '@prisma-next/framework-components/ir';
+import { contractError } from './contract-errors';
 import { StorageTableSchema, StorageValueSetSchema } from './ir/storage-entry-schemas';
 import { StorageTable, type StorageTableInput } from './ir/storage-table';
 import { StorageValueSet, type StorageValueSetInput } from './ir/storage-value-set';
@@ -35,8 +36,10 @@ export function composeSqlEntityKinds(
   ]);
   for (const descriptor of packKinds) {
     if (kinds.has(descriptor.kind)) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.PACK_CONTRIBUTION_INVALID',
         `composeSqlEntityKinds: duplicate entity kind "${descriptor.kind}" — each kind may be registered only once`,
+        { meta: { entityKind: descriptor.kind } },
       );
     }
     kinds.set(descriptor.kind, descriptor);

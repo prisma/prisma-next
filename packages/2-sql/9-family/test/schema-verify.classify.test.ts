@@ -1,6 +1,7 @@
 import type {
   DiffableNode,
   DiffSubjectGranularity,
+  ExpectationFailureReason,
 } from '@prisma-next/framework-components/control';
 import {
   SqlCheckConstraintIR,
@@ -25,11 +26,11 @@ const column = new SqlColumnIR({ name: 'c', nativeType: 'int4', nullable: false 
 const index = new SqlIndexIR({ columns: ['c'], unique: false });
 const check = new SqlCheckConstraintIR({ name: 'chk', column: 'c', permittedValues: ['a'] });
 
-function issueOf(reason: 'not-expected' | 'not-found' | 'not-equal', node: DiffableNode) {
+function issueOf(change: ExpectationFailureReason, node: DiffableNode) {
   return {
     path: ['database', node.id],
-    reason,
-    ...(reason === 'not-expected' ? { actual: node } : { expected: node, actual: node }),
+    ...(change !== 'not-expected' ? { expected: node } : {}),
+    ...(change !== 'not-found' ? { actual: node } : {}),
   };
 }
 

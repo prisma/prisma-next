@@ -1,3 +1,5 @@
+import { InternalError } from './internal-error';
+
 /**
  * Asserts that a value is defined (not null or undefined).
  * Use for invariants where the value should always exist at runtime.
@@ -13,7 +15,7 @@
  */
 export function assertDefined<T>(value: T | null | undefined, message: string): asserts value is T {
   if (value === null || value === undefined) {
-    throw new Error(message);
+    throw new InternalError(message);
   }
 }
 
@@ -30,6 +32,6 @@ export function assertDefined<T>(value: T | null | undefined, message: string): 
  */
 export function invariant(condition: boolean, message: string): asserts condition {
   if (!condition) {
-    throw new Error(message);
+    throw new InternalError(message);
   }
 }

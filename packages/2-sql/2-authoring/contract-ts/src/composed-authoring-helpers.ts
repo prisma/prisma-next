@@ -37,6 +37,7 @@ import type {
   ScalarFieldBuilder,
 } from './contract-dsl';
 import { buildFieldPreset, field, model, rel } from './contract-dsl';
+import { contractError } from './contract-errors';
 import type { MergeExtensionIndexTypes } from './contract-types';
 
 type ExtractTypeNamespaceFromPack<Pack> = ExtractAuthoringNamespaceFromPack<
@@ -224,8 +225,10 @@ const RESERVED_HELPER_KEYS: readonly string[] = ['field', 'model', 'rel', 'type'
 function assertNoBuiltInEntityCollisions(namespace: AuthoringEntityTypeNamespace): void {
   const collisions = Object.keys(namespace).filter((name) => RESERVED_HELPER_KEYS.includes(name));
   if (collisions.length > 0) {
-    throw new Error(
+    throw contractError(
+      'CONTRACT.PACK_CONTRIBUTION_INVALID',
       `Pack-contributed entity type(s) ${collisions.map((c) => `"${c}"`).join(', ')} collide with the reserved built-in helper key(s) on the composed helpers surface. Reserved keys: ${RESERVED_HELPER_KEYS.map((k) => `"${k}"`).join(', ')}.`,
+      { meta: { collisions, reservedKeys: RESERVED_HELPER_KEYS } },
     );
   }
 }
@@ -252,8 +255,10 @@ function createComposedFieldHelpers(
   const coreHelperNames = new Set(Object.keys(coreFieldHelpers));
   for (const helperName of Object.keys(helperNamespace)) {
     if (coreHelperNames.has(helperName)) {
-      throw new Error(
+      throw contractError(
+        'CONTRACT.PACK_CONTRIBUTION_INVALID',
         `Duplicate authoring field helper "${helperName}". Core field helpers reserve that name.`,
+        { meta: { helperName } },
       );
     }
   }

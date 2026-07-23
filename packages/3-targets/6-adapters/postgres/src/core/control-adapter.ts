@@ -1,4 +1,8 @@
-import type { ContractMarkerRecord, LedgerEntryRecord } from '@prisma-next/contract/types';
+import type {
+  ColumnDefault,
+  ContractMarkerRecord,
+  LedgerEntryRecord,
+} from '@prisma-next/contract/types';
 import {
   parseMarkerRowSafely,
   rethrowMarkerReadError,
@@ -7,7 +11,7 @@ import {
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup, CodecRegistry } from '@prisma-next/framework-components/codec';
-import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, type SchemaNodeRef } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
@@ -36,6 +40,7 @@ import type {
   SqlReferentialAction,
   SqlUniqueIRInput,
 } from '@prisma-next/sql-schema-ir/types';
+import { RelationalSchemaNodeKind } from '@prisma-next/sql-schema-ir/types';
 import {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
@@ -66,6 +71,7 @@ import {
   PostgresNativeEnumSchemaNode,
   PostgresPolicySchemaNode,
   PostgresRoleSchemaNode,
+  PostgresSchemaNodeKind,
   PostgresTableSchemaNode,
 } from '@prisma-next/target-postgres/types';
 import { blindCast } from '@prisma-next/utils/casts';
@@ -710,6 +716,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       numeric_scale: number | null;
       column_default: string | null;
       formatted_type: string | null;
+      attidentity: string;
     }>(
       `SELECT
            c.table_name,
@@ -721,7 +728,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
            numeric_precision,
            numeric_scale,
            column_default,
-           format_type(a.atttypid, a.atttypmod) AS formatted_type
+           format_type(a.atttypid, a.atttypmod) AS formatted_type,
+           a.attidentity
          FROM information_schema.columns c
          JOIN pg_catalog.pg_class cl
            ON cl.relname = c.table_name
@@ -737,7 +745,13 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          ORDER BY c.table_name, c.ordinal_position`,
       [schema],
     );
-    // Query all primary keys for all tables in schema
+    // Query all primary keys for all tables in schema. Reads pg_catalog, not
+    // information_schema: `information_schema.table_constraints` hides
+    // constraints on tables where the connecting role's only privilege is
+    // SELECT (its filter grants visibility for INSERT/UPDATE/DELETE/TRUNCATE/
+    // REFERENCES/TRIGGER — not SELECT), so a SELECT-only table introspects
+    // with all its columns but zero constraints and verify reports every
+    // declared constraint as missing. pg_catalog is not privilege-filtered.
     const pkResult = await driver.query<{
       table_name: string;
       constraint_name: string;
@@ -745,24 +759,29 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       ordinal_position: number;
     }>(
       `SELECT
-           tc.table_name,
-           tc.constraint_name,
-           kcu.column_name,
-           kcu.ordinal_position
-         FROM information_schema.table_constraints tc
-         JOIN information_schema.key_column_usage kcu
-           ON tc.constraint_name = kcu.constraint_name
-           AND tc.table_schema = kcu.table_schema
-           AND tc.table_name = kcu.table_name
-         WHERE tc.table_schema = $1
-           AND tc.constraint_type = 'PRIMARY KEY'
-         ORDER BY tc.table_name, kcu.ordinal_position`,
+           cl.relname AS table_name,
+           con.conname AS constraint_name,
+           a.attname AS column_name,
+           k.ord AS ordinal_position
+         FROM pg_catalog.pg_constraint con
+         JOIN pg_catalog.pg_class cl ON cl.oid = con.conrelid
+         JOIN pg_catalog.pg_namespace ns ON ns.oid = cl.relnamespace
+         JOIN LATERAL unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord) ON true
+         JOIN pg_catalog.pg_attribute a
+           ON a.attrelid = con.conrelid
+           AND a.attnum = k.attnum
+         WHERE ns.nspname = $1
+           AND con.contype = 'p'
+         ORDER BY cl.relname, k.ord`,
       [schema],
     );
-    // Query all foreign keys for all tables in schema, including referential actions.
-    // Uses pg_catalog for correct positional pairing of composite FK columns
-    // (information_schema.constraint_column_usage lacks ordinal_position,
-    // which causes Cartesian products for multi-column FKs).
+    // Query all foreign keys for all tables in schema, including referential
+    // actions. Reads pg_catalog only (see the primary-key query above for why
+    // information_schema is unusable here); `unnest(conkey) WITH ORDINALITY`
+    // pairs source and referenced columns positionally, so composite FKs
+    // round-trip in declared order. The referential-action CASEs mirror
+    // pg_constraint's confdeltype/confupdtype encoding and produce the same
+    // rule strings information_schema.referential_constraints reports.
     const fkResult = await driver.query<{
       table_name: string;
       constraint_name: string;
@@ -775,41 +794,48 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       update_rule: string;
     }>(
       `SELECT
-           tc.table_name,
-           tc.constraint_name,
-           kcu.column_name,
-           kcu.ordinal_position,
+           cl.relname AS table_name,
+           con.conname AS constraint_name,
+           a.attname AS column_name,
+           k.ord AS ordinal_position,
            ref_ns.nspname AS referenced_table_schema,
            ref_cl.relname AS referenced_table_name,
            ref_att.attname AS referenced_column_name,
-           rc.delete_rule,
-           rc.update_rule
-         FROM information_schema.table_constraints tc
-         JOIN information_schema.key_column_usage kcu
-           ON tc.constraint_name = kcu.constraint_name
-           AND tc.table_schema = kcu.table_schema
-           AND tc.table_name = kcu.table_name
-         JOIN pg_catalog.pg_constraint pgc
-           ON pgc.conname = tc.constraint_name
-           AND pgc.connamespace = (
-             SELECT oid FROM pg_catalog.pg_namespace WHERE nspname = tc.table_schema
-           )
+           CASE con.confdeltype
+             WHEN 'a' THEN 'NO ACTION'
+             WHEN 'r' THEN 'RESTRICT'
+             WHEN 'c' THEN 'CASCADE'
+             WHEN 'n' THEN 'SET NULL'
+             WHEN 'd' THEN 'SET DEFAULT'
+           END AS delete_rule,
+           CASE con.confupdtype
+             WHEN 'a' THEN 'NO ACTION'
+             WHEN 'r' THEN 'RESTRICT'
+             WHEN 'c' THEN 'CASCADE'
+             WHEN 'n' THEN 'SET NULL'
+             WHEN 'd' THEN 'SET DEFAULT'
+           END AS update_rule
+         FROM pg_catalog.pg_constraint con
+         JOIN pg_catalog.pg_class cl ON cl.oid = con.conrelid
+         JOIN pg_catalog.pg_namespace ns ON ns.oid = cl.relnamespace
+         JOIN LATERAL unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord) ON true
+         JOIN pg_catalog.pg_attribute a
+           ON a.attrelid = con.conrelid
+           AND a.attnum = k.attnum
          JOIN pg_catalog.pg_class ref_cl
-           ON ref_cl.oid = pgc.confrelid
+           ON ref_cl.oid = con.confrelid
          JOIN pg_catalog.pg_namespace ref_ns
            ON ref_ns.oid = ref_cl.relnamespace
          JOIN pg_catalog.pg_attribute ref_att
-           ON ref_att.attrelid = pgc.confrelid
-           AND ref_att.attnum = pgc.confkey[kcu.ordinal_position]
-         JOIN information_schema.referential_constraints rc
-           ON rc.constraint_name = tc.constraint_name
-           AND rc.constraint_schema = tc.table_schema
-         WHERE tc.table_schema = $1
-           AND tc.constraint_type = 'FOREIGN KEY'
-         ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position`,
+           ON ref_att.attrelid = con.confrelid
+           AND ref_att.attnum = con.confkey[k.ord]
+         WHERE ns.nspname = $1
+           AND con.contype = 'f'
+         ORDER BY cl.relname, con.conname, k.ord`,
       [schema],
     );
-    // Query all unique constraints for all tables in schema (excluding PKs)
+    // Query all unique constraints for all tables in schema (excluding PKs).
+    // Reads pg_catalog (see the primary-key query above).
     const uniqueResult = await driver.query<{
       table_name: string;
       constraint_name: string;
@@ -817,18 +843,20 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       ordinal_position: number;
     }>(
       `SELECT
-           tc.table_name,
-           tc.constraint_name,
-           kcu.column_name,
-           kcu.ordinal_position
-         FROM information_schema.table_constraints tc
-         JOIN information_schema.key_column_usage kcu
-           ON tc.constraint_name = kcu.constraint_name
-           AND tc.table_schema = kcu.table_schema
-           AND tc.table_name = kcu.table_name
-         WHERE tc.table_schema = $1
-           AND tc.constraint_type = 'UNIQUE'
-         ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position`,
+           cl.relname AS table_name,
+           con.conname AS constraint_name,
+           a.attname AS column_name,
+           k.ord AS ordinal_position
+         FROM pg_catalog.pg_constraint con
+         JOIN pg_catalog.pg_class cl ON cl.oid = con.conrelid
+         JOIN pg_catalog.pg_namespace ns ON ns.oid = cl.relnamespace
+         JOIN LATERAL unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord) ON true
+         JOIN pg_catalog.pg_attribute a
+           ON a.attrelid = con.conrelid
+           AND a.attnum = k.attnum
+         WHERE ns.nspname = $1
+           AND con.contype = 'u'
+         ORDER BY cl.relname, con.conname, k.ord`,
       [schema],
     );
     // Query all indexes for all tables in schema (excluding constraints).
@@ -873,10 +901,9 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          WHERE i.schemaname = $1
            AND NOT EXISTS (
              SELECT 1
-             FROM information_schema.table_constraints tc
-             WHERE tc.table_schema = $1
-               AND tc.table_name = i.tablename
-               AND tc.constraint_name = i.indexname
+             FROM pg_catalog.pg_constraint con
+             WHERE con.conindid = ic.oid
+               AND con.contype IN ('p', 'u', 'x')
            )
          ORDER BY i.tablename, i.indexname, k.ord`,
       [schema],
@@ -986,6 +1013,21 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         // normalizes them itself.
         const resolvedNativeType = `${normalizeSchemaNativeType(nativeType)}${many ? '[]' : ''}`;
         const rawDefault = colRow.column_default ?? undefined;
+        // `GENERATED ALWAYS AS IDENTITY` ('a') and `GENERATED BY DEFAULT AS
+        // IDENTITY` ('d') both report a NULL column_default — Postgres tracks
+        // generation via attidentity, not a default expression — so neither
+        // variant is visible in `rawDefault` at all. The contract has no
+        // syntax to distinguish the two, so both resolve directly to the same
+        // `autoincrement()` a `serial` column's `nextval(...)` default
+        // already maps to. This is the only place identity is recognized —
+        // there is no `SqlColumnIR.identity` field; every consumer compares
+        // `resolvedDefault` instead.
+        const isIdentityColumn = colRow.attidentity === 'a' || colRow.attidentity === 'd';
+        const resolvedDefault: ColumnDefault | undefined = isIdentityColumn
+          ? { kind: 'function', expression: 'autoincrement()' }
+          : rawDefault !== undefined
+            ? parsePostgresDefault(rawDefault, resolvedNativeType)
+            : undefined;
         columns[colRow.column_name] = {
           name: colRow.column_name,
           nativeType,
@@ -993,12 +1035,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           ...ifDefined('default', rawDefault),
           ...ifDefined('many', many),
           resolvedNativeType,
-          ...ifDefined(
-            'resolvedDefault',
-            rawDefault !== undefined
-              ? parsePostgresDefault(rawDefault, resolvedNativeType)
-              : undefined,
-          ),
+          ...ifDefined('resolvedDefault', resolvedDefault),
         };
       }
 
@@ -1012,6 +1049,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           ? {
               columns: primaryKeyColumns,
               ...(pkRows[0]?.constraint_name ? { name: pkRows[0].constraint_name } : {}),
+              dependsOn: postgresColumnDependsOn(schema, tableName, primaryKeyColumns),
             }
           : undefined;
 
@@ -1054,6 +1092,10 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           name: fk.name,
           ...ifDefined('onDelete', mapReferentialAction(fk.deleteRule)),
           ...ifDefined('onUpdate', mapReferentialAction(fk.updateRule)),
+          dependsOn: [
+            postgresTableDependsOn(fk.referencedSchema, fk.referencedTable),
+            ...postgresColumnDependsOn(schema, tableName, fk.columns),
+          ],
         }),
       );
 
@@ -1078,6 +1120,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       const uniques: readonly SqlUniqueIRInput[] = Array.from(uniquesMap.values()).map((uq) => ({
         columns: Object.freeze([...uq.columns]) as readonly string[],
         name: uq.name,
+        dependsOn: postgresColumnDependsOn(schema, tableName, uq.columns),
       }));
 
       // Process indexes
@@ -1159,6 +1202,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           unique: idx.unique,
           ...(idx.type !== undefined && { type: idx.type }),
           ...(idx.options !== undefined && { options: idx.options }),
+          dependsOn: postgresColumnDependsOn(schema, tableName, idx.columns),
         }),
       );
 
@@ -1241,6 +1285,10 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         ...(row.qual !== null ? { using: row.qual } : {}),
         ...(row.with_check !== null ? { withCheck: row.with_check } : {}),
         permissive,
+        dependsOn: [
+          postgresTableDependsOn(row.schemaname, row.tablename),
+          ...policyRoles.map(postgresRoleDependsOn),
+        ],
       });
       const list = policiesByTable.get(row.tablename) ?? [];
       list.push(policy);
@@ -1500,6 +1548,44 @@ function mapReferentialAction(rule: string): SqlReferentialAction | undefined {
   }
   if (mapped === 'noAction') return undefined;
   return mapped;
+}
+
+/**
+ * A FK/policy dependency chain, mirroring the shape the expected-side
+ * derivation stamps (`contractToPostgresDatabaseSchemaNode`): the database
+ * root's fixed sentinel id, then the namespace, then the table.
+ */
+function postgresTableDependsOn(namespaceId: string, tableName: string): SchemaNodeRef {
+  return [
+    { nodeKind: PostgresSchemaNodeKind.database, id: 'database' },
+    { nodeKind: PostgresSchemaNodeKind.namespace, id: namespaceId },
+    { nodeKind: PostgresSchemaNodeKind.table, id: tableName },
+  ];
+}
+
+/** A policy's dependency chain onto one of the roles it grants to. */
+function postgresRoleDependsOn(role: string): SchemaNodeRef {
+  return [
+    { nodeKind: PostgresSchemaNodeKind.database, id: 'database' },
+    { nodeKind: PostgresSchemaNodeKind.role, id: role },
+  ];
+}
+
+/**
+ * The chains from a table-child object (foreign key, index, unique, primary
+ * key) to each of the own columns it is built on — the introspection-side
+ * mirror of `contractToPostgresDatabaseSchemaNode`'s `columnDependsOn`. An
+ * object is dropped before the columns it covers.
+ */
+function postgresColumnDependsOn(
+  namespaceId: string,
+  tableName: string,
+  columns: readonly string[],
+): SchemaNodeRef[] {
+  return columns.map((column) => [
+    ...postgresTableDependsOn(namespaceId, tableName),
+    { nodeKind: RelationalSchemaNodeKind.column, id: `column:${column}` },
+  ]);
 }
 
 /**

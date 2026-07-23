@@ -362,6 +362,16 @@ describe('enumType() — declaration key must match enumType name', () => {
         models: {},
       }),
     ).toThrow(/enum declaration key "MyAlias" must match enumType name "Role"/);
+
+    expect(() =>
+      defineContract({
+        family: sqlFamilyPack,
+        target: postgresTargetPack,
+        createNamespace: createTestSqlNamespace,
+        enums: { MyAlias: Role },
+        models: {},
+      }),
+    ).toThrow(expect.objectContaining({ code: 'CONTRACT.ENUM_INVALID' }));
   });
 });
 

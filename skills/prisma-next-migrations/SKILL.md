@@ -39,8 +39,8 @@ Once the contract changes, you choose how the change reaches the database. This 
 - **Migration package files** (inside each `migrations/app/<dir>/`):
   - `migration.json` — manifest (metadata + `migrationHash`).
   - `ops.json` — canonical operation list. Content-addressed; `migrationHash` is computed over this.
-  - `end-contract.json` and `end-contract.d.ts` — the contract this migration ends at, imported by `migration.ts` for type-safe data transforms.
   - `migration.ts` — TypeScript authoring source, **framework-rendered** by `migration plan` (or `migration new`). You edit specific holes in it (see *Fill a placeholder* below) and re-emit `ops.json` / `migration.json` by running it.
+- **Contract snapshots.** `migration.ts` imports its bookend contracts from the shared, content-addressed store at `migrations/snapshots/<hex>/contract.json` + `contract.d.ts` (`<hex>` is the contract's 64-hex storage hash) — not from files inside the migration package.
 - **Self-emit.** Running `node migrations/app/<dir>/migration.ts` regenerates `ops.json` and `migration.json` from the (possibly edited) TS source. This is the only supported way to update an existing migration package after edits.
 - **`migration.ts` shape.** Framework-rendered. A class extending `Migration` (from `@prisma-next/family-mongo/migration` on Mongo, or re-exported via `@prisma-next/postgres/migration` on Postgres — see the framing block below), with an `operations` getter that returns an array of factory-call values. The file ends with `MigrationCLI.run(import.meta.url, M)` so executing it self-emits.
 - **`placeholder(slot)`.** A sentinel the planner emits into the rendered `migration.ts` (from `@prisma-next/errors/migration` on Mongo, or the `@prisma-next/postgres/migration` import on Postgres) wherever a data transform is needed. Calling `placeholder(...)` at emit time throws `PN-MIG-2001` *Unfilled migration placeholder*. The user replaces the `() => placeholder(...)` arrow with a real query-plan closure (Postgres) or fills `dataTransform({ check, run })` sources (Mongo — see *Fill a placeholder*), then self-emits.
@@ -99,20 +99,18 @@ pnpm prisma-next migrate --db $DATABASE_URL
 pnpm prisma-next db verify --db $DATABASE_URL
 ```
 
-The `db` ref is a named pointer at `migrations/app/refs/db.json` plus a **paired contract snapshot** (`db.contract.json`, `db.contract.d.ts`). It records which contract hash the project's dev database has been brought up to — the offline planner's stand-in for "where is my local DB?" without opening a connection at plan time.
+The `db` ref is a named pointer at `migrations/app/refs/db.json` — just `{ hash, invariants }`. It records which contract hash the project's dev database has been brought up to — the offline planner's stand-in for "where is my local DB?" without opening a connection at plan time. The contract it names resolves through the shared content-addressed store at `migrations/snapshots/<hex>/contract.json` by that hash, the same store every migration graph node resolves through.
 
-**What `db init` / `db update` write.** When run against the project's default `--db` URL (no explicit `--db` flag), both commands implicitly advance the `db` ref and refresh its paired snapshot from the post-command contract IR. Override the ref name with `--advance-ref <name>`. When you pass `--db <non-default-url>`, ref advancement is suppressed unless `--advance-ref` is explicit — reconciling a different database is not the same as checkpointing this project's dev state.
+**What `db init` / `db update` write.** When run against the project's default `--db` URL (no explicit `--db` flag), both commands implicitly advance the `db` ref: they write-if-absent the post-command contract IR into the snapshot store, then write the ref's pointer. Override the ref name with `--advance-ref <name>`. When you pass `--db <non-default-url>`, ref advancement is suppressed unless `--advance-ref` is explicit — reconciling a different database is not the same as checkpointing this project's dev state.
 
-The on-disk layout mirrors migration bundle snapshots:
+The on-disk layout is just the pointer:
 
 ```text
 migrations/app/refs/
-├── db.json                 # { "hash": "<hex>", "invariants": [] }
-├── db.contract.json        # full contract IR at that hash
-└── db.contract.d.ts        # typed import handle
+└── db.json                 # { "hash": "<hex>", "invariants": [] }
 ```
 
-**First `migration plan` after dev iteration.** `migration plan` defaults `--from` to the `db` ref. When the on-disk migration graph is still **empty** and the `db` ref points at a non-null hash with a paired snapshot (typical after one or more `db update` cycles), the planner emits **two** bundles instead of one:
+**First `migration plan` after dev iteration.** `migration plan` defaults `--from` to the `db` ref. When the on-disk migration graph is still **empty** and the `db` ref points at a non-null hash with a store entry (typical after one or more `db update` cycles), the planner emits **two** bundles instead of one:
 
 1. Baseline: `null → from-hash` (introduces `from-hash` as a graph node)
 2. Delta: `from-hash → current_contract`
@@ -132,19 +130,19 @@ pnpm prisma-next ref set db <graph-node-hash>
 pnpm prisma-next migration plan --name my_change
 ```
 
-If the paired snapshot is missing (`MIGRATION.SNAPSHOT_MISSING`), repopulate with `db update --advance-ref db` or delete the orphan pointer with `ref delete db`.
+If the `db` ref's pointer is itself missing and the hash isn't a graph node either (`MIGRATION.SNAPSHOT_MISSING`), create it with `ref set db <hash>` or advance it with `db update --advance-ref db`.
 
 **After plain `migrate`.** `migrate` does not implicitly advance the `db` ref (production-shaped commands stay explicit). The live marker advances while the ref may lag. Refresh with `db update` (no-op on DB when already current) or `migrate --advance-ref db` in the same invocation.
 
 **When to switch paths.** Use `db update` while the schema is in flux on a solo dev database. Switch to `migration plan` + `migrate` when the change needs a reviewable, replayable migration — typically before opening a PR or touching any shared environment. The `db` ref bridges the two: it captures dev iteration state on disk so the first formal plan knows where you left off.
 
-**Graph-node rule (plan time).** Any hash used as a `from` end — explicit `--from`, default `db` ref, or ref name — must already be a node in the on-disk migration graph once the graph is non-empty. The auto-baseline two-bundle emission is the one exception: it applies only on an **empty** graph with a non-null ref-resolved `from` and an available paired snapshot. If you deleted the snapshot files or the ref pointer without the graph, plan refuses with `MIGRATION.SNAPSHOT_MISSING` instead.
+**Graph-node rule (plan time).** Any hash used as a `from` end — explicit `--from`, default `db` ref, or ref name — must already be a node in the on-disk migration graph once the graph is non-empty. The auto-baseline two-bundle emission is the one exception: it applies only on an **empty** graph with a non-null ref-resolved `from` and an available store entry. If the ref's pointer is missing and the hash isn't a graph node either, plan refuses with `MIGRATION.SNAPSHOT_MISSING` instead.
 
 **Apply-time complement.** `migrate` reads the live marker before DDL. If the marker hash is not a graph node, the command refuses with `MIGRATION.MARKER_MISMATCH` — catching drift the offline planner cannot see. This is separate from `MIGRATION.MARKER_NOT_IN_HISTORY`, which fires later during the runner's graph walk when the marker is off the path being traversed. See `prisma-next-migration-review` for the full diagnostic catalog.
 
 `db` is a **default ref name**, not a reserved one. The framework overwrites it on the next dev cycle; you may `ref set db <hash>` explicitly and accept that a subsequent `db update` replaces it when run against the default URL.
 
-Canonical detail: [Migration System § Refs (paired contract snapshots)](../../docs/architecture%20docs/subsystems/7.%20Migration%20System.md#paired-contract-snapshots), [§ `migration plan`](../../docs/architecture%20docs/subsystems/7.%20Migration%20System.md#migration-plan), [§ Recovery affordances](../../docs/architecture%20docs/subsystems/7.%20Migration%20System.md#recovery-affordances), and [ADR 218 — Refs with paired contract snapshots and universal graph-node invariant](../../docs/architecture%20docs/adrs/ADR%20218%20-%20Refs%20with%20paired%20contract%20snapshots%20and%20universal%20graph-node%20invariant.md) (TML-2629).
+Canonical detail: [Migration System § Contract resolution through the snapshot store](../../docs/architecture%20docs/subsystems/7.%20Migration%20System.md#contract-resolution-through-the-snapshot-store), [§ `migration plan`](../../docs/architecture%20docs/subsystems/7.%20Migration%20System.md#migration-plan), [§ Recovery affordances](../../docs/architecture%20docs/subsystems/7.%20Migration%20System.md#recovery-affordances), [ADR 218 — Refs with paired contract snapshots and universal graph-node invariant](../../docs/architecture%20docs/adrs/ADR%20218%20-%20Refs%20with%20paired%20contract%20snapshots%20and%20universal%20graph-node%20invariant.md) (TML-2629, its paired-snapshot part superseded — see the ADR's Status note), and [ADR 240 — Contract snapshots live in a content-addressed store](../../docs/architecture%20docs/adrs/ADR%20240%20-%20Contract%20snapshots%20live%20in%20a%20content-addressed%20store.md).
 
 ## Workflow — `db update` (quick path)
 
@@ -227,7 +225,7 @@ The scaffold the planner emits looks like:
 
 ```typescript
 // migrations/app/20260515T1200_add_user_name/migration.ts
-import endContract from './end-contract.json' with { type: 'json' };
+import endContract from '../../snapshots/93f07d1b…c9e1e5a2/contract.json' with { type: 'json' };
 import { Migration, MigrationCLI, addColumn, placeholder } from '@prisma-next/postgres/migration';
 
 export default class M extends Migration {
@@ -255,7 +253,7 @@ Replace both `placeholder(...)` calls with query-plan closures built from `endCo
 Build the query builder against `endContract` so the storage hashes line up — using a different contract reference raises `PN-MIG-2005`. The filled-in shape (the rendered scaffold above with `placeholder(...)` calls replaced; if you need an extra factory like `setNotNull`, add it to the *existing* `@prisma-next/postgres/migration` import line rather than authoring a second import). See `prisma-next-queries` for the surrounding `db` setup:
 
 ```typescript
-import endContract from './end-contract.json' with { type: 'json' };
+import endContract from '../../snapshots/93f07d1b…c9e1e5a2/contract.json' with { type: 'json' };
 import { Migration, MigrationCLI, addColumn, setNotNull } from '@prisma-next/postgres/migration';
 import { db } from './db'; // sql({ context: createExecutionContext({ contract: endContract, ... }) })
 
@@ -455,7 +453,7 @@ node migrations/app/<dir>/migration.ts
 pnpm prisma-next migrate --db $DATABASE_URL
 ```
 
-If self-emit itself fails (e.g. the contract has moved on and the operations no longer make sense against `end-contract.json`), the package is stale. Either restore it from version control or delete it and re-plan with `migration plan`.
+If self-emit itself fails (e.g. the contract has moved on and the operations no longer make sense against the migration's end contract), the package is stale. Either restore it from version control or delete it and re-plan with `migration plan`.
 
 ## Workflow — Resolve a destructive-operation prompt (`db update` only)
 

@@ -1,6 +1,6 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
-import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+import { APP_SPACE_ID, issueOutcome } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import {
@@ -129,6 +129,7 @@ describe.sequential('RLS verify extension issues', () => {
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      snapshotsImportPath: '../../snapshots',
     });
     if (planResult.kind !== 'success')
       throw new Error(
@@ -219,7 +220,7 @@ describe.sequential('RLS verify extension issues', () => {
       frameworkComponents,
     });
 
-    const rlsIssues = result.schema.issues.filter((i) => i.reason === 'not-found');
+    const rlsIssues = result.schema.issues.filter((i) => issueOutcome(i) === 'not-found');
     expect(rlsIssues).toHaveLength(1);
     expect(rlsIssues[0]?.expected).toMatchObject({ name: policy.name });
   });
@@ -272,7 +273,7 @@ describe.sequential('RLS verify extension issues', () => {
     });
 
     expect(result.ok).toBe(false);
-    const rlsIssues = result.schema.issues.filter((i) => i.reason === 'not-found');
+    const rlsIssues = result.schema.issues.filter((i) => issueOutcome(i) === 'not-found');
     expect(rlsIssues[0]?.path.join('/')).toContain(policy.name);
   });
 });

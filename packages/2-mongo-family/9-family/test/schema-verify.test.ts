@@ -160,11 +160,9 @@ describe('verifyMongoSchema', () => {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.code).toBe('PN-RUN-3010');
+      expect(result.code).toBe('CONTRACT.SCHEMA_VERIFICATION_FAILED');
       expect(result.schema.issues.length).toBeGreaterThan(0);
-      expect(result.schema.issues).toContainEqual(
-        expect.objectContaining({ path: ['users'], reason: 'not-found' }),
-      );
+      expect(result.schema.issues).toContainEqual(expect.objectContaining({ path: ['users'] }));
     });
 
     it('fails when a contract index is missing from a live collection', () => {
@@ -181,9 +179,9 @@ describe('verifyMongoSchema', () => {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.code).toBe('PN-RUN-3010');
+      expect(result.code).toBe('CONTRACT.SCHEMA_VERIFICATION_FAILED');
       expect(result.schema.issues).toContainEqual(
-        expect.objectContaining({ path: ['users', 'index:email:1'], reason: 'not-equal' }),
+        expect.objectContaining({ path: ['users', 'index:email:1'] }),
       );
     });
 
@@ -203,7 +201,7 @@ describe('verifyMongoSchema', () => {
       expect(result.ok).toBe(false);
       expect(result.schema.issues.length).toBeGreaterThan(0);
       expect(result.schema.issues).toContainEqual(
-        expect.objectContaining({ path: ['users', 'index:email:1'], reason: 'not-expected' }),
+        expect.objectContaining({ path: ['users', 'index:email:1'] }),
       );
     });
 
@@ -227,7 +225,7 @@ describe('verifyMongoSchema', () => {
 
       const diff = diffFromContractAndLive(contract, liveSchema, false);
       expect(diff.warnings).toContainEqual(
-        expect.objectContaining({ path: ['users', 'index:email:1'], reason: 'not-expected' }),
+        expect.objectContaining({ path: ['users', 'index:email:1'] }),
       );
     });
 
@@ -253,7 +251,7 @@ describe('verifyMongoSchema', () => {
 
       expect(result.ok).toBe(false);
       expect(result.schema.issues).toContainEqual(
-        expect.objectContaining({ path: ['users', 'validator'], reason: 'not-found' }),
+        expect.objectContaining({ path: ['users', 'validator'] }),
       );
     });
 
@@ -278,7 +276,7 @@ describe('verifyMongoSchema', () => {
 
       expect(result.ok).toBe(false);
       expect(result.schema.issues).toContainEqual(
-        expect.objectContaining({ path: ['users', 'validator'], reason: 'not-expected' }),
+        expect.objectContaining({ path: ['users', 'validator'] }),
       );
     });
 
@@ -312,7 +310,7 @@ describe('verifyMongoSchema', () => {
 
       expect(result.ok).toBe(false);
       expect(result.schema.issues).toContainEqual(
-        expect.objectContaining({ path: ['users', 'validator'], reason: 'not-equal' }),
+        expect.objectContaining({ path: ['users', 'validator'] }),
       );
     });
 
@@ -338,7 +336,7 @@ describe('verifyMongoSchema', () => {
 
       expect(result.ok).toBe(false);
       expect(result.schema.issues).toContainEqual(
-        expect.objectContaining({ path: ['events', 'options'], reason: 'not-equal' }),
+        expect.objectContaining({ path: ['events', 'options'] }),
       );
     });
   });

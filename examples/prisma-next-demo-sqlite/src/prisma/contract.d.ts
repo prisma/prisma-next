@@ -16,7 +16,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'664e11eed7f1d28dcf79412d71801ffa7c0a6369c717c38a0aa655b033e2213e'>;
+  StorageHashBase<'89be7f7a0e01dca5206d3665bf034e6c3b92b1b77d9336c1e299a131319f4f6a'>;
 export type ExecutionHash =
   ExecutionHashBase<'b5689b5ab97f808cfa98afa9bb2b762a559d895cef8c68395c9ab4611166f605'>;
 export type ProfileHash =
@@ -170,7 +170,9 @@ type ContractBase = Omit<
               };
               primaryKey: { readonly columns: readonly ['id'] };
               uniques: readonly [];
-              indexes: readonly [];
+              indexes: readonly [
+                { readonly columns: readonly ['userId']; readonly name: 'post_userId_idx' },
+              ];
               foreignKeys: readonly [
                 {
                   readonly source: {
@@ -184,8 +186,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'post_userId_fkey';
-                  readonly constraint: true;
-                  readonly index: true;
                 },
               ];
             };
@@ -209,7 +209,10 @@ type ContractBase = Omit<
                 readonly name: 'post_tag_pkey';
               };
               uniques: readonly [];
-              indexes: readonly [];
+              indexes: readonly [
+                { readonly columns: readonly ['postId']; readonly name: 'post_tag_postId_idx' },
+                { readonly columns: readonly ['tagId']; readonly name: 'post_tag_tagId_idx' },
+              ];
               foreignKeys: readonly [
                 {
                   readonly source: {
@@ -223,8 +226,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'post_tag_postId_fkey';
-                  readonly constraint: true;
-                  readonly index: true;
                 },
                 {
                   readonly source: {
@@ -238,8 +239,6 @@ type ContractBase = Omit<
                     readonly columns: readonly ['id'];
                   };
                   readonly name: 'post_tag_tagId_fkey';
-                  readonly constraint: true;
-                  readonly index: true;
                 },
               ];
             };

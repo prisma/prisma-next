@@ -48,7 +48,7 @@ import {
   renderInitOutro,
 } from './output';
 import { type ProbeOutcome, type ProbeOverrides, probeServerVersion } from './probe-db';
-import { findStaleArtefacts, removeDependency } from './reinit-cleanup';
+import { findStaleArtifacts, removeDependency } from './reinit-cleanup';
 import {
   DEFAULT_SKILL_SOURCES,
   formatSkillInstallCommand,
@@ -175,14 +175,14 @@ export async function runInit(
     { path: '.env.example', content: envExampleContent(inputs.target) },
   ];
 
-  // FR9.1 — on re-init, queue the previously-emitted contract artefacts
+  // FR9.1 — on re-init, queue the previously-emitted contract artifacts
   // for deletion so a target switch (or schema-shape change) does not
   // leave a stale `contract.json` / `contract.d.ts` next to the new
   // schema source. Detection is filesystem-only (no parsing of the
   // previous config) so the cleanup is safe to run before the write
   // phase: each path is checked for existence in the precondition,
   // and missing-on-disk-at-write-time is tolerated.
-  const filesToDelete: string[] = inputs.reinit ? [...findStaleArtefacts(baseDir, schemaDir)] : [];
+  const filesToDelete: string[] = inputs.reinit ? [...findStaleArtifacts(baseDir, schemaDir)] : [];
 
   // `init` delegates the skill to `npx skills add prisma/prisma-next#v<version>`,
   // so a hand-rolled `.agents/skills/prisma-next/SKILL.md` in the project
@@ -245,7 +245,7 @@ export async function runInit(
   }
 
   // FR3.4: idempotent .gitattributes — linguist-generated entries for
-  // the emitted artefacts so GitHub diff stats / code review collapse
+  // the emitted artifacts so GitHub diff stats / code review collapse
   // them by default.
   const gitattributesPath = join(baseDir, '.gitattributes');
   const existingGitattributes = existsSync(gitattributesPath)
@@ -373,7 +373,7 @@ export async function runInit(
     }
   }
 
-  // FR9.1 — delete stale artefacts after the new templates are written.
+  // FR9.1 — delete stale artifacts after the new templates are written.
   // Order is intentional: the names do not collide with `filesToWrite`
   // (we never write `contract.json` from this command — that's `contract
   // emit`'s job), so deletion *after* the writes guarantees we never
@@ -534,18 +534,21 @@ export async function runInit(
   if (validated instanceof Error || (validated as { problems?: unknown }).problems !== undefined) {
     // Route through `emitError` rather than throwing: the bare throw
     // bypassed `--json` envelope formatting and `exitCodeForError`, so a
-    // 5009 regression would surface as an uncaught exception in
-    // commander instead of the documented `INTERNAL_ERROR` envelope on
-    // the right channel.
+    // CLI.INIT_INVALID_OUTPUT_DOCUMENT regression would surface as an
+    // uncaught exception in commander instead of the documented
+    // `INTERNAL_ERROR` envelope on the right channel.
     return emitError(
       ui,
       flags,
-      new CliStructuredError('5009', 'Init produced an invalid output document', {
-        domain: 'CLI',
-        why: `The success document failed schema validation: ${String(validated)}`,
-        fix: 'This is a bug in prisma-next. Please report it with the full `-v` output.',
-        docsUrl: 'https://prisma-next.dev/docs/cli/init',
-      }),
+      new CliStructuredError(
+        'CLI.INIT_INVALID_OUTPUT_DOCUMENT',
+        'Init produced an invalid output document',
+        {
+          why: `The success document failed schema validation: ${String(validated)}`,
+          fix: 'This is a bug in prisma-next. Please report it with the full `-v` output.',
+          docsUrl: 'https://prisma-next.dev/docs/cli/init',
+        },
+      ),
     );
   }
 
@@ -582,10 +585,10 @@ function emitError(ui: TerminalUI, flags: GlobalFlags, error: CliStructuredError
  * Maps a structured init error to its documented exit code. Centralised so
  * the error → exit-code contract lives next to the codes themselves.
  *
- * `5009` (and the unknown-code default branch) routes to
- * `INIT_EXIT_INTERNAL_ERROR` because those represent prisma-next bugs the
- * user did not cause — surfacing them as `PRECONDITION` would mislead
- * automation into thinking the caller mis-invoked the CLI.
+ * `CLI.INIT_INVALID_OUTPUT_DOCUMENT` (and the unknown-code default branch)
+ * routes to `INIT_EXIT_INTERNAL_ERROR` because those represent prisma-next
+ * bugs the user did not cause — surfacing them as `PRECONDITION` would
+ * mislead automation into thinking the caller mis-invoked the CLI.
  *
  * See [exit-codes.ts](./exit-codes.ts) for the canonical list and
  * [Style Guide § Exit Codes](../../../../../../../docs/CLI%20Style%20Guide.md#exit-codes)
@@ -596,24 +599,24 @@ function emitError(ui: TerminalUI, flags: GlobalFlags, error: CliStructuredError
  */
 export function exitCodeForError(error: { readonly code: string }): number {
   switch (error.code) {
-    case '5002': // re-init needs --force — precondition
-    case '5003': // missing flags — precondition
-    case '5004': // invalid flag value — precondition
-    case '5005': // --strict-probe without --probe-db — precondition
-    case '5010': // invalid manifest (malformed package.json) — precondition
-    case '5011': // invalid tsconfig (unparseable JSONC) — precondition
-    case '5012': // probe failed under --strict-probe — precondition
-    case '5014': // --authoring / --schema-path extension mismatch — precondition
+    case 'CLI.INIT_REINIT_NEEDS_FORCE': // re-init needs --force — precondition
+    case 'CLI.INIT_MISSING_FLAGS': // missing flags — precondition
+    case 'CLI.INIT_INVALID_FLAG_VALUE': // invalid flag value — precondition
+    case 'CLI.INIT_STRICT_PROBE_WITHOUT_PROBE': // --strict-probe without --probe-db — precondition
+    case 'CLI.INIT_INVALID_MANIFEST': // invalid manifest (malformed package.json) — precondition
+    case 'CLI.INIT_INVALID_TSCONFIG': // invalid tsconfig (unparseable JSONC) — precondition
+    case 'CLI.INIT_PROBE_FAILED': // probe failed under --strict-probe — precondition
+    case 'CLI.INIT_AUTHORING_SCHEMA_PATH_MISMATCH': // --authoring / --schema-path extension mismatch — precondition
       return INIT_EXIT_PRECONDITION;
-    case '5006': // user aborted interactive prompt
+    case 'CLI.INIT_USER_ABORTED': // user aborted interactive prompt
       return INIT_EXIT_USER_ABORTED;
-    case '5007': // install failed
+    case 'CLI.INIT_INSTALL_FAILED': // install failed
       return INIT_EXIT_INSTALL_FAILED;
-    case '5008': // emit failed
+    case 'CLI.INIT_EMIT_FAILED': // emit failed
       return INIT_EXIT_EMIT_FAILED;
-    case '5009': // invalid output document — internal bug in prisma-next
+    case 'CLI.INIT_INVALID_OUTPUT_DOCUMENT': // invalid output document — internal bug in prisma-next
       return INIT_EXIT_INTERNAL_ERROR;
-    case '5013': // skill install failed
+    case 'CLI.INIT_SKILL_INSTALL_FAILED': // skill install failed
       return INIT_EXIT_SKILL_INSTALL_FAILED;
     default:
       // Any unexpected code is treated as an internal bug rather than
@@ -844,7 +847,7 @@ function formatCatalogWarning(
 /**
  * Recognised pnpm error signatures that justify a fallback to npm.
  *
- * These patterns indicate the published artefact itself is at fault
+ * These patterns indicate the published artifact itself is at fault
  * (a leaked `workspace:*` or `catalog:` specifier), not the user's
  * environment — pnpm is faithfully reporting "I cannot resolve this
  * registry version", and npm is willing to install it because npm

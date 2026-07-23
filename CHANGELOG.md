@@ -6,6 +6,190 @@ Changelog tracking starts at **v0.12.0**, the first release cut after this conve
 
 <!-- New release entries go here, newest first, each mirroring docs/releases/v<version>.md under a `## v<version>` header. -->
 
+## v0.16.0
+
+This release makes `contract infer` output round-trip cleanly through `contract emit`, materializes foreign keys and indexes as discrete contract entities, fixes the first-run experience of the Supabase extension end to end, and adds per-codec temporal presets that spell column type and auto-update behavior together.
+
+### Breaking changes
+
+- **Foreign keys and indexes are discrete contract entities** — `contract emit` now materializes each foreign key's `constraint`/`index` authoring booleans into separate persisted entities: a `foreignKeys[]` entry is the referential constraint only, and every backing index (including one backing a foreign key) is its own named `indexes[]` entry. The authoring surface is unchanged (`@relation(index:)`, TS `fk({ constraint, index })`, `foreignKeyDefaults`), and re-running `contract emit` regenerates the new shape with no source change. TypeScript that read `.constraint` / `.index` off a contract's `foreignKeys[]` entry must read the discrete `indexes[]` entry instead. No migration or DDL change — the schema the planner and `db verify` derive is identical. See the [0.15-to-0.16 upgrade recipe](https://github.com/prisma/prisma-next/blob/v0.16.0/skills/upgrade/prisma-next-upgrade/upgrades/0.15-to-0.16/) and the [extension-author recipe](https://github.com/prisma/prisma-next/blob/v0.16.0/skills/extension-author/prisma-next-extension-upgrade/upgrades/0.15-to-0.16/). ([#989](https://github.com/prisma/prisma-next/pull/989))
+
+  Before:
+
+  ```jsonc
+  "foreignKeys": [ { "source": { "columns": ["user_id"] }, ..., "constraint": true, "index": true } ],
+  "indexes": []
+  ```
+
+  After:
+
+  ```jsonc
+  "foreignKeys": [ { "source": { "columns": ["user_id"] }, ... } ],
+  "indexes": [ { "columns": ["user_id"], "name": "identities_user_id_idx" } ]
+  ```
+
+- **A singular back-relation over a non-unique foreign key is rejected at emit** — a schema declaring a 1:1 relation whose foreign-key columns are not covered by a unique constraint previously emitted a contract claiming a guarantee the database cannot enforce. Emit now fails with `PSL_NON_UNIQUE_BACKRELATION`; add `@unique`/`@@unique` to the foreign-key fields, or make the back-relation field a list. ([#1015](https://github.com/prisma/prisma-next/pull/1015))
+
+  Before (accepted, emitted `cardinality: '1:1'`):
+
+  ```prisma
+  model Profile {
+    id     Int  @id
+    userId Int              // no @unique
+    user   User @relation(fields: [userId], references: [id])
+  }
+
+  model User {
+    id      Int      @id
+    profile Profile?
+  }
+  ```
+
+  After: the same schema fails emit with `PSL_NON_UNIQUE_BACKRELATION`. Add `@unique` to `userId` (or make `profile` a `Profile[]` list).
+
+- **`contract infer` declares identity-column defaults, and `db verify --strict` now sees them** — infer emits `@default(autoincrement())` for a Postgres `GENERATED ... AS IDENTITY` column (previously nothing), and `db verify` introspecting a live identity column resolves its default to `autoincrement()` too. If you run `db verify --strict` against a table with an identity column whose contract predates this fix, verify reports that default as an unexpected extra — re-run `contract infer` for the affected table, or add `@default(autoincrement())` by hand. Without `--strict`, nothing changes. ([#1011](https://github.com/prisma/prisma-next/pull/1011))
+
+- **`contract infer` back-relation names no longer double-pluralize** — the hand-rolled pluralization rule turned already-plural table names into `sessionses`; infer now uses real inflection (`sessions` stays `sessions`, `status` still becomes `statuses`). Already-generated `.prisma` files are untouched, but the next `contract infer` run against a database with already-plural table names renames the affected back-relation fields — public field names your code reaches via `.include()`/`.select()` and the generated types — so diff the regenerated file and update call sites. ([#1011](https://github.com/prisma/prisma-next/pull/1011))
+
+- **`@prisma-next/extension-supabase` no longer exports `./test/utils`** — the `bootstrapSupabaseShim` subpath typechecked but never worked from npm (it reads fixture files that were never published, so every call failed with ENOENT). Delete the import and any test setup that called it. ([#997](https://github.com/prisma/prisma-next/pull/997))
+
+### Features
+
+- Per-codec temporal presets carry execution-default behavior as arguments, so a column's exact type and its auto-update behavior can finally be spelled together — e.g. the `timestamp(3)` columns Prisma ORM migrations generate for `@updatedAt`. `temporal.updatedAt()` survives as shorthand for `temporal.timestamptz(onCreate: now, onUpdate: now)`. ([#1003](https://github.com/prisma/prisma-next/pull/1003))
+
+  ```prisma
+  model Page {
+    updatedAt temporal.timestamp(3, onCreate: now, onUpdate: now)
+    lastSeen  temporal.timestamp(3)
+    touched   temporal.timestamptz(onUpdate: now)
+  }
+  ```
+
+- The Postgres target registers its built-in index types (`btree`, `hash`, `gin`, `gist`, `spgist`, `brin`), so `@@index(..., type: "gin")` — which `contract infer` already printed — now emits instead of throwing `unregistered index type`. ([#1011](https://github.com/prisma/prisma-next/pull/1011))
+
+### Fixes
+
+- Using `@prisma-next/extension-supabase` against a stock Supabase project now works first-try: generated migrations for RLS contracts import, typecheck, and run (RLS operations render as methods on the migration base class); `migrate`'s remediation for a missing extension-space migration works when followed verbatim; `db verify` no longer reports phantom missing constraints; `db.asUser(jwt)` supports the ES256/JWKS signing current Supabase uses; and `db.asServiceRole()` queries succeed with the grants a real project provides. ([#997](https://github.com/prisma/prisma-next/pull/997))
+- More `contract infer` round-trip fixes: a plain `Decimal` field on Postgres no longer throws `CODEC_PARAMETERIZATION_MISMATCH` at connect, the 1:1 back-relation shape infer prints is accepted by emit, literal-shaped `dbgenerated(...)` defaults compare equal in `db verify` instead of reporting permanent drift, and foreign keys pointing outside the introspected scope are explained in infer's output instead of vanishing silently. ([#1011](https://github.com/prisma/prisma-next/pull/1011))
+- MTI variant-narrowed `updateCount`, `deleteCount`, and include-backed `deleteAll` now compile their predicates through a correlated subquery that joins the variant table — previously the generated SQL could reference the variant table without it being in scope. ([#940](https://github.com/prisma/prisma-next/pull/940))
+- An explicit `.select(...)` on a polymorphic query or include now restricts MTI variant fields to the selection; unselected variant fields no longer leak into results. Omitting the selection keeps the full default shape. ([#984](https://github.com/prisma/prisma-next/pull/984))
+- The language server surfaces config-load failures as a diagnostic on the config file (`PRISMA_NEXT_CONFIG_LOAD_FAILED`) and keeps serving schema diagnostics from the last working configuration when a reload fails, instead of silently wiping every marker. ([#974](https://github.com/prisma/prisma-next/pull/974))
+- Migration operations are now ordered by a dependency graph over schema-diff issues instead of a hand-maintained per-kind integer table, fixing drop-order defects (e.g. a column dropping before its own constraint). For code reading the migration-diff internals: `SchemaDiffIssue.reason` is removed — discriminate via the presence of `expected`/`actual`, or the `issueOutcome` helper from `@prisma-next/framework-components/control`. ([#992](https://github.com/prisma/prisma-next/pull/992))
+
+## v0.15.0
+
+This release ships Postgres row-level security end-to-end (policies for every operation, explicit `@@rls` enablement, role declarations — authored in PSL or TypeScript, planned by `migration plan`, drift caught by `db verify`), native Postgres enums (external adoption and a managed lifecycle), the complete introspected Supabase contract, a PSL language server (`prisma-next lsp`) with formatting, completions, and semantic highlighting, native scalar-list columns, PSL many-to-many authoring, and one unified schema differ behind `db verify` and migration planning. SQL ORM includes now decode through codecs, matching top-level reads.
+
+### Breaking changes
+
+- **SQL ORM includes decode through codecs** — every scalar field of an included relation now decodes through its contract-bound codec, matching top-level query results. Code that relied on included fields keeping the database's raw JSON representation must be updated: Postgres `bytea` include fields return `Uint8Array` instead of `\x`-prefixed hex text, timestamp fields return `Date` instead of strings, and custom codec-backed fields return whatever the codec's `decodeJson` produces. Custom SQL codec authors: `encodeJson` / `decodeJson` now use the exact scalar shape the database produces inside JSON values — see the [extension-author recipe](https://github.com/prisma/prisma-next/blob/v0.15.0/skills/extension-author/prisma-next-extension-upgrade/upgrades/0.14-to-0.15/) for the built-in representation changes. ([#942](https://github.com/prisma/prisma-next/pull/942))
+
+  Before:
+
+  ```ts
+  const [post] = await db.orm.public.Post.find({ include: { author: true } });
+  post.author.avatar;    // '\\x89504e…' (raw hex text)
+  post.author.createdAt; // '2026-07-01T12:00:00' (string)
+  ```
+
+  After:
+
+  ```ts
+  post.author.avatar;    // Uint8Array
+  post.author.createdAt; // Date
+  ```
+
+- **`db verify --json` reports a single `schema.issues` list** — the split `schema.issues` / `schema.schemaDiffIssues` pair collapses into one `schema.issues` array of `{ path, reason, message, expected?, actual? }`, and the retired `outcome` field is replaced by `reason` (`'missing'` → `'not-found'`, `'extra'` → `'not-expected'`, `'mismatch'` → `'not-equal'`). The same collapse applies to `schema.warnings`. Update scripts or CI steps that read `schemaDiffIssues` or compare `.outcome`. See the [0.14→0.15 upgrade recipe](https://github.com/prisma/prisma-next/blob/v0.15.0/skills/upgrade/prisma-next-upgrade/upgrades/0.14-to-0.15/). ([#921](https://github.com/prisma/prisma-next/pull/921))
+
+  Before:
+
+  ```json
+  { "schema": { "issues": [], "schemaDiffIssues": [{ "outcome": "missing", "message": "…" }] } }
+  ```
+
+  After:
+
+  ```json
+  { "schema": { "issues": [{ "reason": "not-found", "path": ["…"], "message": "…" }] } }
+  ```
+
+- **RLS policies require `@@rls` on the target model** — RLS enablement is an explicit, authored table attribute. A `policy_*` block's `target` model must declare `@@rls`, or `contract emit` fails with `PSL_EXTENSION_TARGET_MODEL_MISSING_ATTRIBUTE`. Plan semantics follow the marker: a marked table with RLS off plans `ENABLE ROW LEVEL SECURITY`, removing every policy keeps RLS enabled (fail-closed deny-all), and removing `@@rls` plans `DISABLE ROW LEVEL SECURITY` (requires the destructive allowance). Renaming only a policy's name plans a single `ALTER POLICY … RENAME TO` instead of drop+create. Extension authors constructing `PostgresTableSchemaNode` by hand must supply the now-required `rlsEnabled` boolean. ([#945](https://github.com/prisma/prisma-next/pull/945))
+
+  Before:
+
+  ```prisma
+  model Profile {
+    id     Uuid   @id
+    userId Uuid   @unique
+  }
+  ```
+
+  After:
+
+  ```prisma
+  model Profile {
+    id     Uuid   @id
+    userId Uuid   @unique
+    @@rls
+  }
+  ```
+
+- **Extension authors: SQL contract authoring requires a target `createNamespace`** — the SQL family no longer materialises a placeholder namespace, so `prismaContract(...)` / `defineContract(...)` from `@prisma-next/sql-contract-psl` / `@prisma-next/sql-contract-ts` need the target's namespace factory (`postgresCreateNamespace` / `sqliteCreateNamespace`); target-pack `defineContract` wrappers already supply it, so app authors are unaffected. `SqlNamespace` is now an abstract class; `buildSqlNamespace`, `buildSqlNamespaceMap`, `SqlBoundNamespace`, and `SqlUnboundNamespace` are removed, and hand-written namespace literals carry the target `kind` (e.g. `'postgres-schema'`) instead of `'sql-namespace'`. See the [extension-author recipe](https://github.com/prisma/prisma-next/blob/v0.15.0/skills/extension-author/prisma-next-extension-upgrade/upgrades/0.14-to-0.15/). ([#864](https://github.com/prisma/prisma-next/pull/864))
+
+- **Extension authors: the coordinate-based schema-diff SPI is retired** — the migration planner and `db verify` now run on one generic node differ. `collectSqlSchemaIssues` / `collectSqlSchemaIssuesPerNamespace`, `diffPostgresDatabaseSchema`, and `SqlControlTargetDescriptor.diffDatabaseSchema` are removed (use `diffSchemas` or a target's `buildXPlanDiff`); `MigrationPlanner.plan()`'s `keepDiffIssue` predicate is replaced by an `ownership` oracle; the issue types `BaseSchemaIssue` / `SchemaIssue` / `EnumValuesChangedIssue` are gone — `SchemaDiffIssue` is the single issue shape everywhere, including the codec `verifyType` hook; and `graphWalkStrategy` is renamed `resolveRecordedPath` in `@prisma-next/migration-tools/aggregate`. See the [extension-author recipe](https://github.com/prisma/prisma-next/blob/v0.15.0/skills/extension-author/prisma-next-extension-upgrade/upgrades/0.14-to-0.15/). ([#921](https://github.com/prisma/prisma-next/pull/921), [#894](https://github.com/prisma/prisma-next/pull/894))
+
+- **Extension authors: restricted-column typing goes through the codec** — a column restricted to a value set derives its TS literal union by rendering each stored value through the codec's `renderValueLiteral(value, side)`, replacing the framework's deleted domain-enum override. Custom codec descriptors used by enum/restricted columns must implement it, or the column widens to the codec's output type. ([#896](https://github.com/prisma/prisma-next/pull/896))
+
+- **Extension authors: Mongo `deriveJsonSchema` sources enums from value sets** — the fourth argument of `deriveJsonSchema` / `derivePolymorphicJsonSchema` changes from a domain-enum map to a value-set map (`contract.storage.namespaces[<ns>].entries.valueSet`). Callers through `mongoContract(...)` / `defineContract(...)` need no change. ([#900](https://github.com/prisma/prisma-next/pull/900))
+
+- **Extension authors: `ScalarFieldState`'s first generic is the column descriptor** — `ScalarFieldState<'pg/text@1', …>` becomes `ScalarFieldState<ColumnTypeDescriptor<'pg/text@1'>, …>`, so field states preserve the whole descriptor type (including native-enum member tuples). Built contract types also keep literal `nativeType` / `typeParams` instead of widening to `string`. ([#958](https://github.com/prisma/prisma-next/pull/958))
+
+- **Extension authors: `native_enum` entities serialize into `contract.json`, keyed by physical type name** — packs declaring native Postgres enums must re-emit their bundled contract so the `entries.native_enum` maps land in the published artifacts (this is what lets a consumer's `contract infer` subtract pack-owned enum types). Code addressing an entry by key switches from the PascalCase name to the physical Postgres type name (`entries.native_enum.aal_level`, not `.AalLevel`). ([#946](https://github.com/prisma/prisma-next/pull/946), [#954](https://github.com/prisma/prisma-next/pull/954))
+
+### Features
+
+- **Postgres row-level security, end-to-end** — PSL gains `policy_select`, `policy_insert`, `policy_update`, `policy_delete`, and `policy_all` blocks (with `using` / `withCheck` predicates and per-role targeting), the `@@rls` enablement attribute, and standalone `role` declarations inside `namespace unbound { }`. `migration plan` plans the full lifecycle (`ENABLE` / `DISABLE ROW LEVEL SECURITY`, policy create/drop, rename via `ALTER POLICY`), and `db verify` fails on policy drift and on declared roles the live cluster lacks. The same surface is authorable in the TypeScript DSL (`policySelect(...)`, `rlsEnabled(model)`, `role(name)`), producing wire-name-identical contracts. ([#771](https://github.com/prisma/prisma-next/pull/771), [#868](https://github.com/prisma/prisma-next/pull/868), [#945](https://github.com/prisma/prisma-next/pull/945), [#950](https://github.com/prisma/prisma-next/pull/950), [#957](https://github.com/prisma/prisma-next/pull/957), [#959](https://github.com/prisma/prisma-next/pull/959))
+
+- **Native Postgres enums** — `CREATE TYPE … AS ENUM` types are first-class again, this time as explicit entities. External types the database already owns (e.g. Supabase's `auth.aal_level`) are declared via `native_enum` blocks, typed as member-value literal unions, adopted by `contract infer`, and read at runtime through the new Postgres-only `db.nativeEnums` accessor. Managed native enums get a migration lifecycle: create/delete, and member addition via `ALTER TYPE … ADD VALUE` (other member changes are refused with a converting-migration hint). Also authorable in the TypeScript DSL via `nativeEnum(name, ...values)` + `field.column(pg.enum(handle))`, with the member union visible in `typeof contract` without an emit. ([#906](https://github.com/prisma/prisma-next/pull/906), [#944](https://github.com/prisma/prisma-next/pull/944), [#949](https://github.com/prisma/prisma-next/pull/949), [#970](https://github.com/prisma/prisma-next/pull/970), [#935](https://github.com/prisma/prisma-next/pull/935), [#958](https://github.com/prisma/prisma-next/pull/958))
+
+- **The complete Supabase contract** — `@prisma-next/extension-supabase` now ships the full introspected description of everything Supabase owns: every `auth` and `storage` table, all native enum types, and the three platform roles (`anon`, `authenticated`, `service_role`), up from the previous 5-table minimum. A secondary `db.asServiceRole().supabase.{sql,orm}` admin root reads Supabase-internal tables as `service_role`, and the extension ships with docs, a real-Supabase acceptance harness, and a user-facing `prisma-next-supabase` skill. ([#845](https://github.com/prisma/prisma-next/pull/845), [#960](https://github.com/prisma/prisma-next/pull/960), [#985](https://github.com/prisma/prisma-next/pull/985), [#987](https://github.com/prisma/prisma-next/pull/987))
+
+- **PSL language server** — a new `prisma-next lsp` subcommand serves diagnostics, formatting, completions (types and block templates), semantic highlighting, folding regions, and symbol-table diagnostics over LSP, backed by the fault-tolerant CST parser (which now fully replaces the legacy parser). `prisma format` formats PSL from the CLI, and a browser playground wires a Monaco editor to the language server. ([#852](https://github.com/prisma/prisma-next/pull/852), [#851](https://github.com/prisma/prisma-next/pull/851), [#850](https://github.com/prisma/prisma-next/pull/850), [#857](https://github.com/prisma/prisma-next/pull/857), [#862](https://github.com/prisma/prisma-next/pull/862), [#871](https://github.com/prisma/prisma-next/pull/871), [#878](https://github.com/prisma/prisma-next/pull/878), [#869](https://github.com/prisma/prisma-next/pull/869), [#856](https://github.com/prisma/prisma-next/pull/856), [#887](https://github.com/prisma/prisma-next/pull/887), [#972](https://github.com/prisma/prisma-next/pull/972))
+
+- **PSL native scalar lists** — scalar-list fields (`String[]`, `Int[]`, …) lower to native array storage columns instead of a JSONB fallback, end-to-end: author, migrate, and infer, gated on the adapter-reported `scalarList` capability. ([#870](https://github.com/prisma/prisma-next/pull/870), [#846](https://github.com/prisma/prisma-next/pull/846))
+
+- **PSL authors many-to-many** — an `N:M` relation with a `through` junction is now authorable in PSL, completing the M:N surface whose read side landed in 0.14. ([#819](https://github.com/prisma/prisma-next/pull/819))
+
+- **Per-migration contract snapshots** — each applied migration persists its contract snapshot in a 1:1 ledger companion table, and the `Migration` base class takes typed start/end contract JSON, exposing `this.startContract` / `this.endContract` views for data-transform migrations. ([#908](https://github.com/prisma/prisma-next/pull/908), [#879](https://github.com/prisma/prisma-next/pull/879))
+
+- **Client-safe static surface** — new `@prisma-next/{postgres,sqlite,mongo}/static` entrypoints export `<target>Static({ contractJson })`, a driver-free `ExecutionContext` plus derived `enums`, query builder, `raw`, and `contract` — safe to import in client bundles. The runtime facades also expose `db.context` and `db.contract`. ([#888](https://github.com/prisma/prisma-next/pull/888))
+
+- **Mongo enums, end-to-end** — enums are authorable for MongoDB in PSL and the TypeScript builder, enforced at the database layer via a planner-generated `$jsonSchema` validator, and typed from a stored value set the same way SQL enums are. The Mongo client also gains `db.raw` and `db.execute(plan)`. ([#834](https://github.com/prisma/prisma-next/pull/834), [#900](https://github.com/prisma/prisma-next/pull/900), [#880](https://github.com/prisma/prisma-next/pull/880))
+
+- **Extension-aware `contract infer`** — `contract infer` omits database elements a stack extension pack's contract already describes, and resolves a foreign key into pack-owned space as a qualified cross-space relation (e.g. `supabase:auth.AuthUser`) instead of re-declaring the pack's tables. ([#919](https://github.com/prisma/prisma-next/pull/919))
+
+- **Variant-declared relations in the ORM** — the `.variant('X')`-narrowed accessor surfaces relations the variant model declares (filterable and includable), alongside the base model's relations. ([#933](https://github.com/prisma/prisma-next/pull/933), [#976](https://github.com/prisma/prisma-next/pull/976))
+
+- **Enum `@@type` inference** — a PSL `enum` block may omit `@@type`; the codec is inferred from the member values (text for string members, int for integers). ([#905](https://github.com/prisma/prisma-next/pull/905))
+
+- **`@relation(index: false)` and `inet` columns** — PSL's `@relation` gains an optional `index` argument for foreign keys whose columns genuinely have no backing index (`contract infer` emits it automatically), and the Postgres target gains a `pg/inet@1` codec so `inet` columns are authorable as `String @db.Inet` and inferrable. ([#960](https://github.com/prisma/prisma-next/pull/960))
+
+### Fixes
+
+- **`@default(false)` survives emission** — the contract canonicalizer no longer strips `value: false` from resolved defaults, so a boolean-`false` column default is present in the emitted `contract.json` and round-trips against live introspection. Re-emitting an affected contract changes its storage hash. ([#904](https://github.com/prisma/prisma-next/pull/904))
+
+- **Mongo reshaping reads decode through codecs** — aggregation reads through `$project` / `$addFields` stages decode their output fields instead of returning raw BSON (a projected `_id` now comes back decoded, not as a raw `ObjectId`). ([#897](https://github.com/prisma/prisma-next/pull/897))
+
+- **`pg` bindings resolve by structure** — a caller-supplied Pool/Client from a duplicated `pg` copy in a bundle now resolves correctly instead of throwing `Unable to determine pg binding type` at boot; new `isPgPool` / `isPgClient` guards are exported from `@prisma-next/postgres/runtime`. ([#969](https://github.com/prisma/prisma-next/pull/969))
+
+- **Array columns verify cleanly** — a scalar-list column's derived schema IR keeps the bare element type with `many: true` (previously every list column verified `not-equal` against live introspection); Postgres introspection also excludes expression-keyed indexes and no longer collides unique and non-unique indexes over identical columns. ([#960](https://github.com/prisma/prisma-next/pull/960))
+
+- **Stack-missing migration errors name the failing operation** — the error raised when a migration references an operation the stack doesn't provide now says which operation. ([#953](https://github.com/prisma/prisma-next/pull/953))
+
+### New contributors
+
+- [@sorenbs](https://github.com/sorenbs) made their first contribution in [#912](https://github.com/prisma/prisma-next/pull/912)
+
 ## v0.14.0
 
 This release reshapes the enum surface (PSL `enum` is now a domain concept backed by a value-set CHECK constraint, not a native Postgres type), makes the SQL builder always-qualified by namespace, adds native UUID storage on Postgres, ships a new fault-tolerant PSL parser, completes the read side of many-to-many (correlated includes plus `some` / `every` / `none` filters through the junction), and adds a Supabase façade alongside several runtime-class renamings. Most breaking changes have a matching codemod or upgrade recipe.

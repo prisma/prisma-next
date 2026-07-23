@@ -18,6 +18,7 @@ export type {
   AuthoringModelAttributeLoweringOutput,
   AuthoringPslBlockDescriptor,
   AuthoringPslBlockDescriptorNamespace,
+  AuthoringSelectRef,
   AuthoringStorageTypeTemplate,
   AuthoringTemplateValue,
   AuthoringTypeConstructorDescriptor,
@@ -42,6 +43,7 @@ export {
   resolveEnumCodecId,
   validateAuthoringHelperArguments,
 } from '../shared/framework-authoring';
+export type { AuthoringOption } from '../shared/option-descriptor';
 export type {
   PslBlockParam,
   PslBlockParamList,

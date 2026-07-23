@@ -17,6 +17,7 @@ import {
   JsonObjectExpr,
   ListExpression,
   LiteralExpr,
+  NativeJsonValueProjection,
   NotExpr,
   NullCheckExpr,
   OperationExpr,
@@ -66,10 +67,12 @@ describe('rich SQL AST', () => {
     expect(SubqueryExpr.of(select).kind).toBe('subquery');
     expect(lowerEmail(column, param, literal).kind).toBe('operation');
     expect(AggregateExpr.sum(column).kind).toBe('aggregate');
-    expect(JsonObjectExpr.fromEntries([JsonObjectExpr.entry('id', column)]).kind).toBe(
-      'json-object',
-    );
-    expect(JsonArrayAggExpr.of(column).kind).toBe('json-array-agg');
+    expect(
+      JsonObjectExpr.fromEntries([
+        JsonObjectExpr.entry('id', new NativeJsonValueProjection(column)),
+      ]).kind,
+    ).toBe('json-object');
+    expect(JsonArrayAggExpr.of(new NativeJsonValueProjection(column)).kind).toBe('json-array-agg');
     expect(binary.kind).toBe('binary');
     expect(AndExpr.of([binary]).kind).toBe('and');
     expect(OrExpr.of([binary]).kind).toBe('or');
@@ -172,7 +175,7 @@ describe('rich SQL AST', () => {
     expect(rewritten.limit).toBe(99);
     expect(rewritten.projection[0]?.expr).toEqual(ColumnRef.of('member', 'id'));
     expect(rewritten.projection[1]?.expr?.kind).toBe('operation');
-    expect((rewritten.projection[1]?.expr as OperationExpr).args[0]).toEqual(
+    expect((rewritten.projection[1]!.expr as OperationExpr).args[0]).toEqual(
       ParamRef.of(10, { name: 'email', codec: { codecId: 'pg/text@1' } }),
     );
     expect(rewritten.joins?.[0]?.on).toEqual(
@@ -182,7 +185,7 @@ describe('rich SQL AST', () => {
       ),
     );
     expect(
-      ((rewritten.joins?.[0]?.source as DerivedTableSource).query.where as BinaryExpr).right,
+      ((rewritten.joins![0]!.source as DerivedTableSource).query.where as BinaryExpr).right,
     ).toEqual(LiteralExpr.of('TRUE'));
   });
 

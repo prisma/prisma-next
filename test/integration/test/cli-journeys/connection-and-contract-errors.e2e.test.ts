@@ -109,7 +109,7 @@ withTempDir(({ createTempDir }) => {
 
         // U.01: db verify (fails — contract says "mysql", config says "postgres")
         const verify = await runDbVerify(ctx);
-        expect(verify.exitCode, 'U.01: db verify target mismatch').toBe(1);
+        expect(verify.exitCode, 'U.01: db verify target mismatch').toBe(2);
         expect(stripAnsi(verify.stdout), 'U.01: mentions target mismatch').toContain(
           'Target mismatch',
         );

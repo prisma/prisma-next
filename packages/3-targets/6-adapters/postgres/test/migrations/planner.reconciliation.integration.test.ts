@@ -77,6 +77,7 @@ async function applyBaseline(
     fromContract: null,
     frameworkComponents,
     spaceId: APP_SPACE_ID,
+    snapshotsImportPath: '../../snapshots',
   });
   if (result.kind !== 'success') {
     throw new Error(`baseline planner failed: ${JSON.stringify(result)}`);
@@ -117,6 +118,7 @@ async function planAndExecute(
     fromContract: null,
     frameworkComponents,
     spaceId: APP_SPACE_ID,
+    snapshotsImportPath: '../../snapshots',
   });
   if (planResult.kind !== 'success') {
     throw new Error(`planner failed: ${JSON.stringify(planResult, null, 2)}`);
@@ -420,8 +422,6 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
                 columns: ['id'],
               },
               name: 'child_parent_id_fkey',
-              constraint: true,
-              index: true,
             },
           ],
         },
@@ -754,8 +754,6 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
                 columns: ['id'],
               },
               name: 'child_parent_id_fkey',
-              constraint: true,
-              index: true,
             },
           ],
         },
@@ -1201,14 +1199,11 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
   //
   // This test uses the same FK constraint name ("fk_parent") on two tables,
   // which is valid in PG (constraint names are per-table, not per-schema).
-  // It currently fails because the *verifier's* FK introspection query doesn't
-  // scope by conrelid, so it aggregates columns across both tables during
-  // baseline setup. The planner's constraintExistsCheck was fixed separately
-  // (unit-tested via constraintExistsCheck table scoping test). When the
-  // verifier is fixed, this test should pass and the .fails can be removed.
+  // Introspection reads pg_constraint keyed by conrelid oid, so same-named
+  // constraints on different tables never merge.
   // ==========================================================================
 
-  it.fails('drops the correct FK when two tables share a constraint name', {
+  it('drops the correct FK when two tables share a constraint name', {
     timeout: testTimeout,
   }, async () => {
     const baselineContract = makeContract(
@@ -1237,8 +1232,6 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
                 columns: ['id'],
               },
               name: 'fk_parent',
-              constraint: true,
-              index: true,
             },
           ],
         },
@@ -1263,8 +1256,6 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
                 columns: ['id'],
               },
               name: 'fk_parent',
-              constraint: true,
-              index: true,
             },
           ],
         },
@@ -1304,8 +1295,6 @@ describe.sequential('PostgresMigrationPlanner - reconciliation integration', () 
                 columns: ['id'],
               },
               name: 'fk_parent',
-              constraint: true,
-              index: true,
             },
           ],
         },

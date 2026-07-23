@@ -38,9 +38,10 @@ const MigrationMetaSchema = type({
  *
  * The from/to identities come from `describe()`. A migration provides them in
  * one of two ways:
- *  - **Contract-derived (default):** assign the committed `start-contract.json`
- *    / `end-contract.json` imports to `startContractJson` / `endContractJson`;
- *    the concrete `describe()` below derives `to`/`from` from their
+ *  - **Contract-derived (default):** assign the `contract.json` imports from
+ *    the snapshot store (`migrations/snapshots/<hex>/contract.json`) to
+ *    `startContractJson` / `endContractJson`; the concrete `describe()` below
+ *    derives `to`/`from` from their
  *    `storage.storageHash`. The family bases additionally expose typed view
  *    getters (`startContract` / `endContract`) over the same JSON.
  *  - **Override (e.g. extension migrations that carry no contract):** override
@@ -60,8 +61,8 @@ export abstract class Migration<
   abstract readonly targetId: string;
 
   /**
-   * The migration's end-state contract JSON (the committed `end-contract.json`
-   * import). When set, the derived `describe()` reads `to` from its
+   * The migration's end-state contract JSON (the `contract.json` import from
+   * the snapshot store). When set, the derived `describe()` reads `to` from its
    * `storage.storageHash`. Family bases build the typed `endContract` view from
    * it. Optional so `describe()`-overriding migrations (no contract) compile.
    *
@@ -74,8 +75,8 @@ export abstract class Migration<
   readonly endContractJson?: { readonly storage: { readonly storageHash: string } };
 
   /**
-   * The migration's start-state contract JSON (the committed
-   * `start-contract.json` import). Absent for a baseline migration (`from`
+   * The migration's start-state contract JSON (the `contract.json` import
+   * from the snapshot store). Absent for a baseline migration (`from`
    * derives to `null`). Family bases build the typed `startContract` view from
    * it.
    */

@@ -3,6 +3,7 @@ import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import {
   APP_SPACE_ID,
   assembleAuthoringContributions,
+  issueOutcome,
   type MigrationOperationPolicy,
 } from '@prisma-next/framework-components/control';
 import { buildSymbolTable } from '@prisma-next/psl-parser';
@@ -203,6 +204,7 @@ async function applyContract(
     fromContract: null,
     frameworkComponents,
     spaceId: APP_SPACE_ID,
+    snapshotsImportPath: '../../snapshots',
   });
   if (planResult.kind !== 'success')
     throw new Error(`Planner failed: ${JSON.stringify(planResult)}`);
@@ -304,6 +306,7 @@ describe.sequential('RLS lifecycle e2e — edit replaces, removal fails verify',
         fromContract: null,
         frameworkComponents,
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: '../../snapshots',
       });
 
       expect(planResult.kind).toBe('success');
@@ -390,7 +393,9 @@ describe.sequential('RLS lifecycle e2e — edit replaces, removal fails verify',
       });
 
       expect(verifyResult.ok).toBe(false);
-      const extraIssues = verifyResult.schema.issues.filter((i) => i.reason === 'not-expected');
+      const extraIssues = verifyResult.schema.issues.filter(
+        (i) => issueOutcome(i) === 'not-expected',
+      );
       expect(extraIssues.length).toBeGreaterThan(0);
 
       const issuePaths = extraIssues.map((i) => i.path.join('/'));
@@ -474,6 +479,7 @@ describe.sequential('RLS policy_insert WITH CHECK — enforcement + edit replace
         fromContract: null,
         frameworkComponents,
         spaceId: APP_SPACE_ID,
+        snapshotsImportPath: '../../snapshots',
       });
 
       expect(planResult.kind).toBe('success');

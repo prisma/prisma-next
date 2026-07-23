@@ -184,8 +184,7 @@ No product analytics work is required. If adoption is measured later, package-le
 - `test/integration/test/mongo/fixtures/prisma-next.config.ts`
 - `examples/mongo-demo/prisma-next.config.ts`
 - `docs/architecture docs/adrs/ADR 181 - Contract authoring DSL for SQL TS authoring.md`
-- `docs/planning/mongo-target/1-design-docs/contract-symmetry.md`
-- `docs/planning/mongo-target/mongodb-status-update.md`
+- `docs/architecture docs/subsystems/10. MongoDB Family.md` (the promoted home of the former `docs/planning/mongo-target/` archive, now deleted)
 
 # Open Questions
 

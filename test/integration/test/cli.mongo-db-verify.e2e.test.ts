@@ -153,7 +153,7 @@ describe('mongo db verify command (e2e)', { timeout: timeouts.spinUpMongoMemoryS
       expect(getExitCode()).not.toBe(0);
       const parsed = extractJson(consoleOutput) as Record<string, unknown>;
       expect(parsed).toMatchObject({
-        code: 'PN-RUN-3001',
+        code: 'CONTRACT.MARKER_MISSING',
       });
     });
 

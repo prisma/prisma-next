@@ -36,8 +36,6 @@ function createRefActionContract(
       tableName: 'user',
       columns: ['id'],
     },
-    constraint: true,
-    index: true,
     ...(onDelete !== undefined && { onDelete }),
     ...(onUpdate !== undefined && { onUpdate }),
   };
@@ -112,6 +110,7 @@ async function planAndGetFkSql(
     fromContract: null,
     frameworkComponents: [],
     spaceId: APP_SPACE_ID,
+    snapshotsImportPath: '../../snapshots',
   });
 
   expect(result.kind).toBe('success');
