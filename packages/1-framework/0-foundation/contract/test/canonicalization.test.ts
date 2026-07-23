@@ -577,6 +577,69 @@ describe('default omission', () => {
     const idField = drillDomainModel(result, 'User', 'fields', 'id');
     expect(idField['default']).toBeNull();
   });
+
+  it('preserves literal default value false (not stripped as default-omission)', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        storage: unboundStorage({
+          users: {
+            columns: {
+              is_active: {
+                codecId: 'pg/bool@1',
+                nativeType: 'bool',
+                nullable: false,
+                default: { kind: 'literal', value: false },
+              },
+            },
+          },
+        }),
+      }),
+    );
+    const col = drill(unboundTables(result), 'users', 'columns', 'is_active');
+    expect(col['default']).toEqual({ kind: 'literal', value: false });
+  });
+
+  it('preserves literal default value 0 (not stripped as default-omission)', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        storage: unboundStorage({
+          users: {
+            columns: {
+              view_count: {
+                codecId: 'pg/int4@1',
+                nativeType: 'int4',
+                nullable: false,
+                default: { kind: 'literal', value: 0 },
+              },
+            },
+          },
+        }),
+      }),
+    );
+    const col = drill(unboundTables(result), 'users', 'columns', 'view_count');
+    expect(col['default']).toEqual({ kind: 'literal', value: 0 });
+  });
+
+  it('preserves literal default value empty string (not stripped as default-omission)', () => {
+    const result = canonicalizeContractToObject(
+      minimal({
+        storage: unboundStorage({
+          users: {
+            columns: {
+              bio: {
+                codecId: 'pg/text@1',
+                nativeType: 'text',
+                nullable: true,
+                default: { kind: 'literal', value: '' },
+              },
+            },
+          },
+        }),
+      }),
+    );
+    const col = drill(unboundTables(result), 'users', 'columns', 'bio');
+    expect(col['default']).toEqual({ kind: 'literal', value: '' });
+  });
 });
 
 describe('index and unique sorting', () => {
