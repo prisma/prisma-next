@@ -412,6 +412,10 @@ withTempDir(({ createTempDir }) => {
     // total: a partial unique index does not guarantee at-most-one child per
     // parent, and an expression unique index never introspects a usable
     // column set at all.
+    //
+    // No `contract emit` here: a bare unique index has no PSL representation,
+    // so the interpreter rejects the inferred singular back-relation with
+    // PSL_NON_UNIQUE_BACKRELATION — a known gap tracked under TML-3086.
     const db = useDevDatabase({
       onReady: (cs) =>
         withClient(cs, (client) =>

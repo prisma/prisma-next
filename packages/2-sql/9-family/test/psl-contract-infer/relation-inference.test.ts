@@ -161,12 +161,10 @@ describe('inferRelations', () => {
     });
   });
 
-  it('keeps a list back-relation when the unique index column set does not match the FK columns', () => {
-    // An expression unique index (e.g. ON handle (user_id, lower(name)))
-    // introspects with a null column name for the expression key, so the
-    // postgres adapter drops the whole index and the closest surviving shape
-    // is a unique index whose column set differs from the FK's — the
-    // set-equality match fails and the back-relation stays a list.
+  it('keeps a list back-relation when the unique index columns are a superset of the FK columns', () => {
+    // A unique index on (user_id, name) does not make the FK on (user_id)
+    // unique — only exact set equality between index and FK columns may
+    // produce a 1:1, so the back-relation stays a list.
     const tables: Record<string, SqlTableIR> = {
       user: new SqlTableIR({
         name: 'user',
