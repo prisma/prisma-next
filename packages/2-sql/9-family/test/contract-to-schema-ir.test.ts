@@ -553,7 +553,7 @@ describe('contractToSchemaIR', () => {
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
     expect(result.tables['T']!.indexes).toEqual([
-      new SqlIndexIR({ columns: ['email'], name: 'T_email_idx', unique: false }),
+      new SqlIndexIR({ columns: ['email'], name: 'T_email_idx', unique: false, partial: false }),
     ]);
   });
 
@@ -670,6 +670,7 @@ describe('contractToSchemaIR', () => {
       new SqlIndexIR({
         columns: ['workflowId'],
         unique: false,
+        partial: false,
         name: 'WorkflowState_workflowId_idx',
       }),
     ]);

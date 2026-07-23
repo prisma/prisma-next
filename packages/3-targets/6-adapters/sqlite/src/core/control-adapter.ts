@@ -613,6 +613,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
             columns: Object.freeze([...idxColumns]) as readonly string[],
             name: idx.name,
             unique: idx.unique === 1,
+            partial: idx.partial === 1,
             dependsOn: flatColumnDependsOn(tableName, idxColumns),
           });
         }

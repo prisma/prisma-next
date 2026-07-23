@@ -148,6 +148,7 @@ export function createSchemaTable(
     indexes?: ReadonlyArray<{
       columns: readonly string[];
       unique: boolean;
+      partial?: boolean;
       name?: string;
       type?: string;
       options?: Record<string, unknown>;
@@ -169,7 +170,7 @@ export function createSchemaTable(
     ),
     foreignKeys: options?.foreignKeys ?? [],
     uniques: options?.uniques ?? [],
-    indexes: options?.indexes ?? [],
+    indexes: (options?.indexes ?? []).map((idx) => ({ ...idx, partial: idx.partial ?? false })),
     ...ifDefined('primaryKey', options?.primaryKey),
   });
 }

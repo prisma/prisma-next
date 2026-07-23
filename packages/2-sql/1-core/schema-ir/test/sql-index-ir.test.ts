@@ -4,49 +4,69 @@ import { SqlIndexIR } from '../src/ir/sql-index-ir';
 
 describe('SqlIndexIR', () => {
   it('id is derived from the column tuple, not name', () => {
-    const index = new SqlIndexIR({ columns: ['email'], unique: false, name: 'idx_users_email' });
+    const index = new SqlIndexIR({
+      columns: ['email'],
+      unique: false,
+      partial: false,
+      name: 'idx_users_email',
+    });
     expect(index.id).toBe('index:email');
   });
 
   it('two unnamed indexes on the same columns share the same id', () => {
-    const a = new SqlIndexIR({ columns: ['tenant_id'], unique: false });
-    const b = new SqlIndexIR({ columns: ['tenant_id'], unique: false });
+    const a = new SqlIndexIR({ columns: ['tenant_id'], unique: false, partial: false });
+    const b = new SqlIndexIR({ columns: ['tenant_id'], unique: false, partial: false });
     expect(a.id).toBe(b.id);
   });
 
   it('nodeKind is the index kind', () => {
-    const index = new SqlIndexIR({ columns: ['email'], unique: false });
+    const index = new SqlIndexIR({ columns: ['email'], unique: false, partial: false });
     expect(index.nodeKind).toBe('sql-index');
   });
 
   it('children is empty (an index is a leaf)', () => {
-    const index = new SqlIndexIR({ columns: ['email'], unique: false });
+    const index = new SqlIndexIR({ columns: ['email'], unique: false, partial: false });
     expect(index.children()).toEqual([]);
   });
 
   describe('isEqualTo', () => {
     it('true when unique/type/options all match', () => {
-      const a = new SqlIndexIR({ columns: ['email'], unique: true, type: 'btree' });
-      const b = new SqlIndexIR({ columns: ['email'], unique: true, type: 'btree' });
+      const a = new SqlIndexIR({ columns: ['email'], unique: true, partial: false, type: 'btree' });
+      const b = new SqlIndexIR({ columns: ['email'], unique: true, partial: false, type: 'btree' });
       expect(a.isEqualTo(b)).toBe(true);
     });
 
     it('a unique index and a non-unique index are not equal (symmetric — neither direction satisfies)', () => {
-      const uniqueIdx = new SqlIndexIR({ columns: ['email'], unique: true });
-      const plainIdx = new SqlIndexIR({ columns: ['email'], unique: false });
+      const uniqueIdx = new SqlIndexIR({ columns: ['email'], unique: true, partial: false });
+      const plainIdx = new SqlIndexIR({ columns: ['email'], unique: false, partial: false });
       expect(uniqueIdx.isEqualTo(plainIdx)).toBe(false);
       expect(plainIdx.isEqualTo(uniqueIdx)).toBe(false);
     });
 
     it('false when type differs', () => {
-      const a = new SqlIndexIR({ columns: ['email'], unique: false, type: 'btree' });
-      const b = new SqlIndexIR({ columns: ['email'], unique: false, type: 'gin' });
+      const a = new SqlIndexIR({
+        columns: ['email'],
+        unique: false,
+        partial: false,
+        type: 'btree',
+      });
+      const b = new SqlIndexIR({ columns: ['email'], unique: false, partial: false, type: 'gin' });
       expect(a.isEqualTo(b)).toBe(false);
     });
 
     it('false when options differ', () => {
-      const a = new SqlIndexIR({ columns: ['email'], unique: false, options: { fillfactor: 90 } });
-      const b = new SqlIndexIR({ columns: ['email'], unique: false, options: { fillfactor: 70 } });
+      const a = new SqlIndexIR({
+        columns: ['email'],
+        unique: false,
+        partial: false,
+        options: { fillfactor: 90 },
+      });
+      const b = new SqlIndexIR({
+        columns: ['email'],
+        unique: false,
+        partial: false,
+        options: { fillfactor: 70 },
+      });
       expect(a.isEqualTo(b)).toBe(false);
     });
 
@@ -54,25 +74,37 @@ describe('SqlIndexIR', () => {
       const contractSide = new SqlIndexIR({
         columns: ['email'],
         unique: false,
+        partial: false,
         options: { fillfactor: 70, fastupdate: true },
       });
       const introspectedSide = new SqlIndexIR({
         columns: ['email'],
         unique: false,
+        partial: false,
         options: { fillfactor: '70', fastupdate: 'true' },
       });
       expect(contractSide.isEqualTo(introspectedSide)).toBe(true);
     });
 
     it('absent options and empty options compare equal', () => {
-      const a = new SqlIndexIR({ columns: ['email'], unique: false });
-      const b = new SqlIndexIR({ columns: ['email'], unique: false, options: {} });
+      const a = new SqlIndexIR({ columns: ['email'], unique: false, partial: false });
+      const b = new SqlIndexIR({ columns: ['email'], unique: false, partial: false, options: {} });
       expect(a.isEqualTo(b)).toBe(true);
     });
 
     it('false when option keys differ', () => {
-      const a = new SqlIndexIR({ columns: ['email'], unique: false, options: { fillfactor: 70 } });
-      const b = new SqlIndexIR({ columns: ['email'], unique: false, options: { fastupdate: 70 } });
+      const a = new SqlIndexIR({
+        columns: ['email'],
+        unique: false,
+        partial: false,
+        options: { fillfactor: 70 },
+      });
+      const b = new SqlIndexIR({
+        columns: ['email'],
+        unique: false,
+        partial: false,
+        options: { fastupdate: 70 },
+      });
       expect(a.isEqualTo(b)).toBe(false);
     });
   });
@@ -80,11 +112,13 @@ describe('SqlIndexIR', () => {
   describe('partial', () => {
     it('is readable, non-enumerable, and ignored by isEqualTo', () => {
       const partialIdx = new SqlIndexIR({ columns: ['email'], unique: true, partial: true });
-      const totalIdx = new SqlIndexIR({ columns: ['email'], unique: true });
+      const totalIdx = new SqlIndexIR({ columns: ['email'], unique: true, partial: false });
       expect(partialIdx.partial).toBe(true);
-      expect(totalIdx.partial).toBeUndefined();
+      expect(totalIdx.partial).toBe(false);
       expect(Object.keys(partialIdx)).not.toContain('partial');
+      expect(Object.keys(totalIdx)).not.toContain('partial');
       expect(JSON.parse(JSON.stringify(partialIdx))).not.toHaveProperty('partial');
+      expect(JSON.parse(JSON.stringify(totalIdx))).not.toHaveProperty('partial');
       expect(partialIdx.isEqualTo(totalIdx)).toBe(true);
       expect(totalIdx.isEqualTo(partialIdx)).toBe(true);
     });
@@ -100,8 +134,13 @@ describe('SqlIndexIR', () => {
     ];
 
     it('is readable, non-enumerable, and ignored by isEqualTo', () => {
-      const withDeps = new SqlIndexIR({ columns: ['email'], unique: false, dependsOn });
-      const without = new SqlIndexIR({ columns: ['email'], unique: false });
+      const withDeps = new SqlIndexIR({
+        columns: ['email'],
+        unique: false,
+        partial: false,
+        dependsOn,
+      });
+      const without = new SqlIndexIR({ columns: ['email'], unique: false, partial: false });
       expect(withDeps.dependsOn).toEqual(dependsOn);
       expect(without.dependsOn).toBeUndefined();
       expect(Object.keys(withDeps)).not.toContain('dependsOn');

@@ -197,6 +197,7 @@ export function contractToPostgresDatabaseSchemaNode(
           new SqlIndexIR({
             columns: i.columns,
             unique: i.unique,
+            partial: i.partial,
             ...ifDefined('name', i.name),
             ...ifDefined('type', i.type),
             ...ifDefined('options', i.options),

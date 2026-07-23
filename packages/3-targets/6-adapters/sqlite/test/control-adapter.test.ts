@@ -124,6 +124,26 @@ describe('SqliteControlAdapter.introspect', () => {
     await driver.close();
   });
 
+  it('stamps partial: true on a partial unique index and partial: false on total indexes', async () => {
+    const driver = createMemoryDriver();
+    driver.db.exec('CREATE TABLE t (a TEXT, b TEXT, archived INTEGER)');
+    driver.db.exec('CREATE UNIQUE INDEX idx_t_a_total ON t (a)');
+    driver.db.exec('CREATE UNIQUE INDEX idx_t_b_active ON t (b) WHERE archived = 0');
+    const adapter = new SqliteControlAdapter(createSqliteBuiltinCodecLookup());
+    const schema = await adapter.introspect(driver);
+
+    const indexes = schema.tables['t']!.indexes;
+    const totalIdx = indexes.find((i) => i.name === 'idx_t_a_total');
+    const partialIdx = indexes.find((i) => i.name === 'idx_t_b_active');
+    expect(totalIdx!.partial).toBe(false);
+    expect(partialIdx!.partial).toBe(true);
+    // Partiality stays out of JSON so serialized schema snapshots and differ
+    // semantics are unchanged.
+    expect(JSON.parse(JSON.stringify(partialIdx))).not.toHaveProperty('partial');
+    expect(JSON.parse(JSON.stringify(totalIdx))).not.toHaveProperty('partial');
+    await driver.close();
+  });
+
   it('introspects unique constraints', async () => {
     const driver = createMemoryDriver();
     driver.db.exec('CREATE TABLE t (a TEXT, b TEXT, UNIQUE (a, b))');

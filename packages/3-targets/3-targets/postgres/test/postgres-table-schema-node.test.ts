@@ -122,7 +122,7 @@ describe('PostgresTableSchemaNode', () => {
       primaryKey: { columns: ['id'] },
       foreignKeys: [{ columns: ['user_id'], referencedTable: 'users', referencedColumns: ['id'] }],
       uniques: [{ columns: ['user_id', 'status'] }],
-      indexes: [{ columns: ['status'], unique: false }],
+      indexes: [{ columns: ['status'], unique: false, partial: false }],
       checks: [{ name: 'chk_status', column: 'status', permittedValues: ['active', 'inactive'] }],
       rlsEnabled: false,
       policies: [basePolicy],

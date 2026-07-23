@@ -106,7 +106,9 @@ describe('inferRelations', () => {
         primaryKey: { columns: ['id'] },
         foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
         uniques: [],
-        indexes: [{ columns: ['user_id'], unique: true, name: 'profile_user_id_idx' }],
+        indexes: [
+          { columns: ['user_id'], unique: true, partial: false, name: 'profile_user_id_idx' },
+        ],
       }),
     };
     const modelNameMap = new Map([
@@ -184,7 +186,14 @@ describe('inferRelations', () => {
         primaryKey: { columns: ['id'] },
         foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
         uniques: [],
-        indexes: [{ columns: ['user_id', 'name'], unique: true, name: 'handle_user_name_idx' }],
+        indexes: [
+          {
+            columns: ['user_id', 'name'],
+            unique: true,
+            partial: false,
+            name: 'handle_user_name_idx',
+          },
+        ],
       }),
     };
     const modelNameMap = new Map([
@@ -539,7 +548,7 @@ describe('inferRelations', () => {
         primaryKey: { columns: ['id'] },
         foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
         uniques: [],
-        indexes: [{ columns: ['user_id'], unique: false }],
+        indexes: [{ columns: ['user_id'], unique: false, partial: false }],
       }),
     };
     const modelNameMap = new Map([
@@ -582,7 +591,7 @@ describe('inferRelations', () => {
         ],
         uniques: [],
         // Same columns, reversed order: does not satisfy the FK's (tenant_id, user_id) order.
-        indexes: [{ columns: ['user_id', 'tenant_id'], unique: false }],
+        indexes: [{ columns: ['user_id', 'tenant_id'], unique: false, partial: false }],
       }),
     };
     const modelNameMap = new Map([

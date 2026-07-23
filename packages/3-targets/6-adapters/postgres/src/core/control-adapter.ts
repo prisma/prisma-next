@@ -1204,7 +1204,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           columns: Object.freeze([...idx.columns]),
           name: idx.name,
           unique: idx.unique,
-          ...(idx.partial && { partial: true }),
+          partial: idx.partial,
           ...(idx.type !== undefined && { type: idx.type }),
           ...(idx.options !== undefined && { options: idx.options }),
           dependsOn: postgresColumnDependsOn(schema, tableName, idx.columns),

@@ -54,8 +54,8 @@ describe('buildSchemaLookupMap', () => {
       tables: {
         user: makeTable({
           indexes: [
-            { columns: ['created_at'], unique: false },
-            { columns: ['email'], unique: true },
+            { columns: ['created_at'], unique: false, partial: false },
+            { columns: ['email'], unique: true, partial: false },
           ],
         }),
       },
@@ -87,7 +87,7 @@ describe('hasUniqueConstraint', () => {
     tables: {
       user: makeTable({
         uniques: [{ columns: ['email'] }],
-        indexes: [{ columns: ['tenant', 'slug'], unique: true }],
+        indexes: [{ columns: ['tenant', 'slug'], unique: true, partial: false }],
       }),
     },
   });
@@ -115,7 +115,7 @@ describe('hasIndex', () => {
     tables: {
       user: makeTable({
         uniques: [{ columns: ['email'] }],
-        indexes: [{ columns: ['created_at'], unique: false }],
+        indexes: [{ columns: ['created_at'], unique: false, partial: false }],
       }),
     },
   });

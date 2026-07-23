@@ -62,7 +62,7 @@ describe('PostgresMigrationPlanner - unique constraints vs indexes (structural n
               primaryKey: { columns: ['id'] },
               uniques: table.uniques ?? [],
               foreignKeys: [],
-              indexes: table.indexes ?? [],
+              indexes: (table.indexes ?? []).map((i) => ({ ...i, partial: false })),
               policies: [],
               rlsEnabled: false,
             }),

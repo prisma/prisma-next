@@ -192,7 +192,7 @@ describe('printPsl', () => {
           primaryKey: { columns: ['id'] },
           foreignKeys: [],
           uniques: [{ columns: ['type', 'code'] }],
-          indexes: [{ columns: ['category', 'type'], unique: false }],
+          indexes: [{ columns: ['category', 'type'], unique: false, partial: false }],
         },
       },
     });
@@ -229,7 +229,12 @@ describe('printPsl', () => {
           foreignKeys: [],
           uniques: [],
           indexes: [
-            { columns: ['category', 'type'], unique: false, name: 'record_category_type_idx' },
+            {
+              columns: ['category', 'type'],
+              unique: false,
+              partial: false,
+              name: 'record_category_type_idx',
+            },
           ],
         },
       },
@@ -264,7 +269,13 @@ describe('printPsl', () => {
           foreignKeys: [],
           uniques: [],
           indexes: [
-            { columns: ['token'], unique: false, name: 'record_token_hash_idx', type: 'hash' },
+            {
+              columns: ['token'],
+              unique: false,
+              partial: false,
+              name: 'record_token_hash_idx',
+              type: 'hash',
+            },
           ],
         },
       },

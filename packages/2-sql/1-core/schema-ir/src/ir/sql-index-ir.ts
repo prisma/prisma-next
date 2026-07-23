@@ -20,13 +20,14 @@ export interface SqlIndexIRInput {
    */
   readonly dependsOn?: readonly SchemaNodeRef[];
   /**
-   * Set when introspection saw a partial index (`pg_index.indpred` present).
-   * Consumed by relation inference — a partial unique index does not
-   * guarantee at-most-one row per key, so it cannot back a 1:1. Never
+   * Whether the index is partial (has a row predicate). Required: every
+   * producer must assert partiality explicitly, because a partial unique
+   * index does not guarantee at-most-one row per key and so cannot back a
+   * 1:1 relation — "unknown" must not silently default to "total". Never
    * compared by `isEqualTo` and never serialized: differ/verify semantics
    * are unchanged, and surfacing partial-index drift is out of scope.
    */
-  readonly partial?: boolean;
+  readonly partial: boolean;
 }
 
 /**
@@ -67,7 +68,7 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
   /** See {@link SqlIndexIRInput.dependsOn}. Non-enumerable so it stays out of JSON and structural equality, matching `SqlColumnIR.codecRef`. */
   declare readonly dependsOn?: readonly SchemaNodeRef[];
   /** See {@link SqlIndexIRInput.partial}. Non-enumerable so it stays out of JSON and structural equality, matching `dependsOn`. */
-  declare readonly partial?: boolean;
+  declare readonly partial: boolean;
 
   constructor(input: SqlIndexIRInput) {
     super();

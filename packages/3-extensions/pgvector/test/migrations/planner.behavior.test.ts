@@ -662,7 +662,7 @@ function buildUserTableSchema(): PostgresTableSchemaNode {
     primaryKey: { columns: ['id'] },
     uniques: [{ columns: ['email'], name: 'user_email_key' }],
     foreignKeys: [],
-    indexes: [{ columns: ['email'], name: 'user_email_idx', unique: false }],
+    indexes: [{ columns: ['email'], name: 'user_email_idx', unique: false, partial: false }],
     rlsEnabled: false,
   });
 }
@@ -834,7 +834,7 @@ function buildPostTableSchema(): PostgresTableSchemaNode {
         resolvedReferencedNamespace: 'public',
       },
     ],
-    indexes: [{ columns: ['userId'], name: 'post_userId_idx', unique: false }],
+    indexes: [{ columns: ['userId'], name: 'post_userId_idx', unique: false, partial: false }],
     rlsEnabled: false,
   });
 }

@@ -106,7 +106,7 @@ describe.sequential('Postgres index introspection — type and options', () => {
     expect(idx?.options).toEqual({ fastupdate: 'false' });
   });
 
-  it('stamps partial: true on a partial unique index and leaves total indexes unstamped', {
+  it('stamps partial: true on a partial unique index and partial: false on total indexes', {
     timeout: testTimeout,
   }, async () => {
     await driver!.query(
@@ -123,11 +123,12 @@ describe.sequential('Postgres index introspection — type and options', () => {
     const indexes = ns.tables['doc']?.indexes ?? [];
     const totalIdx = indexes.find((i) => i.name === 'doc_owner_total_idx');
     const partialIdx = indexes.find((i) => i.name === 'doc_owner_active_idx');
-    expect(totalIdx?.partial).toBeUndefined();
+    expect(totalIdx?.partial).toBe(false);
     expect(partialIdx?.partial).toBe(true);
     // Partiality stays out of JSON so serialized schema snapshots and differ
     // semantics are unchanged.
     expect(JSON.parse(JSON.stringify(partialIdx))).not.toHaveProperty('partial');
+    expect(JSON.parse(JSON.stringify(totalIdx))).not.toHaveProperty('partial');
   });
 
   // Regression: composite index columns must be reported in the order they

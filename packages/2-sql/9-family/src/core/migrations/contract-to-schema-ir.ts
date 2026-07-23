@@ -280,6 +280,7 @@ function convertIndex(index: Index, tableName: string): SqlIndexIRInput {
   return {
     columns: index.columns,
     unique: false,
+    partial: false,
     ...ifDefined('name', index.name),
     // Carried so the derived index node compares type/options against the
     // introspected side (the legacy walk read them from the contract).

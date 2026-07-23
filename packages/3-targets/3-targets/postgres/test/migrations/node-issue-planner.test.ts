@@ -431,6 +431,7 @@ describe('planNodeIssues — dependency-graph ordering', () => {
           {
             columns: ['legacy'],
             unique: false,
+            partial: false,
             name: 'account_legacy_idx',
             dependsOn: [legacyColumnChain],
           },

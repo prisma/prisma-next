@@ -13,7 +13,7 @@ describe('flat tree diffability (SqlSchemaIR / SqlTableIR)', () => {
     primaryKey: { columns: ['id'] },
     foreignKeys: [{ columns: ['org_id'], referencedTable: 'orgs', referencedColumns: ['id'] }],
     uniques: [{ columns: ['email'] }],
-    indexes: [{ columns: ['email'], unique: false }],
+    indexes: [{ columns: ['email'], unique: false, partial: false }],
     checks: [{ name: 'chk', column: 'email', permittedValues: ['a'] }],
   });
 

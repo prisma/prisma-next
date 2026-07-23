@@ -121,6 +121,7 @@ export function index(
   return new SqlIndexIR({
     columns,
     unique: overrides.unique ?? false,
+    partial: false,
     ...(overrides.name !== undefined ? { name: overrides.name } : {}),
   });
 }

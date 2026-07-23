@@ -33,7 +33,7 @@ describe('printPsl', () => {
             },
           ],
           uniques: [],
-          indexes: [{ columns: ['user_id'], unique: false }],
+          indexes: [{ columns: ['user_id'], unique: false, partial: false }],
         },
       },
     });

@@ -30,7 +30,7 @@ describe('SqlSchemaIRNode discriminants', () => {
       }),
     ],
     ['SqlUniqueIR', new SqlUniqueIR({ columns: ['email'] })],
-    ['SqlIndexIR', new SqlIndexIR({ columns: ['email'], unique: false })],
+    ['SqlIndexIR', new SqlIndexIR({ columns: ['email'], unique: false, partial: false })],
     [
       'SqlCheckConstraintIR',
       new SqlCheckConstraintIR({ name: 'chk', column: 'status', permittedValues: ['a'] }),
@@ -58,7 +58,11 @@ describe('SqlSchemaIRNode discriminants', () => {
       'sql-foreign-key',
     ],
     ['SqlUniqueIR', new SqlUniqueIR({ columns: ['email'] }), 'sql-unique'],
-    ['SqlIndexIR', new SqlIndexIR({ columns: ['email'], unique: false }), 'sql-index'],
+    [
+      'SqlIndexIR',
+      new SqlIndexIR({ columns: ['email'], unique: false, partial: false }),
+      'sql-index',
+    ],
     [
       'SqlCheckConstraintIR',
       new SqlCheckConstraintIR({ name: 'chk', column: 'status', permittedValues: ['a'] }),
@@ -116,7 +120,11 @@ describe('relationalNodeGranularity map (granularity is off the node)', () => {
       'auxiliary',
     ],
     ['SqlUniqueIR', new SqlUniqueIR({ columns: ['email'] }), 'auxiliary'],
-    ['SqlIndexIR', new SqlIndexIR({ columns: ['email'], unique: false }), 'auxiliary'],
+    [
+      'SqlIndexIR',
+      new SqlIndexIR({ columns: ['email'], unique: false, partial: false }),
+      'auxiliary',
+    ],
     [
       'SqlCheckConstraintIR',
       new SqlCheckConstraintIR({ name: 'chk', column: 'status', permittedValues: ['a'] }),
