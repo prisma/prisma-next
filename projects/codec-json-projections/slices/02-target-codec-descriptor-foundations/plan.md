@@ -34,26 +34,26 @@ Nine sequential dispatches establish PostgreSQL and SQLite target descriptor pro
 - **Hands to:** A complete built-ins-only typed SQLite registry plus unchanged generic registry/type-map views ready for adapter composition.
 - **Focus:** Tests first for canonical descriptor coverage, generic adapter typing, current BLOB/bigint/JSON behavior, char/varchar presence despite control-metadata filtering, and column-helper result types. Do not make adapters stack-aware or change SQL rendering.
 
-### Dispatch 5: PostgreSQL adapter composition
+### Dispatch 5: PostgreSQL extension adoption
+
+- **Outcome:** pgvector, PostGIS, and arktype-json contribute PostgreSQL descriptors through the target authoring API with correct runtime dependencies and unchanged public codec/column behavior.
+- **Builds on:** Dispatch 1's public protocol and Dispatch 3's complete target-typed PostgreSQL built-in set.
+- **Hands to:** A complete first-party PostgreSQL descriptor ecosystem that the adapter can validate atomically without an intermediate state that rejects existing extensions.
+- **Focus:** Tests first for descriptor-array typing, factory/generic preservation, runtime/control contribution parity, and current vector-text/HEXEWKB/structured JSON behavior. Add lean target-package dependencies and lockfile changes; resolve PostGIS parameter optionality only in the behavior-preserving shape pinned by the spec. Do not add future projection formats or conformance packages.
+
+### Dispatch 6: PostgreSQL adapter composition
 
 - **Outcome:** Bare, runtime-stack, and control-stack PostgreSQL adapter construction build one immutable structurally validated target registry before lowering; parameter native-type rendering uses it with byte-identical SQL and no query-time target cast.
-- **Builds on:** Dispatch 3's complete target-typed PostgreSQL built-in set and Dispatch 1's registry validator.
+- **Builds on:** Dispatch 5's complete first-party PostgreSQL descriptor ecosystem plus Dispatch 1's registry validator.
 - **Hands to:** Both PostgreSQL planes accept built-ins plus valid extension target descriptors, reject malformed/wrong-target contributions during composition, and retain existing generic materialization/DDL behavior.
-- **Focus:** Tests first for early validation, duplicate IDs, runtime/control parity, built-ins-only bare factories, enum/custom/array cast SQL parity, and unchanged JSON projection SQL. Retain `meta`/`metaFor`; do not invoke JSON descriptor hooks from renderers.
+- **Focus:** Tests first for early validation, duplicate IDs, runtime/control parity, built-ins-only bare factories, extension visibility, enum/custom/array cast SQL parity, and unchanged JSON projection SQL. Retain `meta`/`metaFor`; do not invoke JSON descriptor hooks from renderers.
 
-### Dispatch 6: SQLite adapter composition
+### Dispatch 7: SQLite adapter composition
 
 - **Outcome:** Bare, runtime-stack, and control-stack SQLite adapter construction build the same immutable extension-inclusive target registry before lowering, while existing codec materialization and byte-identical SQL rendering remain unchanged.
 - **Builds on:** Dispatch 4's complete target-typed SQLite built-in set and Dispatch 2's registry validator.
 - **Hands to:** Both SQLite planes accept valid extension target descriptors, reject malformed/wrong-target contributions during composition, and preserve built-ins-only bare construction.
 - **Focus:** Tests first for runtime stack awareness, runtime/control descriptor-set parity, full char/varchar inclusion despite filtered control metadata, early malformed contribution failure, existing extension parameter encoding, and unchanged JSON object/array SQL. Do not add BLOB/bigint/document transforms.
-
-### Dispatch 7: PostgreSQL extension adoption
-
-- **Outcome:** pgvector, PostGIS, and arktype-json contribute PostgreSQL descriptors through the target authoring API with correct runtime dependencies and unchanged public codec/column behavior.
-- **Builds on:** Dispatch 1's public protocol and Dispatch 5's extension-aware composition boundary.
-- **Hands to:** A complete first-party PostgreSQL descriptor ecosystem that passes control/runtime validation and is ready for TML-3063's projection hard cut.
-- **Focus:** Tests first for descriptor-array typing, factory/generic preservation, runtime/control contribution parity, and current vector-text/HEXEWKB/structured JSON behavior. Add lean target-package dependencies and lockfile changes; resolve PostGIS parameter optionality only in the behavior-preserving shape pinned by the spec. Do not add future projection formats or conformance packages.
 
 ### Dispatch 8: Authoring docs and upgrade instructions
 
@@ -77,9 +77,9 @@ Nine sequential dispatches establish PostgreSQL and SQLite target descriptor pro
 | 2 | Public SQLite protocol is usable before adoption. | One target authoring/registry substrate. | Runtime/type tests prove validation, delegation, and scalar-only semantics. |
 | 3 | PostgreSQL built-ins fully adopt a settled API. | One mechanical target migration. | Descriptor-set/type-map/metadata/codec tests pass with zero behavior drift. |
 | 4 | SQLite built-ins fully adopt a settled API. | One mechanical target migration. | Descriptor-set/type-map/codec tests pass with zero behavior drift. |
-| 5 | PostgreSQL composition consumes the migrated set. | One adapter boundary. | All construction paths validate early and exact SQL parity tests pass. |
-| 6 | SQLite composition consumes the migrated set. | One adapter boundary. | All construction paths validate early and exact SQL parity tests pass. |
-| 7 | PostgreSQL extensions uniformly adopt the settled API. | One mechanical extension migration with a pinned compatibility rule. | Three extension packages pass type/runtime tests and dependency gates. |
+| 5 | PostgreSQL extensions uniformly adopt the settled API. | One mechanical extension migration with a pinned compatibility rule. | Three extension packages pass type/runtime tests and dependency gates. |
+| 6 | PostgreSQL composition consumes the complete migrated set. | One adapter boundary. | All construction paths validate early and exact SQL parity tests pass. |
+| 7 | SQLite composition consumes the migrated set. | One adapter boundary. | All construction paths validate early and exact SQL parity tests pass. |
 | 8 | Published migration guidance matches the final API. | One extension-author migration record. | Validation-by-execution reproduces the committed substrate and coverage passes. |
 | 9 | The whole behavior-preserving slice is proven. | One final audit/gate outcome. | All declared gates and no-drift searches pass on the synchronized head. |
 
@@ -100,9 +100,9 @@ The dispatches are sequential because built-in and adapter migrations consume ta
 
 - **D1/D3:** build/test/typecheck/lint `@prisma-next/target-postgres`; exact descriptor type tests; metadata/native-type and codec JSON regressions.
 - **D2/D4:** build/test/typecheck/lint `@prisma-next/target-sqlite`; exact descriptor type tests; BLOB/bigint/JSON regressions.
-- **D5:** test/typecheck/lint `@prisma-next/adapter-postgres`; exact parameter-cast, runtime/control parity, malformed composition, and JSON pass-through tests.
-- **D6:** test/typecheck/lint `@prisma-next/adapter-sqlite`; exact runtime/control parity, extension descriptor, metadata-filter, and JSON pass-through tests.
-- **D7:** test/typecheck/lint `@prisma-next/extension-pgvector`, `@prisma-next/extension-postgis`, and `@prisma-next/extension-arktype-json`; `pnpm lint:deps`; package manifest validation; lockfile consistency; `pnpm fixtures:check` as a zero-drift gate.
+- **D5:** test/typecheck/lint `@prisma-next/extension-pgvector`, `@prisma-next/extension-postgis`, and `@prisma-next/extension-arktype-json`; `pnpm lint:deps`; package manifest validation; lockfile consistency; `pnpm fixtures:check` as a zero-drift gate.
+- **D6:** test/typecheck/lint `@prisma-next/adapter-postgres`; exact parameter-cast, runtime/control parity, malformed composition, extension visibility, and JSON pass-through tests.
+- **D7:** test/typecheck/lint `@prisma-next/adapter-sqlite`; exact runtime/control parity, extension descriptor, metadata-filter, and JSON pass-through tests.
 - **D8:** `pnpm check:upgrade-coverage --mode pr`; `pnpm lint:skills`; extension migration validation via `pnpm test --filter='./packages/3-extensions/*'` in the isolated replay worktree.
 
 ### Final slice gate
