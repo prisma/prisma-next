@@ -27,3 +27,10 @@
 - **Builds on:** Dispatch 3's fully migrated repository.
 - **Hands to:** Slice 4's hard-cut precondition: no live repository consumer depends on `@db.*`.
 - **Focus:** Current-transition upgrade instructions, comment pruning, grep classification, `pnpm fixtures:check`, package/integration/example tests, typecheck, and lint.
+
+### Dispatch 5: CI and review closure
+
+- **Outcome:** PR #1036 is green and review-clean after reconciling the branch with current `main`, restoring contract-PSL coverage lost during legacy-test migration, and resolving valid review findings without weakening the slice's hard-cut precondition.
+- **Builds on:** Dispatch 4's exhaustive scrub and the review/CI results from PR #1036.
+- **Hands to:** A mergeable slice 3 and an unblocked slice 4.
+- **Focus:** Existing uncommitted `Date`/`Inet` fixes, package-test and coverage failures, valid unresolved review findings, branch/upstream reconciliation, and the full slice validation gate. No deletion of the legacy `@db.*` implementation or migration-diagnostic work from slice 4.
