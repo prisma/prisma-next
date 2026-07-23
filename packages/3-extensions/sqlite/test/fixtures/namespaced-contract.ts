@@ -33,7 +33,7 @@ type Models = {
 };
 
 type Storage = {
-  readonly storageHash: StorageHashBase<'sha256:namespaced-facade-fixture'>;
+  readonly storageHash: StorageHashBase<'namespaced-facade-fixture'>;
   readonly namespaces: {
     readonly __unbound__: {
       readonly id: '__unbound__';

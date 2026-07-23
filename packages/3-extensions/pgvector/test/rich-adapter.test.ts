@@ -31,13 +31,13 @@ import { createComposedPostgresAdapter } from './helpers/composed-adapter';
 const contract = new SqlContractSerializer().deserializeContract({
   target: 'postgres',
   targetFamily: 'sql',
-  profileHash: 'sha256:test-profile',
+  profileHash: 'test-profile',
   roots: {},
   capabilities: {},
   extensionPacks: {},
   meta: {},
   storage: {
-    storageHash: 'sha256:test-core',
+    storageHash: 'test-core',
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,

@@ -30,11 +30,11 @@ import { SupabaseRuntimeImpl } from '../src/runtime/supabase-runtime';
 const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
   target: 'postgres',
-  profileHash: profileHash('sha256:supabase-runtime-test'),
+  profileHash: profileHash('supabase-runtime-test'),
   domain: applicationDomainOf({ models: {} }),
   roots: {},
   storage: new SqlStorage({
-    storageHash: coreHash('sha256:supabase-runtime-test'),
+    storageHash: coreHash('supabase-runtime-test'),
     namespaces: {
       __unbound__: createTestSqlNamespace({ id: '__unbound__', entries: { table: {} } }),
     },

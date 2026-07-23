@@ -13,9 +13,7 @@ import {
   tableSourceForContract,
 } from '../src/storage-resolution';
 
-const STORAGE_HASH = blindCast<SqlStorageType['storageHash'], 'test storage hash literal'>(
-  'sha256:test',
-);
+const STORAGE_HASH = blindCast<SqlStorageType['storageHash'], 'test storage hash literal'>('test');
 
 function usersTable(columnName: string): StorageTable {
   return new StorageTable({

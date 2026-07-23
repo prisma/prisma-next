@@ -54,9 +54,9 @@ function buildAppContract(): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:supabase-classification-test-app'),
+    profileHash: profileHash('supabase-classification-test-app'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:supabase-classification-test-app'),
+      storageHash: coreHash('supabase-classification-test-app'),
       namespaces: {
         public: postgresCreateNamespace({
           id: 'public',

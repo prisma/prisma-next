@@ -14,8 +14,8 @@ When creating `CoreHashBase` or `ProfileHashBase` values in tests, use the `core
 
 ```typescript
 // ❌ WRONG: unsafe cast, hides the branded type from the reader
-coreHash: 'sha256:test' as never,
-profileHash: 'sha256:test-profile' as never,
+coreHash: 'test' as never,
+profileHash: 'test-profile' as never,
 ```
 
 ## The Solution
@@ -24,11 +24,11 @@ profileHash: 'sha256:test-profile' as never,
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 
 // ✅ CORRECT: type-safe, preserves literal type via const type parameter
-coreHash: coreHash('sha256:test'),
-profileHash: profileHash('sha256:test-profile'),
+coreHash: coreHash('test'),
+profileHash: profileHash('test-profile'),
 ```
 
-The constructors use `const` type parameters so `coreHash('sha256:test')` returns `CoreHashBase<'sha256:test'>`, not `CoreHashBase<string>`.
+The constructors use `const` type parameters so `coreHash('test')` returns `CoreHashBase<'test'>`, not `CoreHashBase<string>`.
 
 ## Available Constructors
 

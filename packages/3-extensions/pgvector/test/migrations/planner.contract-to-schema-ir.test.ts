@@ -81,11 +81,11 @@ function createTestContract(
   storage: Omit<SqlStorageInput, 'storageHash'> | SqlStorage,
   overrides?: Partial<Contract<SqlStorage>>,
 ): Contract<SqlStorage> {
-  const storageHashValue = coreHash('sha256:test');
+  const storageHashValue = coreHash('test');
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     storage:
       storage instanceof SqlStorage
         ? storage
@@ -199,7 +199,7 @@ function planFromStorages(
 describe('contractToSchemaIR → planner round-trip', () => {
   it('produces no ops when contract and schemaIR represent the same state', () => {
     const storage: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         user: {
           columns: {
@@ -239,7 +239,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
 
   it('detects additive changes from empty state', async () => {
     const storage: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         user: {
           columns: {
@@ -283,7 +283,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
 
   it('detects incremental table addition', async () => {
     const fromStorage: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         user: {
           columns: {
@@ -298,7 +298,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
     };
 
     const toStorage: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         user: {
           columns: {
@@ -352,7 +352,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
 
   it('handles default values in round-trip', () => {
     const storage: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         item: {
           columns: {
@@ -404,7 +404,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
 describe('planner — additive scenarios', () => {
   it('detects added column on existing table', async () => {
     const from: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         user: table({
           columns: {
@@ -417,7 +417,7 @@ describe('planner — additive scenarios', () => {
     };
 
     const to: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         user: table({
           columns: {
@@ -445,7 +445,7 @@ describe('planner — additive scenarios', () => {
 
   it('detects added table', async () => {
     const from: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         user: table({
           columns: {
@@ -457,7 +457,7 @@ describe('planner — additive scenarios', () => {
     };
 
     const to: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         user: table({
           columns: {
@@ -489,7 +489,7 @@ describe('planner — additive scenarios', () => {
 
   it('detects multiple changes at once (table + unique + index)', async () => {
     const from: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         user: table({
           columns: {
@@ -501,7 +501,7 @@ describe('planner — additive scenarios', () => {
     };
 
     const to: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         user: table({
           columns: {
@@ -539,7 +539,7 @@ describe('planner — additive scenarios', () => {
 
   it('returns no ops when storages are identical', () => {
     const storage: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         user: table({
           columns: {
@@ -563,7 +563,7 @@ describe('planner — additive scenarios', () => {
 describe('detectDestructiveChanges', () => {
   it('rejects column removal with conflict', () => {
     const from: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         user: table({
           columns: {
@@ -577,7 +577,7 @@ describe('detectDestructiveChanges', () => {
     };
 
     const to: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         user: table({
           columns: {
@@ -598,7 +598,7 @@ describe('detectDestructiveChanges', () => {
 
   it('rejects table removal with conflict', () => {
     const from: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         user: table({
           columns: { id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }) },
@@ -612,7 +612,7 @@ describe('detectDestructiveChanges', () => {
     };
 
     const to: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         user: table({
           columns: { id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }) },
@@ -630,7 +630,7 @@ describe('detectDestructiveChanges', () => {
 
   it('rejects multiple destructive changes with all conflicts', () => {
     const from: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         user: table({
           columns: {
@@ -647,7 +647,7 @@ describe('detectDestructiveChanges', () => {
     };
 
     const to: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         user: table({
           columns: { id: col({ nativeType: 'uuid', codecId: 'pg/uuid@1' }) },
@@ -668,7 +668,7 @@ describe('detectDestructiveChanges', () => {
 describe('planner — type and nullability change behavior', () => {
   it('rejects type change (text → int4) as non-additive conflict', () => {
     const from: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         user: table({
           columns: {
@@ -681,7 +681,7 @@ describe('planner — type and nullability change behavior', () => {
     };
 
     const to: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         user: table({
           columns: {
@@ -707,7 +707,7 @@ describe('planner — type and nullability change behavior', () => {
 
   it('rejects nullability tightening (nullable → non-nullable) as non-additive conflict', () => {
     const from: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         user: table({
           columns: {
@@ -720,7 +720,7 @@ describe('planner — type and nullability change behavior', () => {
     };
 
     const to: SqlStorageInput = {
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       ...ns({
         user: table({
           columns: {
@@ -878,7 +878,7 @@ const DEMO_BASE_TABLES = {
 };
 
 const DEMO_BASE_STORAGE: SqlStorageInput = {
-  storageHash: coreHash('sha256:test'),
+  storageHash: coreHash('test'),
   ...ns(DEMO_BASE_TABLES),
   types: {
     user_type: {
@@ -894,11 +894,11 @@ function createDemoContract(
   storage: Omit<SqlStorageInput, 'storageHash'>,
   overrides?: Partial<Contract<SqlStorage>>,
 ): Contract<SqlStorage> {
-  const storageHashValue = coreHash('sha256:demo');
+  const storageHashValue = coreHash('demo');
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     storage: new SqlStorage({ ...storage, storageHash: storageHashValue }),
     roots: {},
     domain: applicationDomainOf({ models: {} }),

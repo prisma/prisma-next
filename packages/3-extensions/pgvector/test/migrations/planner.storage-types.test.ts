@@ -75,9 +75,9 @@ describe('PostgresMigrationPlanner - storage types', () => {
     const contract: Contract<SqlStorage> = {
       target: 'postgres',
       targetFamily: 'sql',
-      profileHash: profileHash('sha256:test'),
+      profileHash: profileHash('test'),
       storage: new SqlStorage({
-        storageHash: coreHash('sha256:test'),
+        storageHash: coreHash('test'),
         types: {
           Role: {
             kind: 'codec-instance',
@@ -172,9 +172,9 @@ describe('PostgresMigrationPlanner - storage types', () => {
     const contract: Contract<SqlStorage> = {
       target: 'postgres',
       targetFamily: 'sql',
-      profileHash: profileHash('sha256:test'),
+      profileHash: profileHash('test'),
       storage: new SqlStorage({
-        storageHash: coreHash('sha256:test'),
+        storageHash: coreHash('test'),
         types: {
           Role: {
             kind: 'codec-instance',
@@ -251,9 +251,9 @@ describe('PostgresMigrationPlanner - storage types', () => {
     const contract: Contract<SqlStorage> = {
       target: 'postgres',
       targetFamily: 'sql',
-      profileHash: profileHash('sha256:test'),
+      profileHash: profileHash('test'),
       storage: new SqlStorage({
-        storageHash: coreHash('sha256:test'),
+        storageHash: coreHash('test'),
         types: {
           UserKind: {
             kind: 'codec-instance',
@@ -321,9 +321,9 @@ describe('PostgresMigrationPlanner - storage types', () => {
     const contract: Contract<SqlStorage> = {
       target: 'postgres',
       targetFamily: 'sql',
-      profileHash: profileHash('sha256:test'),
+      profileHash: profileHash('test'),
       storage: new SqlStorage({
-        storageHash: coreHash('sha256:test'),
+        storageHash: coreHash('test'),
         types: {
           Embedding1536: {
             kind: 'codec-instance',
@@ -391,9 +391,9 @@ describe('PostgresMigrationPlanner - storage types', () => {
     const contract: Contract<SqlStorage> = {
       target: 'postgres',
       targetFamily: 'sql',
-      profileHash: profileHash('sha256:test'),
+      profileHash: profileHash('test'),
       storage: new SqlStorage({
-        storageHash: coreHash('sha256:test'),
+        storageHash: coreHash('test'),
         types: {
           Embedding1536: {
             kind: 'codec-instance',

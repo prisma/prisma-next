@@ -16,7 +16,7 @@ interface MockExec extends ExecutionPlan {
 const baseMeta: PlanMeta = {
   target: 'postgres',
   targetFamily: 'sql',
-  storageHash: 'sha256:test',
+  storageHash: 'test',
   lane: 'orm',
 };
 

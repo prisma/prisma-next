@@ -8,7 +8,7 @@ import sqlite from '../src/runtime/sqlite';
 
 function unboundSqlStorage(): SqlStorage {
   return new SqlStorage({
-    storageHash: coreHash('sha256:sqlite-extensions-test'),
+    storageHash: coreHash('sqlite-extensions-test'),
     namespaces: {
       __unbound__: sqliteCreateNamespace({ id: '__unbound__', entries: { table: {} } }),
     },

@@ -12,11 +12,11 @@ import sqlite from '../src/runtime/sqlite';
 const contract: Contract<SqlStorage> = {
   target: 'sqlite',
   targetFamily: 'sql',
-  profileHash: profileHash('sha256:sqlite-transaction-test'),
+  profileHash: profileHash('sqlite-transaction-test'),
   domain: applicationDomainOf({ models: {} }),
   roots: {},
   storage: new SqlStorage({
-    storageHash: coreHash('sha256:sqlite-transaction-test'),
+    storageHash: coreHash('sqlite-transaction-test'),
     namespaces: {
       __unbound__: sqliteCreateNamespace({ id: '__unbound__', entries: { table: {} } }),
     },

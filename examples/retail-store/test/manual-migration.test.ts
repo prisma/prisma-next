@@ -72,9 +72,9 @@ describe('hand-authored migration (backfill-product-status)', {
   it('migration.json has expected structure', () => {
     const manifest = JSON.parse(readFileSync(resolve(migrationDir, 'migration.json'), 'utf-8'));
 
-    expect(manifest.migrationHash).toMatch(/^sha256:/);
-    expect(manifest.from).toMatch(/^sha256:/);
-    expect(manifest.to).toMatch(/^sha256:/);
+    expect(manifest.migrationHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(manifest.from).toMatch(/^[0-9a-f]{64}$/);
+    expect(manifest.to).toMatch(/^[0-9a-f]{64}$/);
     expect(manifest.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
@@ -136,8 +136,7 @@ describe('hand-authored migration (backfill-product-status)', {
       // so it degrades to an empty-expected diff rather than failing on
       // peer collections (carts, orders, …) that the chain prerequisites
       // would normally create.
-      const STORAGE_HASH =
-        'sha256:50134e16bc78b848f51f2dc00025eb3b4bbcbee55f402f7d9b71608a1b2d0c65';
+      const STORAGE_HASH = '50134e16bc78b848f51f2dc00025eb3b4bbcbee55f402f7d9b71608a1b2d0c65';
       const UNBOUND_NAMESPACE_ID = '__unbound__' as const;
       const result = await runner.execute({
         plan: {

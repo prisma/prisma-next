@@ -23,7 +23,7 @@ test('cacheAnnotation.read returns CachePayload | undefined', () => {
     meta: {
       target: 'postgres',
       targetFamily: 'sql' as const,
-      storageHash: 'sha256:test',
+      storageHash: 'test',
       lane: 'orm',
       paramDescriptors: [],
       annotations: {} as Record<string, unknown>,

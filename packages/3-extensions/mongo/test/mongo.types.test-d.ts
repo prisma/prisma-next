@@ -77,7 +77,7 @@ type EnumContract = MongoContractWithTypeMaps<
   {
     readonly target: 'mongo';
     readonly targetFamily: 'mongo';
-    readonly profileHash: ProfileHashBase<'sha256:enum-facade-test'>;
+    readonly profileHash: ProfileHashBase<'enum-facade-test'>;
     readonly capabilities: Record<string, never>;
     readonly extensionPacks: Record<string, never>;
     readonly meta: Record<string, never>;
@@ -99,7 +99,7 @@ type EnumContract = MongoContractWithTypeMaps<
           readonly entries: { readonly collection: Record<string, never> };
         };
       };
-      readonly storageHash: StorageHashBase<'sha256:enum-facade-storage'>;
+      readonly storageHash: StorageHashBase<'enum-facade-storage'>;
     };
   },
   MongoTypeMaps<

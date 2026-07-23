@@ -35,13 +35,13 @@ const usersTableInput = {
 const publicPostgresContract = {
   target: 'postgres',
   targetFamily: 'sql',
-  profileHash: 'sha256:test-profile',
+  profileHash: 'test-profile',
   roots: {},
   capabilities: { returning: { enabled: true } },
   extensionPacks: {},
   meta: {},
   storage: new SqlStorage({
-    storageHash: 'sha256:test-core-public-orm',
+    storageHash: 'test-core-public-orm',
     namespaces: {
       [PUBLIC_NAMESPACE_ID]: new PostgresSchema({
         id: PUBLIC_NAMESPACE_ID,
@@ -50,7 +50,7 @@ const publicPostgresContract = {
         },
       }),
     },
-  } as unknown as SqlStorageInput<'sha256:test-core-public-orm'>),
+  } as unknown as SqlStorageInput<'test-core-public-orm'>),
   domain: applicationDomainOf({
     namespaceId: PUBLIC_NAMESPACE_ID,
     models: { User: userModel },
@@ -129,13 +129,13 @@ describe('ORM namespace qualification', () => {
     const sqliteContract = {
       target: 'sqlite',
       targetFamily: 'sql',
-      profileHash: 'sha256:test-profile',
+      profileHash: 'test-profile',
       roots: {},
       capabilities: {},
       extensionPacks: {},
       meta: {},
       storage: new SqlStorage({
-        storageHash: 'sha256:test-core-sqlite-orm',
+        storageHash: 'test-core-sqlite-orm',
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: new SqliteDatabase({
             id: UNBOUND_NAMESPACE_ID,
@@ -154,7 +154,7 @@ describe('ORM namespace qualification', () => {
             },
           }),
         },
-      } as unknown as SqlStorageInput<'sha256:test-core-sqlite-orm'>),
+      } as unknown as SqlStorageInput<'test-core-sqlite-orm'>),
       domain: applicationDomainOf({
         namespaceId: UNBOUND_NAMESPACE_ID,
         models: { User: userModel },
