@@ -979,7 +979,7 @@ describe('CompositeTypeDeclarationAst', () => {
 
 describe('NamespaceDeclarationAst', () => {
   function buildNamespace() {
-    // namespace auth { model User {} datasource db {} extend Something {} }
+    // namespace auth { model User {} datasource extension {} extend Something {} }
     const b = new GreenNodeBuilder();
     b.startNode('Document');
     b.startNode('Namespace');

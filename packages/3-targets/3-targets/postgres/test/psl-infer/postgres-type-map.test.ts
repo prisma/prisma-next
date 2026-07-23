@@ -15,8 +15,14 @@ describe('createPostgresTypeMap', () => {
       useNamedType: true,
     });
     expect(typeMap.resolve('timestamptz')).toEqual({
-      pslType: { name: 'DateTime' },
+      pslType: { name: 'Timestamptz' },
       nativeType: 'timestamptz',
+      useNamedType: true,
+    });
+    expect(typeMap.resolve('timestamp with time zone')).toEqual({
+      pslType: { name: 'Timestamptz' },
+      nativeType: 'timestamp with time zone',
+      useNamedType: true,
     });
     expect(typeMap.resolve('jsonb')).toEqual({ pslType: { name: 'Jsonb' }, nativeType: 'jsonb' });
     expect(typeMap.resolve('bytea')).toEqual({ pslType: { name: 'Bytes' }, nativeType: 'bytea' });
