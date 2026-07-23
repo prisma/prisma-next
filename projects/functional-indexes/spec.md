@@ -12,7 +12,7 @@ Make every index and RLS policy a **name-identified, round-trippable** contract 
 
 **Compare by content wherever content is faithfully comparable; where it isn't — SQL bodies, which Postgres reprints — the name carries a content hash and the name is the equivalence relation.**
 
-Every index and policy node is identified in the diff tree by its **name**. Two naming modes exist, distinguished structurally (no stored strategy enum — the node selects its own equivalence from its own properties, per ADR 235's node-owned `isEqualTo`):
+Every index and policy node is identified in the diff tree by its **name**. Constraint nodes — primary key, foreign key, unique, check — are outside this rule: a constraint is its own discrete entity (never a marker on an index; [ADR 161's superseding note](../../docs/architecture%20docs/adrs/ADR%20161%20-%20Explicit%20foreign%20key%20constraint%20and%20index%20configuration.md), Data Contract design principle 4), and it is fully structured, so content comparison is already exact by this rule's own test — no wire name needed (see D5). Two naming modes exist, distinguished structurally (no stored strategy enum — the node selects its own equivalence from its own properties, per ADR 235's node-owned `isEqualTo`):
 
 | Mode | Authored as | `name` in contract | `prefix` field | Diff pairing | Equality of a paired node |
 | --- | --- | --- | --- | --- | --- |
@@ -36,7 +36,7 @@ This table is the behavioral contract. Every scenario gets an automated test (se
 | G | **Hand-authored body under `map:`** | exact | First `CREATE` works; verify then compares authored text vs reprint → false `not-equal` noise. **Degraded by design**; emit-time warning (D9) tells the user to use `name:`. |
 | H | **Out-of-band structured drift on managed** (e.g. `ALTER INDEX … SET (fillfactor=70)`) | managed | Caught: managed `isEqualTo` compares structured attributes (D5). Surfaces as `not-equal` → verify drift / planner conflict. |
 | I | **Pre-project database upgrade** (indexes created under the old plain-name scheme) | managed (re-emitted contract) | First `widening` plan: content pairing (as in C) pairs each plain-named live index with its hash-named replacement → renames only. No rebuilds, no hand-migration. |
-| J | **Same-tuple twins** (unique + redundant plain index on identical columns, legal in Postgres) | any | Representable: identity is the name, so both nodes coexist. The introspection dedup hack is deleted (D6). |
+| J | **Same-tuple twins** (a unique index plus a redundant plain index on identical columns, legal in Postgres) | any | Representable: identity is the name, so both index nodes coexist. The introspection dedup hack is deleted (D6). (A unique *constraint* beside a same-column index was never a collision — different node kinds.) |
 
 ## Design
 
@@ -68,6 +68,8 @@ Invariants (enforced at construction with thrown errors, and at authoring with d
 - `columns` xor `expression` — exactly one.
 - `expression !== undefined ⇒` the index was authored with an explicit `name:` or `map:` (a default prefix cannot be derived from an expression).
 - `name` is always the full physical name. `prefix !== undefined ⇔ name === formatWireName(prefix, <hash>)`.
+
+`UniqueConstraint` (`unique-constraint.ts`, beside `sql-index.ts`) is untouched: a unique constraint is its own contract entity, never an index carrying a constraint marker — the same discrete-entities principle that split FKs from their backing indexes (ADR 161 superseding note; an element must be interpretable from its own node).
 
 `PostgresRlsPolicy` ([postgres-rls-policy.ts](../../packages/3-targets/3-targets/postgres/src/core/postgres-rls-policy.ts)) and `PostgresPolicySchemaNode`: `prefix` becomes **optional** — absent means exact-named. No other field changes.
 
@@ -102,7 +104,7 @@ Refine diagnostics (exact codes; message wording follows the existing `@@index` 
 - `PSL_INDEX_EXPRESSION_REQUIRES_NAME` — "`@@index` with an `expression` argument requires a `name` or `map` argument (a default name cannot be derived from an expression)"
 - `PSL_INDEX_NAME_XOR_MAP` — "`@@index` takes at most one of `name` and `map`"
 
-`@@unique` (`uniqueModelSpec`) gains `name` (managed prefix) beside the existing `map` (now exact mode), with the same `PSL_UNIQUE_NAME_XOR_MAP` exclusivity. `@@unique` does **not** take `expression`/`where`/`type` — it remains the *constraint* surface; an expression-unique is a unique **index** and is authored as `@@index(expression: …, unique: true)` (Postgres has no expression form of `ADD CONSTRAINT UNIQUE`).
+`@@unique` (`uniqueModelSpec`) is **unchanged**: it remains the *constraint* surface, and unique constraints stay outside the name-identity model (fully structured, content-compared — see D5). It does not take `expression`/`where`/`type`; an expression-unique is a unique **index** and is authored as `@@index(expression: …, unique: true)` (Postgres has no expression form of `ADD CONSTRAINT UNIQUE`).
 
 **PSL policy blocks** (`policy_select` … `policy_all`): gain the `@@map("<exact name>")` block attribute, the same mechanism `native_enum` uses. With `@@map`, the block-head identifier remains the source-level logical identifier (duplicate-prefix checking unchanged) but the lowered entity is exact-named: `name = map value`, `prefix` absent, no hash computed. Without `@@map`, behavior is unchanged (head = prefix, wire name computed).
 
@@ -126,7 +128,7 @@ constraints.index(fields: ColumnRef | readonly ColumnRef[], opts?: { name?; map?
 constraints.index(opts: { expression: string; name?: string; map?: string; where?; unique?; type?; options? }) // name or map required — enforced at lowering with the same diagnostics as PSL
 ```
 
-`constraints.unique` gains `name?` beside `map?` symmetric with `@@unique`. RLS TS helpers (`policySelect` etc.): descriptor gains `map?: string`, exactly one of `name`/`map` required.
+`constraints.unique` is unchanged, symmetric with `@@unique`. TS policy helpers do not exist yet (postgres-rls closed without `rls-ts-authoring`); the `map?` descriptor parameter lands with whatever future work builds TS policy authoring (see § Dependencies).
 
 Both surfaces lower through one shared path per entity so PSL/TS parity holds by construction; a parity test pins identical IR (wire names included) for identical inputs.
 
@@ -156,7 +158,7 @@ The wire-name machinery hoists from `packages/3-targets/3-targets/postgres/src/c
 
 The RLS tuple is unchanged. The user prefix, schema, and table are excluded from both tuples (ADR 234 rationale).
 
-**Default prefixes** (managed mode with no `name:`): `@@index([a,b])` → `defaultIndexName(table, columns)`; `@@unique([a,b])` → `` `${table}_${columns.join('_')}_key` `` (the current default constraint name); FK-backing indexes → their current default name. So an unnamed index's wire name is `<today's-default-name>_<8hex>`.
+**Default prefixes** (managed mode with no `name:`): `@@index([a,b])` → `defaultIndexName(table, columns)`; FK-backing indexes → their current default name. So an unnamed index's wire name is `<today's-default-name>_<8hex>`. Unique constraints keep their existing default names unhashed (they are outside the wire-name model).
 
 **Prefix length cap:** 54 characters (63-char `name` budget minus the 9-char suffix), enforced at lowering with a clear error — same rule as RLS.
 
@@ -176,7 +178,7 @@ The RLS tuple is unchanged. The user prefix, schema, and table are excluded from
 
 `PostgresPolicySchemaNode.isEqualTo`: managed unchanged (id equality ⇒ always true when paired). Exact-named (prefix absent): compare `operation`, `permissive`, sorted `roles`, `using ?? ''`, `withCheck ?? ''` — the SQL bodies verbatim, same rationale as above.
 
-With postgres-rls slice 2.6 (`unify-unique-and-index-nodes` — a hard dependency, see § Dependencies) landed, `SqlUniqueIR` is gone and `@@unique`-backed uniques are `SqlIndexIR { unique: true }` nodes with the constraint-vs-index flag 2.6 introduces; they participate in name identity exactly like declared indexes. `PrimaryKey` nodes are untouched.
+`SqlUniqueIR` (unique constraints, `pg_constraint`) is **untouched**. Postgres-rls slice 2.6 ([#947](https://github.com/prisma/prisma-next/pull/947)) settled that a unique constraint and an index are different schema elements — different catalog, different DDL, independent lifecycle — and stay two node kinds; its earlier attempt to merge them behind a constraint flag was rejected there, and the contract's discrete-entities principle (D1) forbids an index node that claims to also be a constraint. A unique constraint is fully structured (columns only), so its existing tuple identity + content comparison is already exact — by the one identity rule it needs no wire name. `PrimaryKey` nodes are likewise untouched.
 
 > **Satisfies:** one identity rule for every index node; out-of-band structured drift (scenario H) stays detectable; no reprint is ever compared against hand-authored text under managed naming.
 
@@ -221,7 +223,7 @@ Leftovers proceed as create (additive) / drop (destructive) exactly as today. Th
 
 Postgres inference ([infer-psl-contract.ts](../../packages/3-targets/3-targets/postgres/src/core/psl-infer/infer-psl-contract.ts)) is extended:
 
-- **Indexes.** For each introspected index node: recompute the wire hash from the introspected content (D4 tuple). If the live name parses as `<prefix>_<hash>` **and** the recomputed hash equals the parsed hash → emit managed authoring (`name: <prefix>`); this holds for every fields-only index this toolchain created, so our own databases re-infer to managed contracts byte-identically. Otherwise → emit `map: "<live name>"` with the content verbatim (`expression`/`where` as reprinted). Expression indexes always take the `map:` branch (the reprint never hashes to the authored suffix). `unique: true` for non-constraint-backed unique indexes; constraint-backed uniques keep flowing to `@@unique` (with `map:`/`name:` by the same recompute rule).
+- **Indexes.** For each introspected index node: recompute the wire hash from the introspected content (D4 tuple). If the live name parses as `<prefix>_<hash>` **and** the recomputed hash equals the parsed hash → emit managed authoring (`name: <prefix>`); this holds for every fields-only index this toolchain created, so our own databases re-infer to managed contracts byte-identically. Otherwise → emit `map: "<live name>"` with the content verbatim (`expression`/`where` as reprinted). Expression indexes always take the `map:` branch (the reprint never hashes to the authored suffix). `unique: true` for non-constraint-backed unique indexes; constraint-backed uniques keep flowing to `@@unique` as today (tuple-identified; the constraint name does not participate in equivalence).
 - **Policies** (closing the "later slice" note at [infer-psl-contract.ts:278](../../packages/3-targets/3-targets/postgres/src/core/psl-infer/infer-psl-contract.ts)): each `pg_policies` row emits a `policy_<cmd>` block: head identifier = `parseWireName(policyname)?.prefix ?? policyname`, sanitized to a PSL identifier (collisions within the namespace disambiguated with a numeric suffix — the head is source-only); `@@map("<policyname>")` **always** (a policy body reprint never re-hashes to the live suffix, so managed re-detection is impossible — policies always adopt as exact); `target`, `roles`, `using`/`withCheck` verbatim from `qual`/`with_check`, `permissive` from the row.
 - **RLS enablement.** Tables with `pg_class.relrowsecurity = true` emit the existing `@@rls` model attribute so `rlsEnabled` round-trips.
 
@@ -245,9 +247,8 @@ Wire-name helpers and `SqlIndexIR` semantics live in `2-sql/1-core` (family-shar
 
 ## Dependencies and coordination
 
-- **Hard dependency: postgres-rls slice 2.6 `unify-unique-and-index-nodes`** (branch `slice/unify-unique-and-index-nodes`, in flight). It deletes `SqlUniqueIR` and makes uniques `SqlIndexIR { unique: true }`. This project's D5 rewrites `SqlIndexIR` identity; doing so before/parallel to 2.6 would conflict wholesale. **2.6 must merge first**; slice 1 rebases on it.
-- **Coordination: postgres-rls slice 5 `rls-ts-authoring`** (TS policy helpers, not yet landed). D3's `map?` on the TS policy descriptor applies to those helpers when they exist; if slice 5 is unmerged when our slice 3 runs, the TS half of policy exact-naming moves into slice 5's scope (tracked in both plans).
-- The postgres-rls project's plan gains a cross-reference to this project (its "forward applicability" follow-on is being executed here).
+- **Slice-0 dependency: resolved.** Postgres-rls slice 2.6 merged as [#947](https://github.com/prisma/prisma-next/pull/947) (2026-07-10), but with a **different node shape than this spec originally assumed**: it kept `SqlUniqueIR` and `SqlIndexIR` as two structural nodes and rejected the merged-node-with-flag design (its Alternatives section records why — under tuple identity the merge forced dedup/fail-loud hacks back in; independently, an index claiming "I'm also a constraint" breaks the contract's discrete-entities principle). This spec is amended to that substrate: name identity covers index nodes and policies; unique constraints stay tuple-identified (D5). The operator confirmed this direction on 2026-07-23.
+- **TS policy authoring does not exist.** Postgres-rls closed out ([#979](https://github.com/prisma/prisma-next/pull/979)) without landing its `rls-ts-authoring` slice; there are no `policySelect`-style helpers in `contract-ts`. The TS half of policy exact-naming (`map?` on the descriptor) is out of this project's scope and lands with whatever future work builds TS policy authoring. PSL `@@map` on policy blocks (slice 3) is unaffected.
 
 ## Non-goals
 
@@ -275,5 +276,6 @@ Wire-name helpers and `SqlIndexIR` semantics live in `2-sql/1-core` (family-shar
 - [ADR 235 — The schema differ walks two derived schema IRs](../../docs/architecture%20docs/adrs/ADR%20235%20-%20The%20schema%20differ%20walks%20two%20derived%20schema%20IRs.md) (node-owned equivalence)
 - [ADR 210 — Index-type registry](../../docs/architecture%20docs/adrs/ADR%20210%20-%20Index-type%20registry.md) (`type`/`options` validation, unchanged)
 - [ADR 009 — Deterministic Naming Scheme](../../docs/architecture%20docs/adrs/ADR%20009%20-%20Deterministic%20Naming%20Scheme.md) (default names become managed prefixes)
-- postgres-rls project (off-main): `projects/postgres-rls/` on the `slice/*` branches — substrate and precedent
+- [#947](https://github.com/prisma/prisma-next/pull/947) — unique constraints and indexes are two structural nodes; the reconciliation pass is deleted (substrate this project builds on; postgres-rls itself closed out in [#979](https://github.com/prisma/prisma-next/pull/979))
+- [ADR 161 — Explicit foreign key constraint and index configuration](../../docs/architecture%20docs/adrs/ADR%20161%20-%20Explicit%20foreign%20key%20constraint%20and%20index%20configuration.md) (superseding note: constraints and indexes are discrete entities)
 - ADR draft: [specs/adr-name-identified-indexes.md](specs/adr-name-identified-indexes.md)

@@ -8,15 +8,15 @@ Each slice is named for what a developer can **rely on** when it merges. Slice n
 
 | # | Slice | Where | Status |
 | --- | --- | --- | --- |
-| 0 | `unify-unique-and-index-nodes` (postgres-rls 2.6) — `SqlUniqueIR` deleted, uniques are `SqlIndexIR { unique: true }` | `projects/postgres-rls/`, branch `slice/unify-unique-and-index-nodes` | ⬜ must merge before slice 1 |
+| 0 | `unify-unique-and-index-nodes` (postgres-rls 2.6) — reconciliation pass deleted; unique constraints and indexes settled as **two** structural nodes (not the merged shape this plan originally assumed — see spec § Dependencies) | [#947](https://github.com/prisma/prisma-next/pull/947) | ✅ merged 2026-07-10 |
 
 ## Slices
 
 | # | Slice | Delivers | Depends on | Status |
 | --- | --- | --- | --- | --- |
-| 1 | `indexes-are-name-identified` | Every index node (declared, unique-backed, FK-backing) is name-identified with managed wire names; introspection is full-fidelity (expression/partial capture, skip+dedup hacks deleted); planner renders expression DDL; both rename-pairing phases work; existing databases converge via renames (scenario I). No new authoring surface yet. | 0 | ⬜ |
+| 1 | `indexes-are-name-identified` | Every index node (declared and FK-backing, unique indexes included; unique *constraints* stay tuple-identified — spec D5) is name-identified with managed wire names; introspection is full-fidelity (expression/partial capture, skip+dedup hacks deleted); planner renders expression DDL; both rename-pairing phases work; existing databases converge via renames (scenario I). No new authoring surface yet. | 0 | ⬜ |
 | 2 | `expression-index-authoring` | Ciphers can author their index: `@@index` expression/where/unique/name/map matrix in PSL + TS with exact diagnostics and the D9 warning; DoD-1 e2e green (scenarios B, D, E, G, H, J). | 1 | ⬜ |
-| 3 | `rls-exact-names` | Policies adoptable: `@@map` on policy blocks (+ TS `map` where slice `rls-ts-authoring` has landed), optional `prefix`, exact-policy content comparison, policy content-pairing rename (scenarios C, F for policies). | 1 | ⬜ |
+| 3 | `rls-exact-names` | Policies adoptable: `@@map` on policy blocks, optional `prefix`, exact-policy content comparison, policy content-pairing rename (scenarios C, F for policies). TS policy authoring does not exist; its `map` lands with that future work (spec § Dependencies). | 1 | ⬜ |
 | 4 | `infer-round-trip` | `contract infer` emits policies, `@@rls`, and full-fidelity indexes with managed re-detection; sign-the-database e2e (DoD-2), transition e2e (DoD-3), upgrade e2e (DoD-4) all green. | 2, 3 | ⬜ |
 
 ## Slice boundaries (what goes where)
@@ -34,14 +34,14 @@ The identity switch, done entirely beneath the authoring surface (existing `@@in
 
 ### 2 — `expression-index-authoring`
 
-- D3 for `@@index`/`@@unique`/`constraints.index`/`constraints.unique`: parameter matrix, three PSL diagnostics + `PSL_UNIQUE_NAME_XOR_MAP`, TS overloads with lowering-time enforcement, PSL/TS parity test.
+- D3 for `@@index`/`constraints.index`: parameter matrix, three PSL diagnostics, TS overloads with lowering-time enforcement, PSL/TS parity test (`@@unique`/`constraints.unique` unchanged — spec D3).
 - D9 warning with the exact spec wording.
 - DoD-1 ciphers e2e (PSL and TS variants); scenario-row tests B, D, E, G, H.
 
 ### 3 — `rls-exact-names`
 
 - D1 (policy half): optional `prefix` on `PostgresRlsPolicy` + `PostgresPolicySchemaNode`.
-- D3 (policy half): `@@map` block attribute on the five `policy_*` blocks; TS descriptor `map` if `rls-ts-authoring` merged, else deferred into that slice with a cross-note in `projects/postgres-rls/plan.md`.
+- D3 (policy half): `@@map` block attribute on the five `policy_*` blocks. (No TS half — TS policy authoring was never built; spec § Dependencies.)
 - D5 (policy half): exact-policy `isEqualTo`.
 - D7 (policy half): content-pairing phase 2 added to the existing policy rename pass.
 - D9 warning for policies. Scenario tests C and F, policy edition.

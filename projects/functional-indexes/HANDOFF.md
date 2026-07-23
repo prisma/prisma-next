@@ -12,11 +12,11 @@ Expression (functional) indexes (`CREATE INDEX … USING btree (eql_v3.eq_term(e
 2. [plan.md](plan.md) — four slices with boundaries; slice N's DoD points at spec scenario letters.
 3. [specs/adr-name-identified-indexes.md](specs/adr-name-identified-indexes.md) — the rationale record; migrates to `docs/architecture docs/adrs/` at close-out.
 4. Background ADRs: 234 (wire names), 235 (the differ), 210 (index types), 009 (default names).
-5. Substrate precedent: `projects/postgres-rls/` — lives **off-main** on the `slice/*` branches (e.g. `slice/rls-policy-operations-and-roles`); its HANDOFF carries the operating conventions this project inherits.
+5. Substrate precedent: postgres-rls is **closed out** ([#979](https://github.com/prisma/prisma-next/pull/979)); its decisions live as promoted ADRs (234, 235) and merged PRs ([#947](https://github.com/prisma/prisma-next/pull/947) for the constraint/index node split). The operating conventions it established are carried in this handoff.
 
 ## Hard constraints (do not relitigate)
 
-- **Slice 0 dependency:** postgres-rls slice 2.6 `unify-unique-and-index-nodes` (branch `slice/unify-unique-and-index-nodes`) deletes `SqlUniqueIR`; it must merge before slice 1. If it's still unmerged, coordinate with the operator — do not start slice 1 on the old node shape.
+- **Slice 0 dependency: resolved (2026-07-23).** Postgres-rls slice 2.6 merged as [#947](https://github.com/prisma/prisma-next/pull/947), but it kept `SqlUniqueIR` and `SqlIndexIR` as two structural nodes rather than deleting `SqlUniqueIR` as originally assumed. The operator confirmed the two-node substrate is correct (an index must not carry a constraint marker — discrete-entities principle, ADR 161 superseding note), and spec/plan are amended: name identity covers index nodes and policies; unique constraints stay tuple-identified.
 - **Scenario A is non-negotiable:** infer → emit → verify = zero issues, plan = zero ops, against the same database.
 - **No SQL parsing, ever.** Expression/where/predicate bodies are opaque strings; hashing uses the shared minimal normalizer only.
 - **No stored naming-mode enum.** `prefix` present ⇔ managed; the node's `isEqualTo` dispatches on it.
@@ -33,4 +33,5 @@ Expression (functional) indexes (`CREATE INDEX … USING btree (eql_v3.eq_term(e
 ## State at handoff
 
 - Shaping artifacts written and pushed on a draft PR (branch `project/functional-indexes-shaping`). Nothing implemented yet.
-- Next action: confirm slice-0 status, then write the slice-1 spec (`indexes-are-name-identified`) per plan.md's boundary list and run the build loop.
+- Slice-0 status confirmed and the substrate correction (two-node shape, above) folded into spec/plan/ADR on 2026-07-23.
+- Next action: write the slice-1 spec (`indexes-are-name-identified`) per plan.md's boundary list and run the build loop.
