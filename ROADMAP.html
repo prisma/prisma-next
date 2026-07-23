@@ -196,19 +196,19 @@
     <div class="statusline">
       <span class="item"><span class="k">Ships</span> <span class="v teal">July 31</span></span>
       <span class="item"><span class="k">Health</span> <span class="v ok">On track</span></span>
-      <span class="item"><span class="k">Updated</span> <span class="v">July 21</span></span>
+      <span class="item"><span class="k">Updated</span> <span class="v">July 23</span></span>
       <span class="item"><span class="k">Scoreboard</span> <span class="v link"><a href="https://github.com/prisma/prisma-next/pull/1000">450 proven · 500 unproven · 30 experimental · 250 not in 8.0</a></span></span>
     </div>
     <div class="progress">
-      <p class="cap">Work on this page: <b>34 tasks</b> — 1 done, 12 in flight, 21 not started</p>
-      <div class="bar" role="img" aria-label="34 tasks: 1 done, 12 in flight, 21 not started">
-        <div class="done" style="width: 3%"></div>
-        <div class="flight" style="width: 35%"></div>
+      <p class="cap">Work on this page: <b>34 tasks</b> — 3 done, 11 in flight, 20 not started</p>
+      <div class="bar" role="img" aria-label="34 tasks: 3 done, 11 in flight, 20 not started">
+        <div class="done" style="width: 9%"></div>
+        <div class="flight" style="width: 32%"></div>
       </div>
       <div class="legend">
-        <span><span class="dot" style="background: var(--good)"></span><b>1</b> done</span>
-        <span><span class="dot" style="background: var(--accent)"></span><b>12</b> in flight</span>
-        <span><span class="dot" style="background: var(--open-bg); outline: 1px solid var(--line-strong); outline-offset: -1px;"></span><b>21</b> not started</span>
+        <span><span class="dot" style="background: var(--good)"></span><b>3</b> done</span>
+        <span><span class="dot" style="background: var(--accent)"></span><b>11</b> in flight</span>
+        <span><span class="dot" style="background: var(--open-bg); outline: 1px solid var(--line-strong); outline-offset: -1px;"></span><b>20</b> not started</span>
       </div>
       <p class="cap" style="margin-top: 16px;"><a href="https://github.com/prisma/prisma-next/pull/1000">Feature scoreboard</a>: <b>~1,230 cells</b> (~326 features × 3 databases) — 450 proven, 500 unproven, 30 experimental, 250 not in 8.0</p>
       <div class="bar" role="img" aria-label="Scoreboard: about 450 cells proven, 500 unproven, 30 experimental, 250 not in 8.0">
@@ -247,7 +247,7 @@
       <li>
         <span class="n">3</span>
         <span class="what"><a href="#req3">Every name and format users depend on must be final</a>
-          <span class="note">Error codes are consolidating now; config keys, hashes, and generated-file layouts still to do.</span><span class="mini" aria-hidden="false"><span class="minibar" role="img" aria-label="5 tasks: 1 in flight · 4 not started"><span class="f" style="width: 20.0%"></span></span><span class="minicount">1 in flight · 4 not started</span></span></span>
+          <span class="note">Error codes and the migrations snapshot store have landed; config keys, hashes, and the name sweep still to do.</span><span class="mini" aria-hidden="false"><span class="minibar" role="img" aria-label="5 tasks: 2 done · 3 not started"><span class="d" style="width: 40.0%"></span></span><span class="minicount">2 done · 3 not started</span></span></span>
         <span class="owner">Will</span>
         <span class="pill flight">In progress</span>
       </li>
@@ -273,7 +273,7 @@
         <span class="pill open">Open</span>
       </li>
     </ol>
-    <p class="soft" style="margin-top: 16px;">Two decisions gate work and have dates: the minimum supported Postgres version (<strong>July 22</strong> — it blocks final scoreboard verdicts), and the polymorphism stable-or-experimental call (<strong>July 24</strong>, decided by whether its bug stream has flattened). A third is already made: error codes standardize on dotted namespace codes (like <code>ORM.DECODE_FAILED</code>), and the consolidation is in review. July 24 is also the day the scoreboard verdicts freeze and scope stops moving. There is no other internal schedule: we work these sections as fast as they'll go and ship when they're done.</p>
+    <p class="soft" style="margin-top: 16px;">Two dated decisions still bound the work. One is now overdue: the minimum supported Postgres version, whose <strong>July 22</strong> target has passed and still blocks final scoreboard verdicts until it is set. One is imminent: the polymorphism stable-or-experimental call (<strong>July 24</strong>, decided by whether its bug stream has flattened). A third is already made and delivered: error codes standardize on dotted namespace codes (like <code>ORM.DECODE_FAILED</code>), and the consolidation has landed. July 24 is also the day the scoreboard verdicts freeze and scope stops moving. There is no other internal schedule: we work these sections as fast as they'll go and ship when they're done.</p>
   </section>
 
   <section class="req" id="req1">
@@ -392,9 +392,9 @@
     <p class="soft">Users write <code>catch</code> blocks against error codes, commit generated contract and migration files to their repositories, and write config files against our keys. All of that becomes permanent API at the RC. Five changes must land first — sequenced together, because several of them alter the same generated files and users should see one change, not five.</p>
 
     <details class="task">
-      <summary><svg class="chev" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="t">One error-code scheme instead of four</span><span class="pill flight">In review</span></summary>
+      <summary><svg class="chev" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="t">One error-code scheme instead of four</span><span class="pill done">Landed</span></summary>
       <div class="body">
-        <p>Prisma 8 grew four separate error systems with two incompatible code formats — about 46 codes shaped like <code>PN-CLI-4001</code> and about 89 shaped like <code>RUNTIME.DECODE_FAILED</code> — plus roughly sixteen error classes carrying no code at all, including the database driver errors users hit most often. The format decision is made: <strong>dotted namespace codes win</strong> (<code>RUNTIME.DECODE_FAILED</code>-style). The structural consolidation is in review (<a href="https://linear.app/prisma-company/issue/TML-3067">TML-3067</a>), and the sweep converting the ORM's codeless throws into structured <code>ORM.*</code> errors is in progress (<a href="https://linear.app/prisma-company/issue/TML-3070">TML-3070</a>). Still to come with it: the published table mapping every old code to its new one. Prisma 7's <code>P1001</code>-style codes are deliberately not carried over — the upgrade guide will include a translation table for migrating monitoring rules and runbooks.</p>
+        <p>Prisma 8 grew four separate error systems with two incompatible code formats — about 46 codes shaped like <code>PN-CLI-4001</code> and about 89 shaped like <code>RUNTIME.DECODE_FAILED</code> — plus roughly sixteen error classes carrying no code at all. That's over: every published error is now a structural envelope with a dotted <code>NAMESPACE.SUBCODE</code> code, recognized by a type predicate instead of <code>instanceof</code> (<a href="https://linear.app/prisma-company/issue/TML-3067">TML-3067</a>); the ORM's and the contract-authoring plane's formerly codeless throws carry structured <code>ORM.*</code> / <code>CONTRACT.*</code> codes (<a href="https://linear.app/prisma-company/issue/TML-3070">TML-3070</a>, <a href="https://linear.app/prisma-company/issue/TML-3075">TML-3075</a>); and the reference page documenting all 221 published codes ships in-repo with a CI check that fails any change adding an undocumented code (<a href="https://linear.app/prisma-company/issue/TML-3071">TML-3071</a>). The old→new crosswalk is published in ADR 239 and feeds the v8 upgrade guide. What continues after the freeze is non-breaking by construction: sweeping the adapter and extension planes' remaining codeless throws onto the same scheme only <em>adds</em> codes. Prisma 7's <code>P1001</code>-style codes are deliberately not carried over — the upgrade guide will include a translation table for migrating monitoring rules and runbooks.</p>
       </div>
     </details>
 
@@ -413,9 +413,9 @@
     </details>
 
     <details class="task">
-      <summary><svg class="chev" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="t">Store each contract snapshot once instead of copying it into every migration</span><span class="pill open">Open</span></summary>
+      <summary><svg class="chev" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="t">Store each contract snapshot once instead of copying it into every migration</span><span class="pill done">Landed</span></summary>
       <div class="body">
-        <p>Every migration folder currently carries full copies of the data contract it goes from and to — so a project with N migrations stores roughly 2N copies of N+1 distinct documents. They move to a single <code>migrations/snapshots/</code> folder, one file per distinct contract, named by its content hash; migration folders already record which hashes they go from and to, so they need no new linking files. Safe to do (a migration's identity hash deliberately doesn't cover the snapshots, so no existing migration is invalidated) and urgent to do (the migrations folder layout is one of the things that freezes — users commit these folders to their repositories).</p>
+        <p>Every migration folder used to carry full copies of the data contract it goes from and to — so a project with N migrations stored roughly 2N copies of N+1 distinct documents. They now live in a single <code>migrations/snapshots/</code> folder, one snapshot entry per distinct contract, addressed by its content hash (<a href="https://linear.app/prisma-company/issue/TML-3059">TML-3059</a>); ref-paired snapshots fold into the same store (<a href="https://linear.app/prisma-company/issue/TML-3072">TML-3072</a>). A migration's identity hash deliberately doesn't cover the snapshots, so no existing migration was invalidated, and a one-shot migrator converts existing projects' committed migration trees.</p>
       </div>
     </details>
 
@@ -596,6 +596,8 @@
   <section class="landed">
     <h2>Recently landed</h2>
     <ul>
+      <li><strong>One error-code scheme, delivered end-to-end</strong> — every published error is a structural envelope with a dotted code; the ORM and contract-authoring planes' codeless throws were swept onto it; the 221-code reference page ships with a CI check that keeps it complete (requirement 3).</li>
+      <li><strong>Migration folders moved to a content-addressed snapshot store</strong> — each distinct contract stored once under <code>migrations/snapshots/</code> instead of copied into every migration, with a one-shot migrator for existing projects (requirement 3).</li>
       <li><strong>Adopting an existing database round-trips cleanly</strong> — seven defects fixed, proven against live databases (details in requirement 4).</li>
       <li><strong>Polymorphism fixes narrowed to edge cases</strong> — count-write scoping, field-selection restriction, relation-uniqueness validation (requirement 1).</li>
       <li><strong>The last big contract-format changes landed ahead of the freeze</strong> — foreign keys and indexes became first-class entities in the contract document, and migration operations are now ordered by a real dependency graph.</li>
