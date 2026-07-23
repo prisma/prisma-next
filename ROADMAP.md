@@ -2,7 +2,7 @@
 
 Prisma Next — the contract-first rewrite of Prisma — ships as **Prisma 8**. On **July 31** we publish **`prisma@8.0.0-rc.1`** from the `prisma/prisma` repository: the same repository and the same npm package Prisma users already know. The release candidate is published under a pre-release tag, so `npm install prisma` keeps installing Prisma 7 until 8.0.0 final ships. Prisma 8 carries **PostgreSQL to general availability** — and that is all: **MongoDB ships in early access**, and **SQLite is a proof of concept** at this stage. A release candidate freezes the public API; it does not promise Prisma 7 feature parity. Its promise is different: **everything it ships works and is proven by a test**, everything experimental is labeled, and everything absent is named rather than silently missing.
 
-**Updated July 23 · Health: on track · Ships July 31 · Tasks: 5 done / 12 in flight / 17 not started · [Scoreboard](https://github.com/prisma/prisma-next/pull/1000): ~450 proven / ~500 unproven / ~30 experimental / ~250 not in 8.0**
+**Updated July 23 · Health: on track · Ships July 31 · Tasks: 6 done / 11 in flight / 17 not started · [Scoreboard](https://github.com/prisma/prisma-next/pull/1000): ~450 proven / ~500 unproven / ~30 experimental / ~250 not in 8.0**
 
 ## What needs to happen to release v8-RC1
 
@@ -10,7 +10,7 @@ Six things must be true on release day. Everything on this page belongs to one o
 
 1. **[Queries must return correct values](#1-queries-must-return-correct-values)** — *in progress · Alexey.* The main remaining defect: values read through relation-loading corrupt or fail.
 2. **[The schema language must reach its final form](#2-the-schema-language-must-reach-its-final-form)** — *in flight · Serhii.* Whatever syntax the RC ships is permanent for the life of v8; three language projects are running.
-3. **[Every name and format users depend on must be final](#3-every-name-and-format-users-depend-on-must-be-final)** — *in progress · Will.* Error codes, hashes, and the migration snapshot layout are done; the config-key rename and the `prisma-next` name sweep remain.
+3. **[Every name and format users depend on must be final](#3-every-name-and-format-users-depend-on-must-be-final)** — *in progress · Will.* Error codes, hashes, the migration snapshot layout, and the config-key rename are done; the `prisma-next` name sweep remains.
 4. **[The release's claims must be proven](#4-the-releases-claims-must-be-proven)** — *scoreboard drafted, proofs open · everyone.* "It works" and "you can migrate incrementally" each need a runnable receipt.
 5. **[The code must move into prisma/prisma](#5-the-code-must-move-into-prismaprisma)** — *starting · Alexey.* Repository merge, publishing pipeline, and years of open v7 issues.
 6. **[The rough edges users hit on day one must be gone](#6-the-rough-edges-users-hit-on-day-one-must-be-gone)** — *not started · everyone.* Small fixes that would be embarrassing under announcement-day attention.
@@ -117,9 +117,9 @@ Users write `catch` blocks against error codes, commit generated contract and mi
 Prisma 8 grew four separate error systems with two incompatible code formats — about 46 codes shaped like `PN-CLI-4001` and about 89 shaped like `RUNTIME.DECODE_FAILED` — plus roughly sixteen error classes carrying no code at all. That's over: every published error is now a structural envelope with a dotted `NAMESPACE.SUBCODE` code, recognized by a type predicate instead of `instanceof` ([TML-3067](https://linear.app/prisma-company/issue/TML-3067)); the ORM's and the contract-authoring plane's formerly codeless throws carry structured `ORM.*` / `CONTRACT.*` codes ([TML-3070](https://linear.app/prisma-company/issue/TML-3070), [TML-3075](https://linear.app/prisma-company/issue/TML-3075)); and the reference page documenting all 221 published codes ships in-repo with a CI check that fails any change adding an undocumented code ([TML-3071](https://linear.app/prisma-company/issue/TML-3071)). The old→new crosswalk is published in ADR 239 and feeds the v8 upgrade guide. What continues after the freeze is non-breaking by construction: sweeping the adapter and extension planes' remaining codeless throws onto the same scheme only *adds* codes. Prisma 7's `P1001`-style codes are deliberately not carried over — the upgrade guide will include a translation table for migrating monitoring rules and runbooks.
 </details>
 
-<details><summary>⬜ <b>Rename the `extensionPacks` config key to `extensions`</b></summary>
+<details><summary>✅ <b>Rename the `extensionPacks` config key to `extensions`</b> · landed</summary>
 
-A simple rename with a deep reach: the key appears in user config files, in the schema of the generated contract document, and in the code that canonicalizes and hashes contracts — about 350 files. Breaking, so it happens now or never. While in there, the config format gets a sweep for any other key we'd regret freezing as-is. ([TML-2462](https://linear.app/prisma-company/issue/TML-2462))
+A simple rename with a deep reach: the key lived in user config files, in the generated contract document's schema, and in the code that canonicalizes and hashes contracts. It is now `extensions` everywhere, a guard rejects the old key, and every contract hash, migration, and snapshot was regenerated. The config-format sweep rode along — `contract.source.sourceFormat` became `format` and the sugar `outputPath` became `output` — with the ADRs and the consumer and extension-author upgrade recipes updated to match. ([TML-2462](https://linear.app/prisma-company/issue/TML-2462), [#1032](https://github.com/prisma/prisma-next/pull/1032))
 </details>
 
 <details><summary>✅ <b>Hashes lose their `sha256:` prefix</b> · landed</summary>

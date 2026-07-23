@@ -200,10 +200,10 @@
       <span class="item"><span class="k">Scoreboard</span> <span class="v link"><a href="https://github.com/prisma/prisma-next/pull/1000">450 proven · 500 unproven · 30 experimental · 250 not in 8.0</a></span></span>
     </div>
     <div class="progress">
-      <p class="cap">Work on this page: <b>34 tasks</b> — 5 done, 12 in flight, 17 not started</p>
-      <div class="bar" role="img" aria-label="34 tasks: 5 done, 12 in flight, 17 not started">
-        <div class="done" style="width: 15%"></div>
-        <div class="flight" style="width: 35%"></div>
+      <p class="cap">Work on this page: <b>34 tasks</b> — 6 done, 11 in flight, 17 not started</p>
+      <div class="bar" role="img" aria-label="34 tasks: 6 done, 11 in flight, 17 not started">
+        <div class="done" style="width: 18%"></div>
+        <div class="flight" style="width: 32%"></div>
       </div>
       <div class="legend">
         <span><span class="dot" style="background: var(--good)"></span><b>5</b> done</span>
@@ -247,7 +247,7 @@
       <li>
         <span class="n">3</span>
         <span class="what"><a href="#req3">Every name and format users depend on must be final</a>
-          <span class="note">Error codes, hashes, and the migration snapshot layout are done; the config-key rename and name sweep remain.</span><span class="mini" aria-hidden="false"><span class="minibar" role="img" aria-label="5 tasks: 3 done · 2 not started"><span class="d" style="width: 60.0%"></span></span><span class="minicount">3 done · 2 not started</span></span></span>
+          <span class="note">Error codes, hashes, the migration snapshot layout, and the config-key rename are done; the name sweep remains.</span><span class="mini" aria-hidden="false"><span class="minibar" role="img" aria-label="5 tasks: 4 done · 1 not started"><span class="d" style="width: 80.0%"></span></span><span class="minicount">4 done · 1 not started</span></span></span>
         <span class="owner">Will</span>
         <span class="pill flight">In progress</span>
       </li>
@@ -399,9 +399,9 @@
     </details>
 
     <details class="task">
-      <summary><svg class="chev" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="t">Rename the <code>extensionPacks</code> config key to <code>extensions</code></span><span class="pill open">Open</span></summary>
+      <summary><svg class="chev" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="t">Rename the <code>extensionPacks</code> config key to <code>extensions</code></span><span class="pill done">Landed</span></summary>
       <div class="body">
-        <p>A simple rename with a deep reach: the key appears in user config files, in the schema of the generated contract document, and in the code that canonicalizes and hashes contracts — about 350 files. Breaking, so it happens now or never. While in there, the config format gets a sweep for any other key we'd regret freezing as-is. (<a href="https://linear.app/prisma-company/issue/TML-2462">TML-2462</a>)</p>
+        <p>A simple rename with a deep reach: the key lived in user config files, in the generated contract document's schema, and in the code that canonicalizes and hashes contracts. It is now <code>extensions</code> everywhere, a guard rejects the old key, and every contract hash, migration, and snapshot was regenerated. The config-format sweep rode along — <code>contract.source.sourceFormat</code> became <code>format</code> and the sugar <code>outputPath</code> became <code>output</code> — with the ADRs and the consumer and extension-author upgrade recipes updated to match. (<a href="https://linear.app/prisma-company/issue/TML-2462">TML-2462</a>, <a href="https://github.com/prisma/prisma-next/pull/1032">#1032</a>)</p>
       </div>
     </details>
 
