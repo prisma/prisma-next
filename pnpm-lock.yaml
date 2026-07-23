@@ -3297,6 +3297,9 @@ importers:
       '@prisma-next/sql-runtime':
         specifier: workspace:0.16.0
         version: link:../../2-sql/5-runtime
+      '@prisma-next/target-postgres':
+        specifier: workspace:0.16.0
+        version: link:../../3-targets/3-targets/postgres
       '@standard-schema/spec':
         specifier: ^1.1.0
         version: 1.1.0
@@ -3535,6 +3538,9 @@ importers:
       '@prisma-next/sql-schema-ir':
         specifier: workspace:0.16.0
         version: link:../../2-sql/1-core/schema-ir
+      '@prisma-next/target-postgres':
+        specifier: workspace:0.16.0
+        version: link:../../3-targets/3-targets/postgres
       '@standard-schema/spec':
         specifier: ^1.1.0
         version: 1.1.0
@@ -3557,9 +3563,6 @@ importers:
       '@prisma-next/sql-contract-ts':
         specifier: workspace:0.16.0
         version: link:../../2-sql/2-authoring/contract-ts
-      '@prisma-next/target-postgres':
-        specifier: workspace:0.16.0
-        version: link:../../3-targets/3-targets/postgres
       '@prisma-next/test-utils':
         specifier: workspace:0.16.0
         version: link:../../../test/utils
@@ -3611,6 +3614,9 @@ importers:
       '@prisma-next/sql-schema-ir':
         specifier: workspace:0.16.0
         version: link:../../2-sql/1-core/schema-ir
+      '@prisma-next/target-postgres':
+        specifier: workspace:0.16.0
+        version: link:../../3-targets/3-targets/postgres
       '@standard-schema/spec':
         specifier: ^1.1.0
         version: 1.1.0
@@ -3633,9 +3639,6 @@ importers:
       '@prisma-next/sql-contract-ts':
         specifier: workspace:0.16.0
         version: link:../../2-sql/2-authoring/contract-ts
-      '@prisma-next/target-postgres':
-        specifier: workspace:0.16.0
-        version: link:../../3-targets/3-targets/postgres
       '@prisma-next/test-utils':
         specifier: workspace:0.16.0
         version: link:../../../test/utils
