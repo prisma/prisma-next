@@ -983,7 +983,16 @@ describe('PostgresControlAdapter', () => {
       const result = await adapter.introspect(mockDriver);
 
       expect(tablesOf(result)['user']?.indexes).toEqual([
-        new SqlIndexIR({ columns: ['name'], name: 'user_name_idx', unique: false, partial: false }),
+        new SqlIndexIR({
+          columns: ['name'],
+          name: 'user_name_idx',
+          unique: false,
+          partial: false,
+          type: undefined,
+          options: undefined,
+          annotations: undefined,
+          dependsOn: undefined,
+        }),
       ]);
     });
 
@@ -1053,6 +1062,10 @@ describe('PostgresControlAdapter', () => {
           name: 'user_email_tenant_idx',
           unique: false,
           partial: false,
+          type: undefined,
+          options: undefined,
+          annotations: undefined,
+          dependsOn: undefined,
         }),
       ]);
     });

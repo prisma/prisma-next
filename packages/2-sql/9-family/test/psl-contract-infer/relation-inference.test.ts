@@ -107,7 +107,16 @@ describe('inferRelations', () => {
         foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
         uniques: [],
         indexes: [
-          { columns: ['user_id'], unique: true, partial: false, name: 'profile_user_id_idx' },
+          {
+            columns: ['user_id'],
+            unique: true,
+            partial: false,
+            name: 'profile_user_id_idx',
+            type: undefined,
+            options: undefined,
+            annotations: undefined,
+            dependsOn: undefined,
+          },
         ],
       }),
     };
@@ -145,7 +154,16 @@ describe('inferRelations', () => {
         foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
         uniques: [],
         indexes: [
-          { columns: ['user_id'], unique: true, name: 'draft_active_user_idx', partial: true },
+          {
+            columns: ['user_id'],
+            unique: true,
+            name: 'draft_active_user_idx',
+            partial: true,
+            type: undefined,
+            options: undefined,
+            annotations: undefined,
+            dependsOn: undefined,
+          },
         ],
       }),
     };
@@ -192,6 +210,10 @@ describe('inferRelations', () => {
             unique: true,
             partial: false,
             name: 'handle_user_name_idx',
+            type: undefined,
+            options: undefined,
+            annotations: undefined,
+            dependsOn: undefined,
           },
         ],
       }),
@@ -548,7 +570,18 @@ describe('inferRelations', () => {
         primaryKey: { columns: ['id'] },
         foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
         uniques: [],
-        indexes: [{ columns: ['user_id'], unique: false, partial: false }],
+        indexes: [
+          {
+            columns: ['user_id'],
+            unique: false,
+            partial: false,
+            name: undefined,
+            type: undefined,
+            options: undefined,
+            annotations: undefined,
+            dependsOn: undefined,
+          },
+        ],
       }),
     };
     const modelNameMap = new Map([
@@ -591,7 +624,18 @@ describe('inferRelations', () => {
         ],
         uniques: [],
         // Same columns, reversed order: does not satisfy the FK's (tenant_id, user_id) order.
-        indexes: [{ columns: ['user_id', 'tenant_id'], unique: false, partial: false }],
+        indexes: [
+          {
+            columns: ['user_id', 'tenant_id'],
+            unique: false,
+            partial: false,
+            name: undefined,
+            type: undefined,
+            options: undefined,
+            annotations: undefined,
+            dependsOn: undefined,
+          },
+        ],
       }),
     };
     const modelNameMap = new Map([

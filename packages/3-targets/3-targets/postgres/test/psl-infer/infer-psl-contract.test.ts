@@ -255,7 +255,18 @@ describe('inferPostgresPslContract', () => {
             },
           ],
           uniques: [],
-          indexes: [{ columns: ['user_id'], unique: false, partial: false }],
+          indexes: [
+            {
+              columns: ['user_id'],
+              unique: false,
+              partial: false,
+              name: undefined,
+              type: undefined,
+              options: undefined,
+              annotations: undefined,
+              dependsOn: undefined,
+            },
+          ],
         },
       },
     });

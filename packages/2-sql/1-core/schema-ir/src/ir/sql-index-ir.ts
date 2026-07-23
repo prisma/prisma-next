@@ -5,20 +5,27 @@ import { RelationalSchemaNodeKind } from './schema-node-kinds';
 import type { SqlAnnotations } from './sql-column-ir';
 import { assertNode, defineNonEnumerable, SqlSchemaIRNode } from './sql-schema-ir-node';
 
+/**
+ * Every field is a required key. Values that may legitimately be absent
+ * (an unnamed `@@index`, the btree→undefined type normalization) are typed
+ * `| undefined` instead of optional, so each construction site states the
+ * absence explicitly rather than omitting the key silently. Undefined values
+ * still produce an instance without the property.
+ */
 export interface SqlIndexIRInput {
   readonly columns: readonly string[];
   readonly unique: boolean;
-  readonly name?: string;
-  readonly type?: string;
-  readonly options?: Record<string, unknown>;
-  readonly annotations?: SqlAnnotations;
+  readonly name: string | undefined;
+  readonly type: string | undefined;
+  readonly options: Record<string, unknown> | undefined;
+  readonly annotations: SqlAnnotations | undefined;
   /**
    * The index's own column nodes, as root-anchored chains. The derivation
    * stamps them so an index is dropped before the columns it is built on
    * (Postgres auto-drops the index when a covered column goes). Never
    * compared by `isEqualTo`.
    */
-  readonly dependsOn?: readonly SchemaNodeRef[];
+  readonly dependsOn: readonly SchemaNodeRef[] | undefined;
   /**
    * Whether the index is partial (has a row predicate). Required: every
    * producer must assert partiality explicitly, because a partial unique

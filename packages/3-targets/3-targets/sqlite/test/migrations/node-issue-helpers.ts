@@ -122,7 +122,11 @@ export function index(
     columns,
     unique: overrides.unique ?? false,
     partial: false,
-    ...(overrides.name !== undefined ? { name: overrides.name } : {}),
+    name: overrides.name,
+    type: undefined,
+    options: undefined,
+    annotations: undefined,
+    dependsOn: undefined,
   });
 }
 

@@ -614,6 +614,9 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
             name: idx.name,
             unique: idx.unique === 1,
             partial: idx.partial === 1,
+            type: undefined,
+            options: undefined,
+            annotations: undefined,
             dependsOn: flatColumnDependsOn(tableName, idxColumns),
           });
         }

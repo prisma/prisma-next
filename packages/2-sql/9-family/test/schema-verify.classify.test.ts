@@ -23,7 +23,16 @@ import { classifySqlDiffIssue, computeSqlDiffVerdict } from '../src/core/diff/sc
  */
 const table = new SqlTableIR({ name: 't', columns: {}, foreignKeys: [], uniques: [], indexes: [] });
 const column = new SqlColumnIR({ name: 'c', nativeType: 'int4', nullable: false });
-const index = new SqlIndexIR({ columns: ['c'], unique: false, partial: false });
+const index = new SqlIndexIR({
+  columns: ['c'],
+  unique: false,
+  partial: false,
+  name: undefined,
+  type: undefined,
+  options: undefined,
+  annotations: undefined,
+  dependsOn: undefined,
+});
 const check = new SqlCheckConstraintIR({ name: 'chk', column: 'c', permittedValues: ['a'] });
 
 function issueOf(change: ExpectationFailureReason, node: DiffableNode) {
