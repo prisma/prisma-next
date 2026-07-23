@@ -18,7 +18,10 @@ changes:
       literals), maps the empty-tree sentinel `sha256:empty` to `empty`, recomputes each
       `migrationHash`, and repoints `refs/*.json`. Then drop the prefix from any hash literal
       your pack's source, fixtures, or tests hard-code — a prefixed literal now fails validation
-      instead of round-tripping.
+      instead of round-tripping. Signed databases your extension maintains (acceptance
+      harnesses, reference instances) whose marker/ledger still hold prefixed values report a
+      hash mismatch on verify — there is no compatibility shim; re-sign against the regenerated
+      contract (`prisma-next db sign`).
     detection:
       glob: "**/*.{json,ts,mts,cts,tsx}"
       contains:
@@ -147,6 +150,14 @@ If your pack commits emitted contract artefacts (a pack contract under `src/cont
 ### Update hash literals your pack hard-codes
 
 Sweep your pack's source, fixtures, and tests for `sha256:`-prefixed literals — hand-built contract fixtures, expected `migrationHash` assertions, stub hashes in unit tests. Drop the prefix everywhere; for migration hashes, take the new value from the regenerated manifest, since the value itself changed. Constructing a hash via the framework's `coreHash()` / `profileHash()` constructors with a prefixed string now throws instead of round-tripping.
+
+### Database marker/ledger
+
+There is no compatibility shim: a database whose marker/ledger rows still hold prefixed values reports a hash mismatch on `prisma-next db verify`. This applies to any signed database your extension maintains — acceptance harnesses, reference instances. Re-sign each against its regenerated contract:
+
+```bash
+prisma-next db sign
+```
 
 ### Validation
 
