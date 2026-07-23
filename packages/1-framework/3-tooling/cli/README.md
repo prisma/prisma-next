@@ -1017,6 +1017,33 @@ prisma-next migration status [--db <url>] [--ref <name>] [--config <path>] [--js
 
 **Branched graphs:** When the migration graph has multiple branches (divergence), status reports an `AMBIGUOUS_TARGET` error with the divergence point and branch details. Use `--ref` to target a specific branch.
 
+### `prisma-next repl`
+
+Interactive query console — the Prisma Next replacement for `psql`. Connects to your database through the project's own runtime packages and evaluates Prisma Next queries and plain TypeScript.
+
+```bash
+prisma-next repl [--db <url>] [--config <path>]
+```
+
+**Options:**
+- `--db <url>`: Database connection string (optional; defaults to `config.db.connection`)
+- `--config <path>`: Path to `prisma-next.config.ts`
+
+**What it does:**
+1. Loads the config and the emitted `contract.json`, then resolves the target facade runtime (e.g. `@prisma-next/postgres/runtime`) and any required extension packs from the project's `node_modules`
+2. Exposes `db`, `sql`, `orm`, `enums`, and `raw` in a persistent evaluation context — `const`/`let` bindings survive across submissions and top-level `await` works
+3. Auto-executes queries: submitting a builder, plan, or ORM collection runs it immediately — no `.build()`, `execute()`, or `await` needed — and renders rows as a psql-style table with timing
+4. Autocompletes from the contract: a dropdown menu (Tab or as-you-type) offers tables, columns, models, relations, and builder methods with context sensitivity (columns inside `select('…')`, fields after where-lambda params, etc.); inline ghost text suggests previous inputs fish-style (accept with `→`)
+5. Supports meta commands with psql aliases: `.help` (`\?`), `.tables` (`\dt`), `.schema [table]` (`\d`), `.models`, `.clear`, `.exit` (`\q`)
+
+**Non-interactive mode:** when stdin is piped, each line is evaluated in order and results stream to stdout:
+
+```bash
+echo "db.sql.public.user.select('id','email').limit(5)" | prisma-next repl
+```
+
+The interactive editor lives in `src/repl/`: a pure reducer (`editor-state.ts`) drives the raw-mode terminal shell (`line-editor.ts`), with the completion engine (`completion.ts`), evaluator (`evaluator.ts`), and renderers unit-tested in `test/repl/`.
+
 ### `prisma-next migrate`
 
 Apply planned migrations to the database. Executes previously planned migrations (created by `migration plan`). Compares the database marker against the migration graph to determine which migrations are pending, then executes them sequentially. Each migration runs in its own transaction. Does not plan new migrations — run `migration plan` first.

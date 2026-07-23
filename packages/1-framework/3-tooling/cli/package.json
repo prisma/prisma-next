@@ -150,6 +150,10 @@
       "types": "./dist/commands/migrate.d.mts",
       "import": "./dist/commands/migrate.mjs"
     },
+    "./commands/repl": {
+      "types": "./dist/commands/repl.d.mts",
+      "import": "./dist/commands/repl.mjs"
+    },
     "./commands/ref": {
       "types": "./dist/commands/ref.d.mts",
       "import": "./dist/commands/ref.mjs"

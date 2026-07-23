@@ -25,6 +25,7 @@ import { createMigrationPlanCommand } from './commands/migration-plan';
 import { createMigrationShowCommand } from './commands/migration-show';
 import { createMigrationStatusCommand } from './commands/migration-status';
 import { createRefCommand } from './commands/ref';
+import { createReplCommand } from './commands/repl';
 import { createTelemetryCommand } from './commands/telemetry';
 import { setCommandDescriptions } from './utils/command-helpers';
 import { formatCommandHelp, formatRootHelp } from './utils/formatters/help';
@@ -314,14 +315,18 @@ const initCommand = createInitCommand();
 
 const formatCommand = createFormatCommand();
 const lspCommand = createLspCommand();
+const replCommand = createReplCommand();
 
 // Register top-level commands in the order the spec's intended-surface
 // diagram lists them: verbs (init, migrate) first, then subject
 // namespaces (contract, db, migration, ref). The order shows up in
 // `prisma-next --help` and is the first thing a new user sees, so it
-// matches the order spec.md uses to introduce the surface.
+// matches the order spec.md uses to introduce the surface. Commands
+// added after that spec (repl, format, lsp, telemetry) slot in with the
+// verbs they belong beside rather than appearing in the diagram.
 program.addCommand(initCommand);
 program.addCommand(migrateCommand);
+program.addCommand(replCommand);
 program.addCommand(formatCommand);
 program.addCommand(lspCommand);
 program.addCommand(contractCommand);

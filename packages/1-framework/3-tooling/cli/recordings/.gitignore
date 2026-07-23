@@ -1,4 +1,2 @@
-mp4/
-tapes/
-.bin/
-.cache.json
+mp4/*
+!mp4/repl-demo.mp4

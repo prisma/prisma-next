@@ -43,6 +43,15 @@ export default defineConfig({
         'src/utils/global-flags.ts',
         'src/utils/terminal-ui.ts',
         'src/utils/shutdown.ts',
+        // REPL IO shells — raw-mode terminal editor, interactive session loop,
+        // and dynamic runtime loading; the pure logic (completion, evaluator,
+        // editor-state, render, meta-commands, schema-info, highlight,
+        // materialize, scan) and the stream-parameterized batch mode (batch.ts)
+        // are unit-tested in test/repl/.
+        'src/commands/repl.ts',
+        'src/repl/line-editor.ts',
+        'src/repl/session.ts',
+        'src/repl/load-repl-context.ts',
         // Command files — Commander.js setup and delegation to family instance,
         // tested via e2e tests in @prisma-next/integration-tests (test/integration/test/cli.*.e2e.test.ts)
         'src/commands/contract-emit.ts',
