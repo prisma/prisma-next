@@ -30,11 +30,11 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:b00ee871df781762a9f4a50b908cfe6d309ba66c5776a194782954eceb3e8b48'>;
+  StorageHashBase<'5951a5e350eef3da4d8005f739a5e72c343af45ecbdde402b7e61f6d28406d86'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:f70d6f83ae4711fab697f353e88ba78a3e431a57d22476ca399302dc7d6f574e'>;
+  ExecutionHashBase<'7bac46dcb4fdbdace7a8a19850cd5dd40c95aef3a84236b3b375dfc11bfdb5d6'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
+  ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -45,11 +45,14 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
 
 export type FieldOutputTypes = {
   readonly base: {
-    readonly User: { readonly id: Char<24>; readonly email: CodecTypes['pg/text@1']['output'] };
+    readonly User: {
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly email: CodecTypes['pg/text@1']['output'];
+    };
   };
   readonly transactional: {
     readonly Post: {
-      readonly id: Char<24>;
+      readonly id: CodecTypes['pg/text@1']['output'];
       readonly title: CodecTypes['pg/text@1']['output'];
       readonly authorId: CodecTypes['pg/text@1']['output'];
     };
@@ -58,13 +61,13 @@ export type FieldOutputTypes = {
 export type FieldInputTypes = {
   readonly base: {
     readonly User: {
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly email: CodecTypes['pg/text@1']['input'];
     };
   };
   readonly transactional: {
     readonly Post: {
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly title: CodecTypes['pg/text@1']['input'];
       readonly authorId: CodecTypes['pg/text@1']['input'];
     };
@@ -74,14 +77,14 @@ export type StorageColumnTypes = {
   readonly base: {
     readonly some_table: {
       readonly email: CodecTypes['pg/text@1']['output'];
-      readonly id: Char<24>;
+      readonly id: CodecTypes['pg/text@1']['output'];
     };
   };
   readonly public: {};
   readonly transactional: {
     readonly some_table: {
       readonly authorId: CodecTypes['pg/text@1']['output'];
-      readonly id: Char<24>;
+      readonly id: CodecTypes['pg/text@1']['output'];
       readonly title: CodecTypes['pg/text@1']['output'];
     };
   };
@@ -90,14 +93,14 @@ export type StorageColumnInputTypes = {
   readonly base: {
     readonly some_table: {
       readonly email: CodecTypes['pg/text@1']['input'];
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
     };
   };
   readonly public: {};
   readonly transactional: {
     readonly some_table: {
       readonly authorId: CodecTypes['pg/text@1']['input'];
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly title: CodecTypes['pg/text@1']['input'];
     };
   };
@@ -122,10 +125,9 @@ type ContractBase = Omit<
             readonly some_table: {
               columns: {
                 readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
                   readonly nullable: false;
-                  readonly typeParams: { readonly length: 24 };
                 };
                 readonly email: {
                   readonly nativeType: 'text';
@@ -154,10 +156,9 @@ type ContractBase = Omit<
             readonly some_table: {
               columns: {
                 readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
                   readonly nullable: false;
-                  readonly typeParams: { readonly length: 24 };
                 };
                 readonly title: {
                   readonly nativeType: 'text';
@@ -221,11 +222,7 @@ type ContractBase = Omit<
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 24 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly email: {
                 readonly nullable: false;
@@ -262,11 +259,7 @@ type ContractBase = Omit<
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 24 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly title: {
                 readonly nullable: false;
@@ -318,7 +311,7 @@ type ContractBase = Omit<
       readonly scalarList: true;
     };
   };
-  readonly extensionPacks: {};
+  readonly extensions: {};
   readonly execution: {
     readonly executionHash: ExecutionHash;
     readonly mutations: {

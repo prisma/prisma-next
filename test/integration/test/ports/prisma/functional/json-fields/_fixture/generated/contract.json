@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "profileHash": "3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
   "roots": {
     "entry": {
       "model": "Entry",
@@ -25,7 +25,7 @@
               "json": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/jsonb@1",
+                  "codecId": "pg/json@1",
                   "kind": "scalar"
                 }
               }
@@ -61,8 +61,8 @@
                   "nullable": false
                 },
                 "json": {
-                  "codecId": "pg/jsonb@1",
-                  "nativeType": "jsonb",
+                  "codecId": "pg/json@1",
+                  "nativeType": "json",
                   "nullable": false
                 }
               },
@@ -81,7 +81,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:a815ff49f4020a6dce92ec2987dc8c15a571b2372a62387ab49d185a85efe658"
+    "storageHash": "c70bd8930c375d443f8971c1fc6e78261fde3d64bfec53060850fa5f9732991d"
   },
   "capabilities": {
     "postgres": {
@@ -100,7 +100,7 @@
       "scalarList": true
     }
   },
-  "extensionPacks": {},
+  "extensions": {},
   "meta": {},
   "_generated": {
     "warning": "⚠️  GENERATED FILE - DO NOT EDIT",

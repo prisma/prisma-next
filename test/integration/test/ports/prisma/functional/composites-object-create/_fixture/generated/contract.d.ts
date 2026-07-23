@@ -17,10 +17,10 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:d3204146be7f9bd897e4ef8efdd5fd70112abad92dbb995b6ddfe28268e11277'>;
+  StorageHashBase<'95ba06155628a6148dd6c81cf187f68d1e0d09c7289de3530bbd4b58ac311fcd'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:cca47cfb902adf4e15c2f277dd98af4aff64a3a2c010b49ace1c897de1cc4510'>;
+  ProfileHashBase<'251b3ce23f6c9f561892e7c1af9d2cc941a13d64ba1aa7226b90036b09568cc3'>;
 
 export type CodecTypes = MongoCodecTypes;
 
@@ -252,7 +252,7 @@ type ContractBase = Omit<
     };
   };
   readonly capabilities: {};
-  readonly extensionPacks: {};
+  readonly extensions: {};
   readonly meta: {};
   readonly valueObjects: {
     readonly CommentContentUpvotes: {

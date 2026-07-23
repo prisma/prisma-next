@@ -30,11 +30,11 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:122fa0197f14ca3dffa7e4a6a55234b082ebb3a1c07a5df1a548de16ed8a7827'>;
+  StorageHashBase<'82be1821ae56669ece5324d1aaa9e3726e0443c6aff38557ef99392d8dfa26ce'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:c434c1a9384051ba6cc68b64e3fc63998de005835e54041f387fd3ca2a2ad4f1'>;
+  ExecutionHashBase<'4369450a09245c0a51fc504658e282787722359f0066f6aa63720307499f6b7d'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
+  ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -54,7 +54,7 @@ export type FieldOutputTypes = {
       readonly name: CodecTypes['pg/text@1']['output'];
     };
     readonly StudentClass: {
-      readonly id: Char<24>;
+      readonly id: CodecTypes['pg/text@1']['output'];
       readonly studentId: CodecTypes['pg/text@1']['output'];
       readonly classId: CodecTypes['pg/text@1']['output'];
     };
@@ -71,7 +71,7 @@ export type FieldInputTypes = {
       readonly name: CodecTypes['pg/text@1']['input'];
     };
     readonly StudentClass: {
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly studentId: CodecTypes['pg/text@1']['input'];
       readonly classId: CodecTypes['pg/text@1']['input'];
     };
@@ -89,7 +89,7 @@ export type StorageColumnTypes = {
     };
     readonly studentClass: {
       readonly classId: CodecTypes['pg/text@1']['output'];
-      readonly id: Char<24>;
+      readonly id: CodecTypes['pg/text@1']['output'];
       readonly studentId: CodecTypes['pg/text@1']['output'];
     };
   };
@@ -106,7 +106,7 @@ export type StorageColumnInputTypes = {
     };
     readonly studentClass: {
       readonly classId: CodecTypes['pg/text@1']['input'];
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly studentId: CodecTypes['pg/text@1']['input'];
     };
   };
@@ -167,10 +167,9 @@ type ContractBase = Omit<
             readonly studentClass: {
               columns: {
                 readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
                   readonly nullable: false;
-                  readonly typeParams: { readonly length: 24 };
                 };
                 readonly studentId: {
                   readonly nativeType: 'text';
@@ -314,11 +313,7 @@ type ContractBase = Omit<
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 24 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly studentId: {
                 readonly nullable: false;
@@ -384,7 +379,7 @@ type ContractBase = Omit<
       readonly scalarList: true;
     };
   };
-  readonly extensionPacks: {};
+  readonly extensions: {};
   readonly execution: {
     readonly executionHash: ExecutionHash;
     readonly mutations: {

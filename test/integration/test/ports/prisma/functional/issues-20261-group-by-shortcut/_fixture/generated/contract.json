@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "profileHash": "3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
   "roots": {
     "round": {
       "model": "Round",
@@ -18,11 +18,8 @@
               "id": {
                 "nullable": false,
                 "type": {
-                  "codecId": "sql/char@1",
-                  "kind": "scalar",
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
                 }
               },
               "points": {
@@ -69,12 +66,9 @@
             "round": {
               "columns": {
                 "id": {
-                  "codecId": "sql/char@1",
-                  "nativeType": "character",
-                  "nullable": false,
-                  "typeParams": {
-                    "length": 24
-                  }
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "points": {
                   "codecId": "pg/int4@1",
@@ -102,10 +96,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:6e18f03db20ad6c2ac5a8a6d371885fbaf4a38b330bc5c9f883f0d3ed08e92cf"
+    "storageHash": "13fde2fd9fc102d32d3f5f0609bb9a64276dbc539bb04e5a7ae46dcde10aee94"
   },
   "execution": {
-    "executionHash": "sha256:80f38624fd96e4a2c780f3250dc30924a05123dbe62a876e1a1904d093413e3c",
+    "executionHash": "a228e5a59df579ce219dfdfdacacc1cabf916b060dd1c9f1d57c4587b0f31244",
     "mutations": {
       "defaults": [
         {
@@ -139,7 +133,7 @@
       "scalarList": true
     }
   },
-  "extensionPacks": {},
+  "extensions": {},
   "meta": {},
   "_generated": {
     "warning": "⚠️  GENERATED FILE - DO NOT EDIT",

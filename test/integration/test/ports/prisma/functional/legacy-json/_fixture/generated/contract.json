@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "profileHash": "3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
   "roots": {
     "resource": {
       "model": "Resource",
@@ -96,7 +96,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:57d1c5343a13f5a25853d884c7b3857f283f5e0047802f9f1023692077012315"
+    "storageHash": "475b3d55191a7aad98ece2965b664900f8bb805dbeb59a39bda1b45975f8a024"
   },
   "capabilities": {
     "postgres": {
@@ -115,7 +115,7 @@
       "scalarList": true
     }
   },
-  "extensionPacks": {},
+  "extensions": {},
   "meta": {},
   "_generated": {
     "warning": "⚠️  GENERATED FILE - DO NOT EDIT",

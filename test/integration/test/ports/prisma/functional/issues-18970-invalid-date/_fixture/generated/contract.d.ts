@@ -30,11 +30,11 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:c58abd20fcbe505d8d9621958b55403bd0618777c74b93323d759fd45e5fc1a8'>;
+  StorageHashBase<'a9456a454f0173c121ad877ee64058356b3667689ca5e87346ecbbff0d21dd14'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:ae232bd1f1051df919925afd5e04406e14cc6a4c3c1dbbfbc8b8720ba8feb8ae'>;
+  ExecutionHashBase<'b3a0c7629738fce7d43a03a126ffc34990efca75f034d52cdd67a1adfada5ca4'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
+  ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -46,7 +46,7 @@ type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends key
 export type FieldOutputTypes = {
   readonly public: {
     readonly User: {
-      readonly id: Char<24>;
+      readonly id: CodecTypes['pg/text@1']['output'];
       readonly date: CodecTypes['pg/timestamptz@1']['output'] | null;
     };
   };
@@ -54,7 +54,7 @@ export type FieldOutputTypes = {
 export type FieldInputTypes = {
   readonly public: {
     readonly User: {
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
       readonly date: CodecTypes['pg/timestamptz@1']['input'] | null;
     };
   };
@@ -63,7 +63,7 @@ export type StorageColumnTypes = {
   readonly public: {
     readonly user: {
       readonly date: CodecTypes['pg/timestamptz@1']['output'] | null;
-      readonly id: Char<24>;
+      readonly id: CodecTypes['pg/text@1']['output'];
     };
   };
 };
@@ -71,7 +71,7 @@ export type StorageColumnInputTypes = {
   readonly public: {
     readonly user: {
       readonly date: CodecTypes['pg/timestamptz@1']['input'] | null;
-      readonly id: CodecTypes['sql/char@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
     };
   };
 };
@@ -95,10 +95,9 @@ type ContractBase = Omit<
             readonly user: {
               columns: {
                 readonly id: {
-                  readonly nativeType: 'character';
-                  readonly codecId: 'sql/char@1';
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
                   readonly nullable: false;
-                  readonly typeParams: { readonly length: 24 };
                 };
                 readonly date: {
                   readonly nativeType: 'timestamptz';
@@ -132,11 +131,7 @@ type ContractBase = Omit<
             readonly fields: {
               readonly id: {
                 readonly nullable: false;
-                readonly type: {
-                  readonly kind: 'scalar';
-                  readonly codecId: 'sql/char@1';
-                  readonly typeParams: { readonly length: 24 };
-                };
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly date: {
                 readonly nullable: true;
@@ -174,7 +169,7 @@ type ContractBase = Omit<
       readonly scalarList: true;
     };
   };
-  readonly extensionPacks: {};
+  readonly extensions: {};
   readonly execution: {
     readonly executionHash: ExecutionHash;
     readonly mutations: {
