@@ -12,17 +12,14 @@ describe('createPostgresTypeMap', () => {
     expect(typeMap.resolve('numeric')).toEqual({
       pslType: { name: 'Numeric' },
       nativeType: 'numeric',
-      useNamedType: true,
     });
     expect(typeMap.resolve('timestamptz')).toEqual({
       pslType: { name: 'Timestamptz' },
       nativeType: 'timestamptz',
-      useNamedType: true,
     });
     expect(typeMap.resolve('timestamp with time zone')).toEqual({
       pslType: { name: 'Timestamptz' },
       nativeType: 'timestamp with time zone',
-      useNamedType: true,
     });
     expect(typeMap.resolve('jsonb')).toEqual({ pslType: { name: 'Jsonb' }, nativeType: 'jsonb' });
     expect(typeMap.resolve('bytea')).toEqual({ pslType: { name: 'Bytes' }, nativeType: 'bytea' });
@@ -30,12 +27,10 @@ describe('createPostgresTypeMap', () => {
     expect(typeMap.resolve('uuid')).toEqual({
       pslType: { name: 'Uuid' },
       nativeType: 'uuid',
-      useNamedType: true,
     });
     expect(typeMap.resolve('inet')).toEqual({
       pslType: { name: 'Inet' },
       nativeType: 'inet',
-      useNamedType: true,
     });
   });
 
@@ -52,7 +47,6 @@ describe('createPostgresTypeMap', () => {
     expect(typeMap.resolve('real')).toEqual({
       pslType: { name: 'Real' },
       nativeType: 'real',
-      useNamedType: true,
     });
     expect(typeMap.resolve('double precision')).toEqual({
       pslType: { name: 'Float' },
@@ -66,7 +60,6 @@ describe('createPostgresTypeMap', () => {
       pslType: { name: 'VarChar', args: ['255'] },
       nativeType: 'character varying(255)',
       typeParams: { baseType: 'character varying', params: '255' },
-      useNamedType: true,
     });
   });
 
@@ -76,7 +69,6 @@ describe('createPostgresTypeMap', () => {
       pslType: { name: 'Char', args: ['20'] },
       nativeType: 'character(20)',
       typeParams: { baseType: 'character', params: '20' },
-      useNamedType: true,
     });
   });
 
@@ -84,7 +76,6 @@ describe('createPostgresTypeMap', () => {
     expect(typeMap.resolve('varchar')).toEqual({
       pslType: { name: 'VarChar' },
       nativeType: 'varchar',
-      useNamedType: true,
     });
   });
 
@@ -92,28 +83,23 @@ describe('createPostgresTypeMap', () => {
     expect(typeMap.resolve('timestamp')).toEqual({
       pslType: { name: 'Timestamp' },
       nativeType: 'timestamp',
-      useNamedType: true,
     });
     expect(typeMap.resolve('time(3)')).toEqual({
       pslType: { name: 'Time', args: ['3'] },
       nativeType: 'time(3)',
       typeParams: { baseType: 'time', params: '3' },
-      useNamedType: true,
     });
     expect(typeMap.resolve('date')).toEqual({
       pslType: { name: 'Date' },
       nativeType: 'date',
-      useNamedType: true,
     });
     expect(typeMap.resolve('json')).toEqual({
       pslType: { name: 'Json' },
       nativeType: 'json',
-      useNamedType: true,
     });
     expect(typeMap.resolve('int2')).toEqual({
       pslType: { name: 'SmallInt' },
       nativeType: 'int2',
-      useNamedType: true,
     });
   });
 
