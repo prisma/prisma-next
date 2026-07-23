@@ -1,7 +1,7 @@
 // use prisma-next
 
 model account {
-  id       String  @id @default(uuid())
+  id       Char(36)  @id @default(uuid())
   email    String
   name     String?
   phone    String?

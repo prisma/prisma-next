@@ -227,7 +227,6 @@ function interpret(source: string) {
   const { table: symbolTable } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...scalarTypeDescriptors.keys()],
     pslBlockDescriptors: assembled.pslBlockDescriptors,
   });
   return interpretPslDocumentToSqlContract({
@@ -236,7 +235,7 @@ function interpret(source: string) {
     sourceId: 'schema.prisma',
     capabilities: {},
     target: postgresTarget,
-    scalarTypeDescriptors,
+    scalarColumnDescriptors: scalarTypeDescriptors,
     authoringContributions: assembled,
     composedExtensionContracts: new Map(),
     createNamespace: postgresCreateNamespace,

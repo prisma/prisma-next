@@ -11,19 +11,21 @@ import { mongoContract } from '../src/exports/provider';
 
 const SOURCE_ID = './schema.prisma';
 
-const mongoScalarTypeDescriptors: ReadonlyMap<string, string> = new Map([
-  ['String', 'mongo/string@1'],
-  ['ObjectId', 'mongo/objectId@1'],
-]);
+const mongoScalarAuthoringTypes = {
+  String: { kind: 'typeConstructor', output: { codecId: 'mongo/string@1', nativeType: 'string' } },
+  ObjectId: {
+    kind: 'typeConstructor',
+    output: { codecId: 'mongo/objectId@1', nativeType: 'objectId' },
+  },
+} as const;
 
 function createMongoTestContext(overrides?: Partial<ContractSourceContext>): ContractSourceContext {
   return {
     composedExtensionPacks: [],
     composedExtensionContracts: new Map(),
-    scalarTypeDescriptors: mongoScalarTypeDescriptors,
     authoringContributions: {
       field: {},
-      type: {},
+      type: mongoScalarAuthoringTypes,
       entityTypes: {},
       pslBlockDescriptors: {},
       modelAttributes: {},
@@ -44,7 +46,6 @@ function buildInterpretInput(schema: string, context: ContractSourceContext): Ps
   const { table: symbolTable } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...context.scalarTypeDescriptors.keys()],
     pslBlockDescriptors: context.authoringContributions.pslBlockDescriptors,
   });
   return { document, sourceFile, symbolTable, sourceId: SOURCE_ID };

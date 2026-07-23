@@ -22,7 +22,7 @@ describe('interpretPslDocumentToSqlContract — polymorphism', () => {
     input: Omit<
       InterpretPslDocumentToSqlContractInput,
       | 'target'
-      | 'scalarTypeDescriptors'
+      | 'scalarColumnDescriptors'
       | 'composedExtensionContracts'
       | 'createNamespace'
       | 'capabilities'
@@ -31,7 +31,7 @@ describe('interpretPslDocumentToSqlContract — polymorphism', () => {
   ) =>
     interpretPslDocumentToSqlContractInternal({
       target: postgresTarget,
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
       capabilities: { sql: { scalarList: true } },

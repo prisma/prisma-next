@@ -4,13 +4,13 @@ import { SqliteControlAdapter } from '../core/control-adapter';
 import {
   createSqliteDefaultFunctionRegistry,
   createSqliteMutationDefaultGeneratorDescriptors,
-  createSqliteScalarTypeDescriptors,
+  sqliteScalarAuthoringTypes,
 } from '../core/control-mutation-defaults';
 import { sqliteAdapterDescriptorMeta } from '../core/descriptor-meta';
 
 const sqliteAdapterDescriptor: SqlControlAdapterDescriptor<'sqlite'> = {
   ...sqliteAdapterDescriptorMeta,
-  scalarTypeDescriptors: createSqliteScalarTypeDescriptors(),
+  authoring: { type: sqliteScalarAuthoringTypes, valueObjectStorageType: 'Json' },
   controlMutationDefaults: {
     defaultFunctionRegistry: createSqliteDefaultFunctionRegistry(),
     generatorDescriptors: createSqliteMutationDefaultGeneratorDescriptors(),

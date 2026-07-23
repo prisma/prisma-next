@@ -8,7 +8,7 @@ import postgresPack from '@prisma-next/target-postgres/pack';
 import { postgresCreateNamespace } from '@prisma-next/target-postgres/types';
 import { describe, expect, it } from 'vitest';
 
-const scalarTypeDescriptors = new Map<string, { codecId: string; nativeType: string }>([
+const scalarColumnDescriptors = new Map<string, { codecId: string; nativeType: string }>([
   ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
   ['String', { codecId: 'pg/text@1', nativeType: 'text' }],
 ]);
@@ -18,7 +18,6 @@ function interpret(schema: string) {
   const { table } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...scalarTypeDescriptors.keys()],
     pslBlockDescriptors: {},
   });
   return interpretPslDocumentToSqlContract({
@@ -26,7 +25,7 @@ function interpret(schema: string) {
     sourceFile,
     sourceId: 'schema.prisma',
     target: postgresPack,
-    scalarTypeDescriptors,
+    scalarColumnDescriptors,
     composedExtensionContracts: new Map(),
     composedExtensionPacks: [paradedbPack.id],
     composedExtensionPackRefs: [paradedbPack],

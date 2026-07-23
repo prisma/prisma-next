@@ -16,6 +16,7 @@ import type {
   NamespaceMemberCompletionContext,
   PslCompletionContext,
 } from './completion-context';
+import { refinesScalarType } from './named-type-classification';
 
 export interface PslCompletionCandidateSource {
   readonly scalarTypes: readonly string[];
@@ -274,7 +275,7 @@ function provideModelTypeCompletionItems(
 ): readonly CompletionItem[] {
   return modelTypeCompletionItems(context, sourceFile, [
     ...configuredScalarCandidates(source.scalarTypes),
-    ...topLevelSymbolCandidates(source.symbolTable),
+    ...topLevelSymbolCandidates(source.symbolTable, source.scalarTypes),
     ...allNamespaceCandidates(source.symbolTable),
   ]);
 }
@@ -334,8 +335,18 @@ function configuredScalarCandidates(
 
 function topLevelSymbolCandidates(
   symbolTable: SymbolTable,
+  scalarTypes: readonly string[],
 ): readonly ModelTypeCompletionCandidate[] {
   const { topLevel } = symbolTable;
+  const namedTypes = Object.values(topLevel.namedTypes);
+  const scalarRefinementNames = namedTypes
+    .filter((symbol) => refinesScalarType(symbol, scalarTypes))
+    .map((symbol) => symbol.name)
+    .sort(compareNames);
+  const aliasNames = namedTypes
+    .filter((symbol) => !refinesScalarType(symbol, scalarTypes))
+    .map((symbol) => symbol.name)
+    .sort(compareNames);
   return [
     ...symbolCandidates(
       recordNames(topLevel.models),
@@ -349,18 +360,8 @@ function topLevelSymbolCandidates(
       'Composite type',
       CompletionItemKind.Struct,
     ),
-    ...symbolCandidates(
-      recordNames(topLevel.scalars),
-      'scalar',
-      'Scalar type',
-      CompletionItemKind.Unit,
-    ),
-    ...symbolCandidates(
-      recordNames(topLevel.typeAliases),
-      'typeAlias',
-      'Type alias',
-      CompletionItemKind.Reference,
-    ),
+    ...symbolCandidates(scalarRefinementNames, 'scalar', 'Scalar type', CompletionItemKind.Unit),
+    ...symbolCandidates(aliasNames, 'typeAlias', 'Type alias', CompletionItemKind.Reference),
   ];
 }
 

@@ -32,7 +32,6 @@ function buildSymbolTableInput(
   const { table } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...mongoScalarTypeDescriptors.keys()],
     pslBlockDescriptors: {},
   });
   return { symbolTable: table, sourceFile, sourceId };
@@ -111,7 +110,7 @@ function interpret(
 ) {
   return interpretPslDocumentToMongoContract({
     ...buildSymbolTableInput(schema),
-    scalarTypeDescriptors: mongoScalarTypeDescriptors,
+    scalarTypeCodecIds: mongoScalarTypeDescriptors,
     codecLookup: mongoCodecLookup,
     ...overrides,
   });
@@ -197,7 +196,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         }
       `,
         {
-          scalarTypeDescriptors: new Map([
+          scalarTypeCodecIds: new Map([
             ['ObjectId', 'custom/oid@2'],
             ['String', 'custom/text@2'],
           ]),
@@ -852,7 +851,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         }
       `,
         {
-          scalarTypeDescriptors: mongoScalarTypeDescriptors,
+          scalarTypeCodecIds: mongoScalarTypeDescriptors,
         },
       );
 
@@ -1910,7 +1909,7 @@ describe('interpretPslDocumentToMongoContract', () => {
 `,
           'schema.prisma',
         ),
-        scalarTypeDescriptors: mongoScalarTypeDescriptors,
+        scalarTypeCodecIds: mongoScalarTypeDescriptors,
       });
 
       expect(result.ok).toBe(false);
@@ -1940,7 +1939,7 @@ describe('interpretPslDocumentToMongoContract', () => {
 `,
           'schema.prisma',
         ),
-        scalarTypeDescriptors: mongoScalarTypeDescriptors,
+        scalarTypeCodecIds: mongoScalarTypeDescriptors,
       });
 
       expect(result.ok).toBe(false);
@@ -1962,7 +1961,7 @@ describe('interpretPslDocumentToMongoContract', () => {
 `,
           'schema.prisma',
         ),
-        scalarTypeDescriptors: mongoScalarTypeDescriptors,
+        scalarTypeCodecIds: mongoScalarTypeDescriptors,
       });
 
       expect(result.ok).toBe(true);

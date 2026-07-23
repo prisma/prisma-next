@@ -64,7 +64,6 @@ function buildSymbolTableInput(schema: string): {
   const { table } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...mongoScalarTypeDescriptors.keys()],
     pslBlockDescriptors: {},
   });
   return { symbolTable: table, sourceFile, sourceId: 'test.prisma' };
@@ -73,7 +72,7 @@ function buildSymbolTableInput(schema: string): {
 function interpret(schema: string) {
   return interpretPslDocumentToMongoContract({
     ...buildSymbolTableInput(schema),
-    scalarTypeDescriptors: mongoScalarTypeDescriptors,
+    scalarTypeCodecIds: mongoScalarTypeDescriptors,
     codecLookup: mongoCodecLookup,
   });
 }

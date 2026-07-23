@@ -35,6 +35,7 @@ import {
   type SemanticTokensLegend,
   SemanticTokenTypes,
 } from 'vscode-languageserver';
+import { refinesScalarType } from './named-type-classification';
 
 export type SemanticTokenType =
   | 'keyword'
@@ -548,13 +549,13 @@ function classifyTypeReference(
   if (Object.hasOwn(table.topLevel.compositeTypes, name)) {
     return { tokenType: 'struct' };
   }
-  if (Object.hasOwn(table.topLevel.scalars, name)) {
-    return { tokenType: 'type', modifierBitset: semanticTokenModifierBits.defaultLibrary };
+  const namedType = table.topLevel.namedTypes[name];
+  if (namedType !== undefined) {
+    return refinesScalarType(namedType, source.scalarTypes)
+      ? { tokenType: 'type', modifierBitset: semanticTokenModifierBits.defaultLibrary }
+      : { tokenType: 'type' };
   }
-  if (
-    Object.hasOwn(table.topLevel.typeAliases, name) ||
-    Object.hasOwn(table.topLevel.blocks, name)
-  ) {
+  if (Object.hasOwn(table.topLevel.blocks, name)) {
     return { tokenType: 'type' };
   }
 

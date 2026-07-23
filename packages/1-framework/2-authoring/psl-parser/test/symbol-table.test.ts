@@ -16,8 +16,6 @@ import {
   NamespaceDeclarationAst,
 } from '../src/syntax/ast/declarations';
 
-const SCALAR_TYPES = ['String', 'Int', 'Boolean', 'DateTime'] as const;
-
 const emptyCodecLookup: CodecLookup = {
   get: (): Codec | undefined => undefined,
   targetTypesFor: () => undefined,
@@ -25,13 +23,9 @@ const emptyCodecLookup: CodecLookup = {
   renderOutputTypeFor: () => undefined,
 };
 
-function build(
-  source: string,
-  scalarTypes: readonly string[] = SCALAR_TYPES,
-  pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace = {},
-) {
+function build(source: string, pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace = {}) {
   const { document, sourceFile } = parse(source);
-  return buildSymbolTable({ document, sourceFile, scalarTypes, pslBlockDescriptors });
+  return buildSymbolTable({ document, sourceFile, pslBlockDescriptors });
 }
 
 describe('buildSymbolTable() — AC1 fault tolerance', () => {
@@ -55,11 +49,11 @@ describe('buildSymbolTable() — AC1 fault tolerance', () => {
     expect(result.diagnostics.every((d) => d.code === 'PSL_DUPLICATE_DECLARATION')).toBe(true);
     expect(result.diagnostics).toHaveLength(1);
     expect(Object.keys(result.table.topLevel.models)).toEqual(['User', 'Dangling']);
-    expect(result.table.topLevel.typeAliases['Email']?.kind).toBe('typeAlias');
+    expect(result.table.topLevel.namedTypes['Email']?.kind).toBe('namedType');
   });
 });
 
-describe('buildSymbolTable() — AC2 top-level kinds and scalar/alias classification', () => {
+describe('buildSymbolTable() — AC2 top-level kinds', () => {
   it('classifies each top-level declaration by kind', () => {
     const source = [
       'model User {',
@@ -88,10 +82,9 @@ describe('buildSymbolTable() — AC2 top-level kinds and scalar/alias classifica
     expect(topLevel.blocks['Strict']?.keyword).toBe('policy');
     expect(topLevel.blocks['Strict']?.node).toBeInstanceOf(GenericBlockDeclarationAst);
 
-    expect(topLevel.scalars['Email']?.kind).toBe('scalar');
-    expect(topLevel.scalars['Email']?.node).toBeInstanceOf(NamedTypeDeclarationAst);
-    expect(topLevel.typeAliases['UserId']?.kind).toBe('typeAlias');
-    expect(topLevel.scalars['UserId']).toBeUndefined();
+    expect(topLevel.namedTypes['Email']?.kind).toBe('namedType');
+    expect(topLevel.namedTypes['Email']?.node).toBeInstanceOf(NamedTypeDeclarationAst);
+    expect(topLevel.namedTypes['UserId']?.kind).toBe('namedType');
     expect(result.diagnostics).toEqual([]);
   });
 });
@@ -206,13 +199,13 @@ describe('buildSymbolTable() — AC5 duplicate detection', () => {
 });
 
 describe('buildSymbolTable() — pre-investigated edge cases', () => {
-  it('classifies a constructor binding as typeAlias, never scalar', () => {
+  it('collects a constructor binding as a namedType without classifying it', () => {
     const source = ['types {', '  Embedding = Vector(1536)', '}'].join('\n');
 
-    const result = build(source, ['Vector', 'String']);
+    const result = build(source);
 
-    expect(result.table.topLevel.typeAliases['Embedding']?.kind).toBe('typeAlias');
-    expect(result.table.topLevel.scalars['Embedding']).toBeUndefined();
+    expect(result.table.topLevel.namedTypes['Embedding']?.kind).toBe('namedType');
+    expect(result.table.topLevel.namedTypes['Embedding']?.isConstructor).toBe(true);
   });
 
   it('skips a nameless recovered declaration without diagnostic or throw', () => {
@@ -402,7 +395,7 @@ describe('buildSymbolTable() — resolved model/composite attributes', () => {
 describe('buildSymbolTable() — resolved named-type binding shape', () => {
   it('resolves a scalar-backed binding with baseType and isConstructor=false', () => {
     const result = build(['types {', '  Email = String', '}'].join('\n'));
-    const scalar = result.table.topLevel.scalars['Email'];
+    const scalar = result.table.topLevel.namedTypes['Email'];
 
     expect(scalar?.isConstructor).toBe(false);
     expect(scalar?.baseType).toBe('String');
@@ -413,18 +406,15 @@ describe('buildSymbolTable() — resolved named-type binding shape', () => {
     const result = build(
       ['model User {', '  id Int', '}', 'types {', '  UserId = User', '}'].join('\n'),
     );
-    const alias = result.table.topLevel.typeAliases['UserId'];
+    const alias = result.table.topLevel.namedTypes['UserId'];
 
     expect(alias?.isConstructor).toBe(false);
     expect(alias?.baseType).toBe('User');
   });
 
   it('resolves a constructor binding with isConstructor=true and no baseType', () => {
-    const result = build(['types {', '  Embedding = Vector(1536)', '}'].join('\n'), [
-      'Vector',
-      'String',
-    ]);
-    const alias = result.table.topLevel.typeAliases['Embedding'];
+    const result = build(['types {', '  Embedding = Vector(1536)', '}'].join('\n'));
+    const alias = result.table.topLevel.namedTypes['Embedding'];
 
     expect(alias?.isConstructor).toBe(true);
     expect(alias?.baseType).toBeUndefined();
@@ -462,7 +452,6 @@ describe('buildSymbolTable() — resolved block (BlockSymbol.block)', () => {
   it('resolves an enum block with the descriptor discriminator and bare/value members', () => {
     const result = build(
       ['enum Role {', '  Admin', '  User = "u"', '}'].join('\n'),
-      SCALAR_TYPES,
       ENUM_DESCRIPTORS,
     );
     const block = result.table.topLevel.blocks['Role']?.block;
@@ -485,7 +474,6 @@ describe('buildSymbolTable() — resolved block (BlockSymbol.block)', () => {
         '  using  = "true"',
         '}',
       ].join('\n'),
-      SCALAR_TYPES,
       POLICY_DESCRIPTORS,
     );
     const block = result.table.topLevel.blocks['ReadPosts']?.block;
@@ -508,11 +496,7 @@ describe('buildSymbolTable() — resolved block (BlockSymbol.block)', () => {
   });
 
   it('flags a duplicate block member with PSL_EXTENSION_DUPLICATE_PARAMETER (first-wins)', () => {
-    const result = build(
-      ['enum Role {', '  Admin', '  Admin', '}'].join('\n'),
-      SCALAR_TYPES,
-      ENUM_DESCRIPTORS,
-    );
+    const result = build(['enum Role {', '  Admin', '  Admin', '}'].join('\n'), ENUM_DESCRIPTORS);
     const block = result.table.topLevel.blocks['Role']?.block;
 
     expect(result.diagnostics.map((d) => d.code)).toContain('PSL_EXTENSION_DUPLICATE_PARAMETER');
@@ -522,7 +506,6 @@ describe('buildSymbolTable() — resolved block (BlockSymbol.block)', () => {
   it('resolves namespace-nested blocks too', () => {
     const result = build(
       ['namespace ns {', '  enum Role {', '    Admin', '  }', '}'].join('\n'),
-      SCALAR_TYPES,
       ENUM_DESCRIPTORS,
     );
     const block = result.table.topLevel.namespaces['ns']?.blocks['Role']?.block;
@@ -532,25 +515,21 @@ describe('buildSymbolTable() — resolved block (BlockSymbol.block)', () => {
   });
 
   it('reports non-array values for list parameters instead of accepting an empty list', () => {
-    const result = build(
-      ['policy_select ReadPosts {', '  targets = Post', '}'].join('\n'),
-      SCALAR_TYPES,
-      {
-        policy_select: {
-          kind: 'pslBlock',
-          keyword: 'policy_select',
-          discriminator: 'fixture-policy-select',
-          name: { required: true },
-          parameters: {
-            targets: {
-              kind: 'list',
-              of: { kind: 'ref', refKind: 'model', scope: 'same-space' },
-              required: true,
-            },
+    const result = build(['policy_select ReadPosts {', '  targets = Post', '}'].join('\n'), {
+      policy_select: {
+        kind: 'pslBlock',
+        keyword: 'policy_select',
+        discriminator: 'fixture-policy-select',
+        name: { required: true },
+        parameters: {
+          targets: {
+            kind: 'list',
+            of: { kind: 'ref', refKind: 'model', scope: 'same-space' },
+            required: true,
           },
         },
       },
-    );
+    });
     const block = result.table.topLevel.blocks['ReadPosts']?.block;
 
     expect(result.diagnostics).toEqual(
@@ -590,7 +569,6 @@ describe('buildSymbolTable() — resolved block (BlockSymbol.block)', () => {
     const result = buildSymbolTable({
       document,
       sourceFile,
-      scalarTypes: SCALAR_TYPES,
       pslBlockDescriptors: descriptors,
     });
     const block = result.table.topLevel.namespaces['blog']?.blocks['ReadArticles'];
@@ -637,7 +615,6 @@ describe('buildSymbolTable() — resolved block (BlockSymbol.block)', () => {
     const result = buildSymbolTable({
       document,
       sourceFile,
-      scalarTypes: SCALAR_TYPES,
       pslBlockDescriptors: descriptors,
     });
     const block = result.table.topLevel.blocks['ReadArticles'];
@@ -681,7 +658,6 @@ describe('buildSymbolTable() — N:1 keywords sharing one discriminator', () => 
   it('parses each keyword to its own block, both sharing kind "shape"', () => {
     const result = build(
       ['shape_circle Round {', '}', 'shape_square Boxy {', '}'].join('\n'),
-      SCALAR_TYPES,
       SHAPE_DESCRIPTORS,
     );
 

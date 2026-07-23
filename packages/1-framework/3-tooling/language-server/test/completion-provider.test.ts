@@ -77,7 +77,6 @@ function complete(
   const { table: symbolTable } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes,
     pslBlockDescriptors,
   });
   const context = classifyPslCompletionContext({

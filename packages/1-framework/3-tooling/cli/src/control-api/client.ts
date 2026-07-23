@@ -609,7 +609,6 @@ class ControlClientImpl implements ControlClient {
       const sourceContext = {
         composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
         composedExtensionContracts: stack.extensionContracts,
-        scalarTypeDescriptors: stack.scalarTypeDescriptors,
         authoringContributions: stack.authoringContributions,
         codecLookup: stack.codecLookup,
         controlMutationDefaults: stack.controlMutationDefaults,

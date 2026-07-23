@@ -2,6 +2,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import pgvectorControl from '@prisma-next/extension-pgvector/control';
 import pgvectorPack from '@prisma-next/extension-pgvector/pack';
 import sqlFamilyControl from '@prisma-next/family-sql/control';
+import { collectScalarTypeConstructors } from '@prisma-next/framework-components/authoring';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import {
   defineContract,
@@ -31,22 +32,15 @@ const stack = createControlStack({
 });
 
 function buildColumnDescriptorMap() {
-  const result = new Map<string, { codecId: string; nativeType: string }>();
-  for (const [typeName, codecId] of stack.scalarTypeDescriptors) {
-    const targetTypes = stack.codecLookup.targetTypesFor(codecId);
-    const nativeType = targetTypes?.[0] ?? codecId;
-    result.set(typeName, { codecId, nativeType });
-  }
-  return result;
+  return collectScalarTypeConstructors(stack.authoringContributions.type);
 }
 
 function interpretWithRealPacks(schema: string) {
-  const scalarTypeDescriptors = buildColumnDescriptorMap();
+  const scalarColumnDescriptors = buildColumnDescriptorMap();
   const { document, sourceFile } = parse(schema);
   const { table } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...scalarTypeDescriptors.keys()],
     pslBlockDescriptors: stack.authoringContributions.pslBlockDescriptors,
   });
   return interpretPslDocumentToSqlContract({
@@ -54,7 +48,7 @@ function interpretWithRealPacks(schema: string) {
     sourceFile,
     sourceId: 'schema.prisma',
     target: postgresPack,
-    scalarTypeDescriptors,
+    scalarColumnDescriptors,
     controlMutationDefaults: stack.controlMutationDefaults,
     authoringContributions: stack.authoringContributions,
     composedExtensionContracts: new Map(),

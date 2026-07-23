@@ -48,7 +48,7 @@ export async function resolveConfigInputs(configPath: string): Promise<ConfigRes
 
 function pipelineInputsFromStack(stack: ControlStack): PipelineInputs {
   return {
-    scalarTypes: [...stack.scalarTypeDescriptors.keys()],
+    scalarTypes: [...stack.scalarTypes],
     pslBlockDescriptors: stack.authoringContributions.pslBlockDescriptors,
   };
 }
@@ -67,7 +67,6 @@ function resolveInterpretation(
     context: {
       composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
       composedExtensionContracts: stack.extensionContracts,
-      scalarTypeDescriptors: stack.scalarTypeDescriptors,
       authoringContributions: stack.authoringContributions,
       codecLookup: stack.codecLookup,
       controlMutationDefaults: stack.controlMutationDefaults,
