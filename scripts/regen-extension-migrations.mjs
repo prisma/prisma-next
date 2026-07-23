@@ -284,6 +284,7 @@ async function processExtension(extDir) {
 
   const snapshotsImportPath = snapshotsImportPathFrom(headMigrationDir, migrationsDir);
   const migrationTsSrc = readFileSync(migrationTsPath, 'utf8');
+  const hasSnapshotImports = /import\s+endContract\s+from\s+'/.test(migrationTsSrc);
   const rewrittenMigrationTs = rewriteContractSnapshotSpecifiers(
     migrationTsSrc,
     snapshotsImportPath,
@@ -293,7 +294,7 @@ async function processExtension(extDir) {
     writeFileSync(migrationTsPath, rewrittenMigrationTs, 'utf8');
   }
   const rewroteToLiteral = rewriteMigrationToHash(migrationTsPath, newHash);
-  if (!rewroteToLiteral && rewrittenMigrationTs === migrationTsSrc) {
+  if (!rewroteToLiteral && !hasSnapshotImports) {
     throw new Error(
       `regen-extension-migrations: ${migrationTsPath} carries neither a 'to: ...' hash literal nor snapshot-store contract imports; cannot re-anchor`,
     );

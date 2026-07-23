@@ -403,7 +403,7 @@ describe('interpretPslDocumentToSqlContract cross-contract-space FK (PSL colon-p
     });
   });
 
-  it('emits PSL_UNKNOWN_CONTRACT_SPACE when the space is not in composedExtensions (AC5)', () => {
+  it('emits PSL_UNKNOWN_CONTRACT_SPACE when the space is not in composedExtensions', () => {
     const document = symbolTableInputFromParseArgs({
       schema: `model Profile {
   id Int @id
