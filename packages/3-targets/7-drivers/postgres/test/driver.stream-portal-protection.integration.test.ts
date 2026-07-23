@@ -34,20 +34,33 @@ interface QuerySpy {
   cursorSubmits: number;
 }
 
-function installQuerySpy(client: Client): QuerySpy {
+const INJECTED_COMMIT_FAILURE = 'injected COMMIT failure';
+
+function installQuerySpy(client: Client, failCommit: boolean): QuerySpy {
   const spy: QuerySpy = { texts: [], cursorSubmits: 0 };
   const original = client.query.bind(client);
   const spied = (...args: unknown[]): unknown => {
     const first = args[0];
+    let text: string | undefined;
     if (typeof first === 'string') {
+      text = first;
       spy.texts.push(first);
     } else if (typeof first === 'object' && first !== null) {
       if ('text' in first && typeof (first as { text?: unknown }).text === 'string') {
-        spy.texts.push((first as { text: string }).text);
+        text = (first as { text: string }).text;
+        spy.texts.push(text);
       }
       if ('submit' in first && typeof (first as { submit?: unknown }).submit === 'function') {
         spy.cursorSubmits += 1;
       }
+    }
+    // Force the stream's terminating COMMIT to fail, exercising commitStreamSpan's
+    // surface-vs-swallow decision. Only COMMIT is intercepted; BEGIN, the cursor,
+    // and setup queries run for real. The error carries a real SQLSTATE (25P02,
+    // in_failed_sql_transaction) so the driver treats it as a genuine pg failure
+    // and propagates it, rather than falling back to the buffered path.
+    if (failCommit && text === 'COMMIT') {
+      return Promise.reject(Object.assign(new Error(INJECTED_COMMIT_FAILURE), { code: '25P02' }));
     }
     return (original as (...inner: unknown[]) => unknown)(...args);
   };
@@ -57,6 +70,7 @@ function installQuerySpy(client: Client): QuerySpy {
 
 async function createSharedSessionHarness(options?: {
   readonly cursorBatchSize?: number;
+  readonly failCommit?: boolean;
 }): Promise<SharedSessionHarness> {
   const db = await PGlite.create();
   // Bind to port 0 and read the port the OS actually assigned back from the
@@ -79,7 +93,7 @@ async function createSharedSessionHarness(options?: {
   // from crashing the process; the awaited query/connect still rejects.
   client.on('error', () => {});
   await client.connect();
-  const spy = installQuerySpy(client);
+  const spy = installQuerySpy(client, options?.failCommit ?? false);
 
   const driver = postgresRuntimeDriverDescriptor.create({
     cursor: { batchSize: options?.cursorBatchSize ?? 10 },
@@ -189,6 +203,56 @@ describe('streamed execute on a shared single-session backend', () => {
 
       const after = await h.driver.query<{ n: number }>('select count(*)::int as n from items');
       expect(after.rows).toEqual([{ n: 25 }]);
+    },
+    timeouts.spinUpDbServer,
+  );
+
+  it(
+    'surfaces a failing COMMIT after the stream completed',
+    async () => {
+      const h = await createSharedSessionHarness({ cursorBatchSize: 5, failCommit: true });
+      await seedRows(h, 10);
+
+      const rows: unknown[] = [];
+      let caught: unknown;
+      try {
+        for await (const row of h.driver.execute({ sql: 'select id from items order by id' })) {
+          rows.push(row);
+        }
+      } catch (error) {
+        caught = error;
+      }
+
+      // The rows stream out first; the COMMIT failure surfaces only as the
+      // generator closes, and it is not swallowed on the success path.
+      expect(rows).toHaveLength(10);
+      expect(caught).toBeInstanceOf(Error);
+      expect(h.recordedQueryTexts).toContain('COMMIT');
+    },
+    timeouts.spinUpDbServer,
+  );
+
+  it(
+    'lets the stream error win when both the stream and its COMMIT fail',
+    async () => {
+      const h = await createSharedSessionHarness({ cursorBatchSize: 5, failCommit: true });
+      await seedRows(h, 5);
+
+      let caught: unknown;
+      try {
+        // Division by zero at id = 3 fails the stream mid-read; the terminating
+        // COMMIT then also fails (injected), and must not mask the stream error.
+        for await (const _row of h.driver.execute({
+          sql: 'select 1 / (id - 3) as x from items order by id',
+        })) {
+          // drain until the backend raises division_by_zero
+        }
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(Error);
+      expect(String((caught as Error).message)).not.toContain('injected COMMIT failure');
     },
     timeouts.spinUpDbServer,
   );
