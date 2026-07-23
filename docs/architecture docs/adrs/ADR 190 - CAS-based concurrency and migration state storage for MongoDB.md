@@ -14,9 +14,9 @@ We store migration state in a `_prisma_migrations` collection using two document
 
 ```
 _prisma_migrations
-├── { _id: "marker", storageHash: "sha256:v2", profileHash: "sha256:p2", updatedAt: ... }
-├── { type: "ledger", edgeId: "->sha256:v1", from: "", to: "sha256:v1", appliedAt: ... }
-├── { type: "ledger", edgeId: "sha256:v1->sha256:v2", from: "sha256:v1", to: "sha256:v2", appliedAt: ... }
+├── { _id: "marker", storageHash: "v2", profileHash: "p2", updatedAt: ... }
+├── { type: "ledger", edgeId: "->v1", from: "", to: "v1", appliedAt: ... }
+├── { type: "ledger", edgeId: "v1->v2", from: "v1", to: "v2", appliedAt: ... }
 └── ...
 ```
 

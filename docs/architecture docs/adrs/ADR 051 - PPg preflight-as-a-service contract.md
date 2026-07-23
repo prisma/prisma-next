@@ -103,10 +103,10 @@ ACCEPTED → QUEUED → PROVISIONING (shadow only) → EXECUTING → COMPLETED |
 {
   "bundle": {
     "signature": "eyJhbGciOiJFZERTQSJ9...",
-    "digest": "sha256:abc123...",
+    "digest": "abc123...",
     "metadata": {
-      "coreHash": "sha256:def456...",
-      "profileHash": "sha256:ghi789...",
+      "coreHash": "def456...",
+      "profileHash": "ghi789...",
       "nodeTarget": "18.19.x",
       "createdAt": "2025-10-18T12:00:00Z"
     }

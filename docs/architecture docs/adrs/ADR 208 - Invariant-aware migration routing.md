@@ -11,7 +11,7 @@ import endContract from './end-contract.json' with { type: 'json' };
 
 export default class AddPhoneNotNull extends Migration {
   override describe() {
-    return { from: 'sha256:…', to: 'sha256:…' };
+    return { from: '…', to: '…' };
   }
 
   override get operations() {
@@ -44,7 +44,7 @@ Production declares which data invariants it requires by listing them on the ref
 
 ```json
 // migrations/refs/prod.json
-{ "hash": "sha256:…", "invariants": ["backfill-user-phone"] }
+{ "hash": "…", "invariants": ["backfill-user-phone"] }
 ```
 
 `migrate --to prod` then routes through a path that provides the named invariant — applying the schema change *and* the backfill — and records `backfill-user-phone` on the marker on success. A second `migrate --to prod` against the same database short-circuits to a structural BFS, because marker subtraction empties the effective required set.

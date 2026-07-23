@@ -128,9 +128,9 @@ The database marker verifies only what the database must satisfy:
   "targetFamily": "sql",
   "target": "postgres",
 
-  "storageHash": "sha256:<storage>",
-  "executionHash": "sha256:<execution>",
-  "contractHash": "sha256:<root>",
+  "storageHash": "<storage>",
+  "executionHash": "<execution>",
+  "contractHash": "<root>",
 
   "capabilities": {
     "postgres": { "returning": true }

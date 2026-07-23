@@ -29,7 +29,7 @@ Each on-disk ref `<name>` is a **pointer file** plus a **paired contract snapsho
 
 ```text
 migrations/app/refs/
-├── db.json                 # { "hash": "sha256:…", "invariants": [] }
+├── db.json                 # { "hash": "…", "invariants": [] }
 ├── db.contract.json        # full contract IR at that hash
 └── db.contract.d.ts        # TypeScript handle for the snapshot
 ```
@@ -83,7 +83,7 @@ export async function writeRefPaired(
 
 Any hash that participates as a **`from` end** — whether supplied explicitly (`--from`), resolved implicitly (default `db` ref), or set via `ref set` — must be a **node in the on-disk migration graph**, or the operation refuses with a structured diagnostic.
 
-A **graph node** is a contract hash that appears as the `from` or `to` of any on-disk migration bundle, or the `null` empty-graph sentinel (`sha256:empty`). A hash that is valid on its own but appears in no bundle is *not* a graph node. That distinction is load-bearing: it is exactly the condition that made the single-bundle plan in the reproduction above impossible to apply.
+A **graph node** is a contract hash that appears as the `from` or `to` of any on-disk migration bundle, or the `null` empty-graph sentinel (`empty`). A hash that is valid on its own but appears in no bundle is *not* a graph node. That distinction is load-bearing: it is exactly the condition that made the single-bundle plan in the reproduction above impossible to apply.
 
 Enforcement is centralized in `isGraphNode` / `assertHashIsGraphNode`:
 
