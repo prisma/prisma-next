@@ -205,9 +205,9 @@ changes:
       Contracts emitted before the upgrade keep working (`pg/timestamptz@1` still exists).
     detection:
       glob: "**/*.{prisma,ts,mts,cts}"
-      contains:
-        - "@db.Date"
-        - "Date"
+      regex:
+        - '@db\.Date'
+        - '\sDate(\s|\?|\[|$)'
       anyMatch: true
 
 ---

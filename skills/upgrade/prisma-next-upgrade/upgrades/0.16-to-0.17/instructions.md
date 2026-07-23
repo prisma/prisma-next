@@ -192,9 +192,9 @@ changes:
       local-midnight instants to expect `new Date(Date.UTC(y, m, d))`.
     detection:
       glob: "**/*.prisma"
-      contains:
-        - "@db.Date"
-        - "Date"
+      regex:
+        - '@db\.Date'
+        - '\sDate(\s|\?|\[|$)'
       anyMatch: true
 
 ---
