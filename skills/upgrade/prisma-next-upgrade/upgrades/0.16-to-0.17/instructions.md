@@ -174,6 +174,28 @@ changes:
         - "@default(nanoid("
         - "@default(ulid("
       anyMatch: true
+  - id: postgres-date-rebound-to-pg-date
+    summary: |
+      On the postgres target, PSL `date` columns — `DateTime @db.Date` and the bare `Date`
+      type constructor — re-bind from `pg/timestamptz@1` to the dedicated `pg/date@1` codec.
+      The stored native type is unchanged (`date`), so no schema migration is needed, but a
+      re-emit changes the column's codec ref and therefore the contract's storage hash: run
+      `prisma-next contract emit`, then re-sign any signed database against the regenerated
+      contract (`prisma-next db sign`) — verify reports a hash mismatch until you do.
+      Contracts emitted before the upgrade keep working (`pg/timestamptz@1` still exists).
+      Runtime behavior changes on re-emit: date columns decode as a `Date` at UTC midnight
+      (previously the driver's local-midnight `Date` passed through, so the instant depended
+      on the process timezone — code reading local getters near midnight in negative-UTC-offset
+      zones saw the neighboring day), encode formats `YYYY-MM-DD` from UTC getters, and
+      relation `.include()` over a date column now decodes instead of failing with
+      `RUNTIME.DECODE_FAILED`. Update tests or application code that pinned the old
+      local-midnight instants to expect `new Date(Date.UTC(y, m, d))`.
+    detection:
+      glob: "**/*.prisma"
+      regex:
+        - '@db\.Date'
+        - '\sDate(\s|\?|\[|$)'
+      anyMatch: true
 
 ---
 

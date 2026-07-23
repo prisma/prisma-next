@@ -87,6 +87,151 @@ describe('inferRelations', () => {
     });
   });
 
+  it('detects 1:1 when FK columns exactly match a total unique index', () => {
+    const tables: Record<string, SqlTableIR> = {
+      user: new SqlTableIR({
+        name: 'user',
+        columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      }),
+      profile: new SqlTableIR({
+        name: 'profile',
+        columns: {
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+          user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
+        uniques: [],
+        indexes: [
+          {
+            columns: ['user_id'],
+            unique: true,
+            partial: false,
+            name: 'profile_user_id_idx',
+            type: undefined,
+            options: undefined,
+            annotations: undefined,
+            dependsOn: undefined,
+          },
+        ],
+      }),
+    };
+    const modelNameMap = new Map([
+      ['user', 'User'],
+      ['profile', 'Profile'],
+    ]);
+    const { relationsByTable } = inferRelations(tables, modelNameMap);
+
+    const userRelations = relationsByTable.get('user');
+    expect(userRelations).toHaveLength(1);
+    expect(userRelations![0]).toMatchObject({
+      optional: true,
+      list: false,
+    });
+  });
+
+  it('keeps a list back-relation when the only covering unique index is partial', () => {
+    const tables: Record<string, SqlTableIR> = {
+      user: new SqlTableIR({
+        name: 'user',
+        columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      }),
+      draft: new SqlTableIR({
+        name: 'draft',
+        columns: {
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+          user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
+        uniques: [],
+        indexes: [
+          {
+            columns: ['user_id'],
+            unique: true,
+            name: 'draft_active_user_idx',
+            partial: true,
+            type: undefined,
+            options: undefined,
+            annotations: undefined,
+            dependsOn: undefined,
+          },
+        ],
+      }),
+    };
+    const modelNameMap = new Map([
+      ['user', 'User'],
+      ['draft', 'Draft'],
+    ]);
+    const { relationsByTable } = inferRelations(tables, modelNameMap);
+
+    const userRelations = relationsByTable.get('user');
+    expect(userRelations).toHaveLength(1);
+    expect(userRelations![0]).toMatchObject({
+      optional: false,
+      list: true,
+    });
+  });
+
+  it('keeps a list back-relation when the unique index columns are a superset of the FK columns', () => {
+    // A unique index on (user_id, name) does not make the FK on (user_id)
+    // unique — only exact set equality between index and FK columns may
+    // produce a 1:1, so the back-relation stays a list.
+    const tables: Record<string, SqlTableIR> = {
+      user: new SqlTableIR({
+        name: 'user',
+        columns: { id: { name: 'id', nativeType: 'int4', nullable: false } },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [],
+        uniques: [],
+        indexes: [],
+      }),
+      handle: new SqlTableIR({
+        name: 'handle',
+        columns: {
+          id: { name: 'id', nativeType: 'int4', nullable: false },
+          user_id: { name: 'user_id', nativeType: 'int4', nullable: false },
+          name: { name: 'name', nativeType: 'text', nullable: false },
+        },
+        primaryKey: { columns: ['id'] },
+        foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
+        uniques: [],
+        indexes: [
+          {
+            columns: ['user_id', 'name'],
+            unique: true,
+            partial: false,
+            name: 'handle_user_name_idx',
+            type: undefined,
+            options: undefined,
+            annotations: undefined,
+            dependsOn: undefined,
+          },
+        ],
+      }),
+    };
+    const modelNameMap = new Map([
+      ['user', 'User'],
+      ['handle', 'Handle'],
+    ]);
+    const { relationsByTable } = inferRelations(tables, modelNameMap);
+
+    const userRelations = relationsByTable.get('user');
+    expect(userRelations).toHaveLength(1);
+    expect(userRelations![0]).toMatchObject({
+      optional: false,
+      list: true,
+    });
+  });
+
   it('detects 1:1 when FK columns match PK columns', () => {
     const tables: Record<string, SqlTableIR> = {
       user: new SqlTableIR({
@@ -425,7 +570,18 @@ describe('inferRelations', () => {
         primaryKey: { columns: ['id'] },
         foreignKeys: [{ columns: ['user_id'], referencedTable: 'user', referencedColumns: ['id'] }],
         uniques: [],
-        indexes: [{ columns: ['user_id'], unique: false }],
+        indexes: [
+          {
+            columns: ['user_id'],
+            unique: false,
+            partial: false,
+            name: undefined,
+            type: undefined,
+            options: undefined,
+            annotations: undefined,
+            dependsOn: undefined,
+          },
+        ],
       }),
     };
     const modelNameMap = new Map([
@@ -468,7 +624,18 @@ describe('inferRelations', () => {
         ],
         uniques: [],
         // Same columns, reversed order: does not satisfy the FK's (tenant_id, user_id) order.
-        indexes: [{ columns: ['user_id', 'tenant_id'], unique: false }],
+        indexes: [
+          {
+            columns: ['user_id', 'tenant_id'],
+            unique: false,
+            partial: false,
+            name: undefined,
+            type: undefined,
+            options: undefined,
+            annotations: undefined,
+            dependsOn: undefined,
+          },
+        ],
       }),
     };
     const modelNameMap = new Map([

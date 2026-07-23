@@ -282,7 +282,7 @@ export const postgresNativeAuthoringTypes = {
   Uuid: { kind: 'typeConstructor', output: { codecId: 'pg/uuid@1', nativeType: 'uuid' } },
   SmallInt: { kind: 'typeConstructor', output: { codecId: 'pg/int2@1', nativeType: 'int2' } },
   Real: { kind: 'typeConstructor', output: { codecId: 'pg/float4@1', nativeType: 'float4' } },
-  Date: { kind: 'typeConstructor', output: { codecId: 'pg/timestamptz@1', nativeType: 'date' } },
+  Date: { kind: 'typeConstructor', output: { codecId: 'pg/date@1', nativeType: 'date' } },
 } as const satisfies AuthoringTypeNamespace;
 
 export const postgresAuthoringTypes = {

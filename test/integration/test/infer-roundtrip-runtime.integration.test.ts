@@ -168,7 +168,7 @@ withTempDir(({ createTempDir }) => {
     );
   });
 
-  describe('Runtime: date columns — top-level select works, include() decode stays broken until @db.Date binds to pg/date@1', () => {
+  describe('Runtime: date columns decode via pg/date@1 in both top-level select and include()', () => {
     let database: Awaited<ReturnType<typeof createDevDatabase>>;
 
     beforeAll(async () => {
@@ -194,7 +194,7 @@ withTempDir(({ createTempDir }) => {
     }, timeouts.spinUpPpgDev);
 
     it(
-      'top-level select decodes the date; include() rejects the same column (known gap)',
+      'top-level select and include() both decode the date column',
       async () => {
         const ctx = await inferAndEmit(database.connectionString, createTempDir);
         const contract = readEmittedContract(ctx);
@@ -221,45 +221,28 @@ withTempDir(({ createTempDir }) => {
             const records = new Collection({ runtime, context }, 'Record', {
               namespaceId: 'public',
             });
-            const [row] = await records.select('id', 'notedOn').all();
-            // `@db.Date` inherits `pg/timestamptz@1`, whose decode() passes
-            // through the driver's local-midnight `Date` — only the calendar
-            // date is stable across process timezones, so assert via local
-            // getters, not an exact instant.
-            const notedOn = row?.notedOn;
-            expect(notedOn, 'top-level select decodes a Date').toBeInstanceOf(Date);
-            const decoded = notedOn as Date;
-            expect(
-              [decoded.getFullYear(), decoded.getMonth(), decoded.getDate()],
-              'top-level select decodes the right calendar date',
-            ).toEqual([2024, 0, 15]);
+            // `pg/date@1` canonicalizes a date column as a `Date` at UTC
+            // midnight, independent of the process timezone.
+            const rows = await records.select('id', 'notedOn').all();
+            expect(rows).toEqual([{ id: 1, notedOn: new Date(Date.UTC(2024, 0, 15)) }]);
 
             const owners = new Collection({ runtime, context }, 'Owner', {
               namespaceId: 'public',
             });
-            let includeResult: unknown;
-            let includeError: unknown;
-            try {
-              includeResult = await owners
-                .select('id')
-                // `contract` is a dynamically-introspected `Contract<SqlStorage>`
-                // with no literal domain shape (it doesn't exist until this test
-                // runs infer + emit), so `include`'s relation-name type inference
-                // has nothing to key off; test files are exempt from the
-                // no-bare-casts rule.
-                .include('records' as never, (record) => record.select('notedOn'))
-                .all();
-            } catch (error) {
-              includeError = error;
-            }
-            // Pins the gap: `pg/timestamptz@1.decodeJson` rejects the bare
-            // `YYYY-MM-DD` that `json_agg` renders. Binding the date spelling to
-            // `pg/date@1` flips this — then assert
-            // [{ id: 1, records: [{ notedOn: new Date(Date.UTC(2024, 0, 15)) }] }].
-            expect(includeResult, 'include() must not silently return a value').toBeUndefined();
-            expect(includeError, 'include() rejects the date column today').toMatchObject({
-              code: 'RUNTIME.DECODE_FAILED',
-            });
+            const includeResult = await owners
+              .select('id')
+              // `contract` is a dynamically-introspected `Contract<SqlStorage>`
+              // with no literal domain shape (it doesn't exist until this test
+              // runs infer + emit), so `include`'s relation-name type inference
+              // has nothing to key off; test files are exempt from the
+              // no-bare-casts rule.
+              .include('records' as never, (record) => record.select('notedOn'))
+              .all();
+            // `pg/date@1.decodeJson` accepts the bare `YYYY-MM-DD` that
+            // `json_agg` renders.
+            expect(includeResult).toEqual([
+              { id: 1, records: [{ notedOn: new Date(Date.UTC(2024, 0, 15)) }] },
+            ]);
           } finally {
             await runtime.close();
           }

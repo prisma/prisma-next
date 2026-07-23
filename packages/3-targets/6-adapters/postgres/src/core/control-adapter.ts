@@ -867,6 +867,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       tablename: string;
       indexname: string;
       indisunique: boolean;
+      indpartial: boolean;
       attname: string | null;
       index_position: number;
       amname: string | null;
@@ -885,6 +886,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
            i.tablename,
            i.indexname,
            ix.indisunique,
+           ix.indpred IS NOT NULL AS indpartial,
            a.attname,
            k.ord AS index_position,
            am.amname,
@@ -1130,6 +1132,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           columns: string[];
           name: string;
           unique: boolean;
+          partial: boolean;
           type: string | undefined;
           options: Record<string, string> | undefined;
         }
@@ -1165,6 +1168,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
             columns: [idxRow.attname],
             name: idxRow.indexname,
             unique: idxRow.indisunique,
+            partial: idxRow.indpartial,
             type: indexType,
             options: indexOptions,
           });
@@ -1200,8 +1204,10 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           columns: Object.freeze([...idx.columns]),
           name: idx.name,
           unique: idx.unique,
-          ...(idx.type !== undefined && { type: idx.type }),
-          ...(idx.options !== undefined && { options: idx.options }),
+          partial: idx.partial,
+          type: idx.type,
+          options: idx.options,
+          annotations: undefined,
           dependsOn: postgresColumnDependsOn(schema, tableName, idx.columns),
         }),
       );

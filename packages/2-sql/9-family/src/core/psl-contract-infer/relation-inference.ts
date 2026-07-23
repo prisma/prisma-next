@@ -123,6 +123,16 @@ function detectOneToOne(fk: SqlForeignKeyIR, table: SqlTableIR): boolean {
     }
   }
 
+  for (const index of table.indexes) {
+    if (!index.unique || index.partial) {
+      continue;
+    }
+    const indexCols = [...index.columns].sort();
+    if (indexCols.length === fkCols.length && indexCols.every((c, i) => c === fkCols[i])) {
+      return true;
+    }
+  }
+
   return false;
 }
 

@@ -197,10 +197,11 @@ export function contractToPostgresDatabaseSchemaNode(
           new SqlIndexIR({
             columns: i.columns,
             unique: i.unique,
-            ...ifDefined('name', i.name),
-            ...ifDefined('type', i.type),
-            ...ifDefined('options', i.options),
-            ...ifDefined('annotations', i.annotations),
+            partial: i.partial,
+            name: i.name,
+            type: i.type,
+            options: i.options,
+            annotations: i.annotations,
             dependsOn: columnDependsOn(ddlSchema, tableName, i.columns),
           }),
       );
