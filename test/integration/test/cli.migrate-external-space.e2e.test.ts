@@ -243,7 +243,7 @@ withTempDir(({ createTempDir }) => {
           // parse-and-execute round fails rather than silently running
           // hard-coded commands.
           const fix = errorJson.fix ?? '';
-          expect(fix).not.toContain('--to sha256:');
+          expect(fix).not.toMatch(/--to [0-9a-f]{64}/);
           const numberedCommands = fix
             .split('\n')
             .map((line) => line.trim())

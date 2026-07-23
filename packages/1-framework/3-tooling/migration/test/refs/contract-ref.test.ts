@@ -6,11 +6,11 @@ import type { Refs } from '../../src/refs';
 import { parseContractRef } from '../../src/refs/contract-ref';
 import type { RefResolutionContext, RefResolutionError } from '../../src/refs/types';
 
-const HASH_A = `sha256:${'a'.repeat(64)}`;
-const HASH_B = `sha256:${'b'.repeat(64)}`;
-const HASH_C = `sha256:${'c'.repeat(64)}`;
-const MIG_HASH_1 = `sha256:${'1'.repeat(64)}`;
-const MIG_HASH_2 = `sha256:${'2'.repeat(64)}`;
+const HASH_A = `${'a'.repeat(64)}`;
+const HASH_B = `${'b'.repeat(64)}`;
+const HASH_C = `${'c'.repeat(64)}`;
+const MIG_HASH_1 = `${'1'.repeat(64)}`;
+const MIG_HASH_2 = `${'2'.repeat(64)}`;
 
 function pkg(
   dirName: string,
@@ -95,9 +95,9 @@ describe('parseContractRef', () => {
       }
     });
 
-    it('resolves a prefix with sha256: scheme', () => {
+    it('resolves a prefix with  scheme', () => {
       const ctx = createContext();
-      const result = parseContractRef('sha256:bbbbbb', ctx);
+      const result = parseContractRef('bbbbbb', ctx);
       expect(result.ok).toBe(true);
       if (result.ok) {
         expect(result.value.hash).toBe(HASH_B);
@@ -105,8 +105,8 @@ describe('parseContractRef', () => {
     });
 
     it('returns ambiguous when multiple contracts share a prefix', () => {
-      const HASH_AMB1 = `sha256:aabbcc${'1'.repeat(58)}`;
-      const HASH_AMB2 = `sha256:aabbcc${'2'.repeat(58)}`;
+      const HASH_AMB1 = `aabbcc${'1'.repeat(58)}`;
+      const HASH_AMB2 = `aabbcc${'2'.repeat(58)}`;
       const ctx = createContext({
         packages: [
           pkg('m1', null, HASH_AMB1, MIG_HASH_1),

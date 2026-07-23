@@ -622,7 +622,7 @@ A `migration check` failure row: a migration declares a destination hash `to` bu
 
 ### MIGRATION.CHECK_SNAPSHOT_UNPARSEABLE
 
-A `migration check` failure row: either the migration's `to` value is not a well-formed `sha256:<64 hex>` hash, or the contract snapshot stored for it exists but cannot be parsed. Re-emit the package, or restore `migrations/snapshots/` from version control.
+A `migration check` failure row: either the migration's `to` value is not a well-formed 64-hex hash, or the contract snapshot stored for it exists but cannot be parsed. Re-emit the package, or restore `migrations/snapshots/` from version control.
 
 ### MIGRATION.CHECK_SPACE_DISJOINTNESS_VIOLATION
 
@@ -742,7 +742,7 @@ An operation returned by an authored migration class failed schema validation du
 
 ### MIGRATION.INVALID_REF_FILE
 
-A ref file under `migrations/<space>/refs/` is not valid JSON or does not match the expected `{ "hash": "sha256:<64 hex>", "invariants": [...] }` shape. Meta: `path`, `reason`.
+A ref file under `migrations/<space>/refs/` is not valid JSON or does not match the expected `{ "hash": "<64 hex>", "invariants": [...] }` shape. Meta: `path`, `reason`.
 
 ### MIGRATION.INVALID_REF_NAME
 
@@ -750,7 +750,7 @@ A ref name is syntactically invalid: names must be lowercase alphanumeric with h
 
 ### MIGRATION.INVALID_REF_VALUE
 
-The value given for a ref (e.g. to `ref set`) is not a valid contract hash — it must be `sha256:<64 hex chars>` or `sha256:empty`. Meta: `value`.
+The value given for a ref (e.g. to `ref set`) is not a valid contract hash — it must be 64 lowercase hex chars or `empty`. Meta: `value`.
 
 ### MIGRATION.INVALID_REFS
 

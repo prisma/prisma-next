@@ -13,7 +13,7 @@ class BackfillStatus extends Migration {
     return [createIndex('users', [{ field: 'email', direction: 1 }], { unique: true })];
   }
   override describe() {
-    return { from: 'sha256:v1', to: 'sha256:v2' };
+    return { from: 'v1', to: 'v2' };
   }
 }
 export default BackfillStatus;

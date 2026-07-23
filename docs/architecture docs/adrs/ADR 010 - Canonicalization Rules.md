@@ -1,5 +1,7 @@
 # ADR 010 — Canonicalization Rules for contract.json
 
+**Revised:** 2026-07-23 — hashes are represented as bare lowercase hex; the former `sha256:` algorithm prefix was dropped before the RC format freeze (TML-2756). The prefix carried no information — the algorithm never varies per hash — and a change to the hashing rules is signalled by re-emit, not by an in-band marker, the same no-in-band-version reasoning [ADR 234](ADR%20234%20-%20Content-addressed%20wire%20names%20for%20Postgres-normalized%20objects.md) records. Examples below use the bare form.
+
 ## Context
 
 - `contract.json` is the canonical artifact consumed by the runtime, planner, preflight, and PPg
@@ -93,7 +95,7 @@ This project adopts a pragmatic subset inspired by RFC 8785 with additional doma
 - `storageHash` is computed over canonical JSON for storage meaning (profile-only fields stripped)
 - `executionHash` is emitted only when execution-plane defaults are present in the emitted contract artifact
 - `profileHash` is computed over canonical JSON including profile fields
-- Hash algorithm: SHA-256, represented as `sha256:<hex>`
+- Hash algorithm: SHA-256, represented as bare lowercase `<hex>` (no algorithm prefix)
 
 ## Emitter responsibilities
 
@@ -113,7 +115,7 @@ This project adopts a pragmatic subset inspired by RFC 8785 with additional doma
 ### Minimal canonical object
 
 ```json
-{"schemaVersion":"1","targetFamily":"sql","target":"postgres","profileHash":"sha256:...","models":{},"storage":{"storageHash":"sha256:...","tables":{}}}
+{"schemaVersion":"1","targetFamily":"sql","target":"postgres","profileHash":"...","models":{},"storage":{"storageHash":"...","tables":{}}}
 ```
 
 ### With capabilities
@@ -121,7 +123,7 @@ This project adopts a pragmatic subset inspired by RFC 8785 with additional doma
 `capabilities` records contract requirements. Adapters still negotiate and verify support at connect time; this example only shows required keys captured in the contract.
 
 ```json
-{"schemaVersion":"1","targetFamily":"sql","target":"postgres","profileHash":"sha256:...","models":{"User":{"fields":{"email":{"codecId":"text","nullable":false},"id":{"codecId":"int4","nullable":false}},"storage":{"table":"user"}}},"storage":{"storageHash":"sha256:...","tables":{"user":{"columns":{"email":{"type":"text"},"id":{"type":"int4"}},"primaryKey":{"columns":["id"],"name":"user_pkey"}}}},"capabilities":{"sql":{"jsonAgg":true,"lateral":true}},"codecs":{"int4":{"ts":"number"},"text":{"ts":"string"}}}
+{"schemaVersion":"1","targetFamily":"sql","target":"postgres","profileHash":"...","models":{"User":{"fields":{"email":{"codecId":"text","nullable":false},"id":{"codecId":"int4","nullable":false}},"storage":{"table":"user"}}},"storage":{"storageHash":"...","tables":{"user":{"columns":{"email":{"type":"text"},"id":{"type":"int4"}},"primaryKey":{"columns":["id"],"name":"user_pkey"}}}},"capabilities":{"sql":{"jsonAgg":true,"lateral":true}},"codecs":{"int4":{"ts":"number"},"text":{"ts":"string"}}}
 ```
 
 ## Alternatives considered

@@ -5,35 +5,35 @@ import {
   storageHashHex,
 } from '../src/control/contract-snapshot-layout';
 
-const VALID_HASH = `sha256:${'a'.repeat(64)}`;
+const VALID_HASH = 'a'.repeat(64);
 
 describe('storageHashHex', () => {
-  it('strips the sha256: prefix from a valid hash', () => {
+  it('returns a valid 64-hex hash unchanged', () => {
     expect(storageHashHex(VALID_HASH)).toBe('a'.repeat(64));
   });
 
-  it('throws on a missing prefix', () => {
-    expect(() => storageHashHex('a'.repeat(64))).toThrow();
+  it('throws on a legacy sha256:-prefixed hash', () => {
+    expect(() => storageHashHex(`sha256:${'a'.repeat(64)}`)).toThrow();
   });
 
-  it('throws on the wrong prefix', () => {
+  it('throws on an algorithm-prefixed hash', () => {
     expect(() => storageHashHex(`md5:${'a'.repeat(64)}`)).toThrow();
   });
 
   it('throws when the hex portion is too short', () => {
-    expect(() => storageHashHex(`sha256:${'a'.repeat(63)}`)).toThrow();
+    expect(() => storageHashHex('a'.repeat(63))).toThrow();
   });
 
   it('throws when the hex portion is too long', () => {
-    expect(() => storageHashHex(`sha256:${'a'.repeat(65)}`)).toThrow();
+    expect(() => storageHashHex('a'.repeat(65))).toThrow();
   });
 
   it('throws on uppercase hex characters', () => {
-    expect(() => storageHashHex(`sha256:${'A'.repeat(64)}`)).toThrow();
+    expect(() => storageHashHex('A'.repeat(64))).toThrow();
   });
 
   it('throws on non-hex characters', () => {
-    expect(() => storageHashHex(`sha256:${'g'.repeat(64)}`)).toThrow();
+    expect(() => storageHashHex('g'.repeat(64))).toThrow();
   });
 
   it('throws on an empty string', () => {

@@ -188,8 +188,8 @@ describe('emit parity fixtures', () => {
         expect(tsContractJson).toEqual(pslContractJson);
         assertContractJsonOmitsSourceProvenance(tsContractJson);
 
-        expect(tsEmitFirst.storageHash).toMatch(/^sha256:[a-f0-9]{64}$/);
-        expect(tsEmitFirst.profileHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+        expect(tsEmitFirst.storageHash).toMatch(/^[a-f0-9]{64}$/);
+        expect(tsEmitFirst.profileHash).toMatch(/^[a-f0-9]{64}$/);
         expect(pslEmitFirst.storageHash).toBe(tsEmitFirst.storageHash);
         expect(pslEmitFirst.profileHash).toBe(tsEmitFirst.profileHash);
 
@@ -200,7 +200,7 @@ describe('emit parity fixtures', () => {
         expect(pslExecutionHash).toBe(tsExecutionHash);
         if (tsExecutionHash !== undefined) {
           expect(typeof tsExecutionHash).toBe('string');
-          expect(tsExecutionHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+          expect(tsExecutionHash).toMatch(/^[a-f0-9]{64}$/);
         }
 
         if (writeExpected) {

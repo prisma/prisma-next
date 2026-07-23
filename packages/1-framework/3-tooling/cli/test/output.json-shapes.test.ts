@@ -8,22 +8,22 @@ describe('MigrateResult JSON shape (aggregate-walking)', () => {
       ok: true,
       migrationsApplied: 2,
       migrationsTotal: 2,
-      markerHash: 'sha256:app',
+      markerHash: 'app',
       applied: [
         {
           spaceId: 'pgvector',
           dirName: '20250101000000_install_pgvector',
-          migrationHash: 'sha256:m-ext',
-          from: 'sha256:0000',
-          to: 'sha256:ext',
+          migrationHash: 'm-ext',
+          from: '0000',
+          to: 'ext',
           operationsExecuted: 1,
         },
         {
           spaceId: 'app',
           dirName: '20250101000001_init',
-          migrationHash: 'sha256:m-app',
-          from: 'sha256:0000',
-          to: 'sha256:app',
+          migrationHash: 'm-app',
+          from: '0000',
+          to: 'app',
           operationsExecuted: 3,
         },
       ],
@@ -33,7 +33,7 @@ describe('MigrateResult JSON shape (aggregate-walking)', () => {
           spaceId: 'pgvector',
           kind: 'extension',
           operations: [{ id: 'op1', label: 'Install vector ext', operationClass: 'additive' }],
-          marker: { storageHash: 'sha256:ext' },
+          marker: { storageHash: 'ext' },
         },
         {
           spaceId: 'app',
@@ -43,7 +43,7 @@ describe('MigrateResult JSON shape (aggregate-walking)', () => {
             { id: 'op3', label: 'Create post', operationClass: 'additive' },
             { id: 'op4', label: 'Add fk', operationClass: 'additive' },
           ],
-          marker: { storageHash: 'sha256:app' },
+          marker: { storageHash: 'app' },
         },
       ],
       timings: { total: 42 },
@@ -68,10 +68,10 @@ describe('MigrateResult JSON shape (aggregate-walking)', () => {
       spaceId: 'pgvector',
       kind: 'extension',
       operations: [{ id: 'op1', label: 'Install vector ext', operationClass: 'additive' }],
-      marker: { storageHash: 'sha256:ext' },
+      marker: { storageHash: 'ext' },
     };
     expect(Object.keys(entry).sort()).toEqual(['kind', 'marker', 'operations', 'spaceId']);
-    expect(entry.marker).toEqual({ storageHash: 'sha256:ext' });
+    expect(entry.marker).toEqual({ storageHash: 'ext' });
   });
 });
 
@@ -82,14 +82,14 @@ describe('MigrationStatusResult JSON shape', () => {
       spaces: [
         {
           space: 'app',
-          currentContract: 'sha256:marker',
-          targetContract: 'sha256:leaf',
+          currentContract: 'marker',
+          targetContract: 'leaf',
           migrations: [
             {
               name: '20260101T1200_init',
-              hash: 'sha256:mid',
-              fromContract: 'sha256:a',
-              toContract: 'sha256:b',
+              hash: 'mid',
+              fromContract: 'a',
+              toContract: 'b',
               operationCount: 3,
               createdAt: '2026-01-01T00:00:00.000Z',
               refs: [],

@@ -17,6 +17,5 @@ export function computeSqlFingerprint(sql: string): string {
   const withoutNumbers = withoutStrings.replace(NUMERIC_LITERAL_REGEX, '?');
   const normalized = withoutNumbers.replace(WHITESPACE_REGEX, ' ').trim().toLowerCase();
 
-  const hash = createHash('sha256').update(normalized).digest('hex');
-  return `sha256:${hash}`;
+  return createHash('sha256').update(normalized).digest('hex');
 }

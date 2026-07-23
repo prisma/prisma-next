@@ -89,21 +89,21 @@ describe('Migration Errors', () => {
   it('errorDataTransformContractMismatch carries name + expected + actual hashes', () => {
     const error = errorDataTransformContractMismatch({
       dataTransformName: 'backfill-user-name',
-      expected: 'sha256:aaa',
-      actual: 'sha256:bbb',
+      expected: 'aaa',
+      actual: 'bbb',
     });
     expect(error).toMatchObject({
       code: 'MIGRATION.DATA_TRANSFORM_CONTRACT_MISMATCH',
       message: 'dataTransform query plan built against wrong contract',
       meta: {
         dataTransformName: 'backfill-user-name',
-        expected: 'sha256:aaa',
-        actual: 'sha256:bbb',
+        expected: 'aaa',
+        actual: 'bbb',
       },
     });
     expect(error.why).toContain('backfill-user-name');
-    expect(error.why).toContain('sha256:aaa');
-    expect(error.why).toContain('sha256:bbb');
+    expect(error.why).toContain('aaa');
+    expect(error.why).toContain('bbb');
     expect(error.fix).toContain('createExecutionContext');
     expect(error.toEnvelope().code).toBe('MIGRATION.DATA_TRANSFORM_CONTRACT_MISMATCH');
   });

@@ -284,8 +284,8 @@ describe('emit-then-consume: value-union narrowing through the emitted contract.
   ];
 
   const testHashes = {
-    storageHash: 'sha256:enum-e2e-test',
-    profileHash: 'sha256:enum-e2e-profile',
+    storageHash: 'enum-e2e-test',
+    profileHash: 'enum-e2e-profile',
   };
 
   it('emits the enum value union into FieldOutputTypes for a Role field', () => {

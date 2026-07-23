@@ -227,7 +227,7 @@ export function errorInvalidRefs(refsPath: string, reason: string): MigrationToo
 export function errorInvalidRefFile(filePath: string, reason: string): MigrationToolsError {
   return new MigrationToolsError('MIGRATION.INVALID_REF_FILE', 'Invalid ref file', {
     why: `Ref file at "${filePath}" is invalid: ${reason}`,
-    fix: 'Ensure the ref file contains valid JSON with { "hash": "sha256:<64 hex chars>", "invariants": ["..."] }.',
+    fix: 'Ensure the ref file contains valid JSON with { "hash": "<64 hex chars>", "invariants": ["..."] }.',
     details: { path: filePath, reason },
   });
 }
@@ -250,7 +250,7 @@ export function errorNoTarget(reachableHashes: readonly string[]): MigrationTool
 
 export function errorInvalidRefValue(value: string): MigrationToolsError {
   return new MigrationToolsError('MIGRATION.INVALID_REF_VALUE', 'Invalid ref value', {
-    why: `Ref value "${value}" is not a valid contract hash. Values must be in the format "sha256:<64 hex chars>" or "sha256:empty".`,
+    why: `Ref value "${value}" is not a valid contract hash. Values must be a 64-character hex digest or "empty".`,
     fix: 'Use a valid storage hash from `prisma-next contract emit` output or an existing migration.',
     details: { value },
   });

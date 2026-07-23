@@ -570,26 +570,26 @@ describe('generateCodecTypeIntersection', () => {
 describe('generateHashTypeAliases', () => {
   it('generates storage and profile hash aliases', () => {
     const result = generateHashTypeAliases({
-      storageHash: 'sha256:abc123',
-      profileHash: 'sha256:def456',
+      storageHash: 'abc123',
+      profileHash: 'def456',
     });
-    expect(result).toContain("StorageHashBase<'sha256:abc123'>");
-    expect(result).toContain("ProfileHashBase<'sha256:def456'>");
+    expect(result).toContain("StorageHashBase<'abc123'>");
+    expect(result).toContain("ProfileHashBase<'def456'>");
   });
 
   it('generates concrete execution hash when provided', () => {
     const result = generateHashTypeAliases({
-      storageHash: 'sha256:abc',
-      executionHash: 'sha256:exec',
-      profileHash: 'sha256:prof',
+      storageHash: 'abc',
+      executionHash: 'exec',
+      profileHash: 'prof',
     });
-    expect(result).toContain("ExecutionHashBase<'sha256:exec'>");
+    expect(result).toContain("ExecutionHashBase<'exec'>");
   });
 
   it('generates generic execution hash when not provided', () => {
     const result = generateHashTypeAliases({
-      storageHash: 'sha256:abc',
-      profileHash: 'sha256:prof',
+      storageHash: 'abc',
+      profileHash: 'prof',
     });
     expect(result).toContain('ExecutionHashBase<string>');
   });
@@ -598,16 +598,16 @@ describe('generateHashTypeAliases', () => {
 describe('serializeExecutionType', () => {
   it('uses ExecutionHash alias instead of literal hash value', () => {
     const result = serializeExecutionType({
-      executionHash: 'sha256:abc123',
+      executionHash: 'abc123',
       mutations: { defaults: [] },
     });
     expect(result).toContain('readonly executionHash: ExecutionHash');
-    expect(result).not.toContain('sha256:abc123');
+    expect(result).not.toContain('abc123');
   });
 
   it('serializes non-hash fields normally', () => {
     const result = serializeExecutionType({
-      executionHash: 'sha256:abc123',
+      executionHash: 'abc123',
       mutations: { defaults: [{ kind: 'autoIncrement' }] },
     });
     expect(result).toContain('readonly mutations:');

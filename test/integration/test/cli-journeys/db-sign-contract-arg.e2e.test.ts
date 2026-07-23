@@ -47,7 +47,7 @@ withTempDir(({ createTempDir }) => {
         const planJson = parseJsonOutput(plan);
         const contractHash = planJson?.['to'] as string;
         expect(contractHash, 'plan must produce a target hash').toBeTruthy();
-        const hashPrefix = contractHash.replace('sha256:', '').slice(0, 8);
+        const hashPrefix = contractHash.slice(0, 8);
 
         const init = await runDbInit(ctx);
         expect(init.exitCode, 'init').toBe(0);

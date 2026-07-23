@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "profileHash": "9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "shop": {
       "model": "Shop",
@@ -97,13 +97,6 @@
   },
   "storage": {
     "namespaces": {
-      "__unbound__": {
-        "entries": {
-          "table": {}
-        },
-        "id": "__unbound__",
-        "kind": "postgres-unbound-schema"
-      },
       "public": {
         "entries": {
           "table": {
@@ -145,7 +138,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:42bb55b36779510808a1d0fa1d97deace3348341de7dbca7a5a5ee8a4c021aba"
+    "storageHash": "0ff2d1ae553dde00311c46c0283baa3e9107de85a7d02174c30086befbbe8ba7"
   },
   "capabilities": {
     "postgres": {
@@ -160,7 +153,8 @@
       "defaultInInsert": true,
       "enums": true,
       "lateral": true,
-      "returning": true
+      "returning": true,
+      "scalarList": true
     }
   },
   "extensionPacks": {},

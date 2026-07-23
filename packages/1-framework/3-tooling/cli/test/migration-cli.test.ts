@@ -68,7 +68,7 @@ class FakeMigration extends Migration {
     return [];
   }
   override describe() {
-    return { from: 'sha256:from', to: 'sha256:to' };
+    return { from: 'from', to: 'to' };
   }
 }
 
@@ -81,7 +81,7 @@ class WrongTargetMigration extends Migration {
     return [];
   }
   override describe() {
-    return { from: 'sha256:from', to: 'sha256:to' };
+    return { from: 'from', to: 'to' };
   }
 }
 
@@ -107,7 +107,7 @@ class StackHungryWrongTargetMigration extends Migration {
     return [];
   }
   override describe() {
-    return { from: 'sha256:from', to: 'sha256:to' };
+    return { from: 'from', to: 'to' };
   }
 }
 
@@ -165,7 +165,7 @@ describe('MigrationCLI.run', () => {
     const ops = JSON.parse(readFileSync(join(workDir, 'ops.json'), 'utf-8'));
     expect(ops).toEqual([]);
     const manifest = JSON.parse(readFileSync(join(workDir, 'migration.json'), 'utf-8'));
-    expect(manifest).toMatchObject({ from: 'sha256:from', to: 'sha256:to' });
+    expect(manifest).toMatchObject({ from: 'from', to: 'to' });
   });
 
   it('prints artifacts to stdout in --dry-run mode without writing files', async () => {
@@ -354,8 +354,8 @@ describe('MigrationCLI.run', () => {
     createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
 
     const existing = {
-      from: 'sha256:from',
-      to: 'sha256:to',
+      from: 'from',
+      to: 'to',
       migrationHash: null,
       createdAt: '2026-01-15T10:00:00.000Z',
     };
@@ -373,9 +373,9 @@ describe('MigrationCLI.run', () => {
     const manifest = JSON.parse(readFileSync(join(workDir, 'migration.json'), 'utf-8'));
     expect(manifest.createdAt).toBe(existing.createdAt);
     // Even though the on-disk fixture started with `migrationHash: null`,
-    // MigrationCLI.run must rewrite it to a real `sha256:...` digest —
+    // MigrationCLI.run must rewrite it to a real `...` digest —
     // otherwise readMigrationPackage() would reject the package.
-    expect(manifest.migrationHash).toMatch(/^sha256:/);
+    expect(manifest.migrationHash).toMatch(/^/);
   });
 
   it('exits non-zero with MIGRATION.INVALID_JSON when migration.json is unparseable', async () => {

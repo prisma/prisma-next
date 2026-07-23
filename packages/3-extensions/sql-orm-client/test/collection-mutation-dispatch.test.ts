@@ -28,7 +28,7 @@ function makeCompiled(sqlText = 'select 1'): SqlQueryPlan<Record<string, unknown
     meta: {
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'sha256:test',
+      storageHash: 'test',
       lane: 'orm-client',
     },
   };

@@ -35,7 +35,7 @@ describe('mongoEmission.validateStructure', () => {
   it('throws for missing storage.namespaces', () => {
     const contract = {
       ...createMongoContract(),
-      storage: { storageHash: 'sha256:test' },
+      storage: { storageHash: 'test' },
     } as Contract;
     expect(() => mongoEmission.validateStructure(contract)).toThrow('must have storage.namespaces');
   });

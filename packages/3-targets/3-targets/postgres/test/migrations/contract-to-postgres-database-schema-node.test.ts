@@ -76,9 +76,9 @@ function makeContract(options: {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:project-from-contract-test'),
+    profileHash: profileHash('project-from-contract-test'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:project-from-contract-test'),
+      storageHash: coreHash('project-from-contract-test'),
       namespaces: { [SCHEMA_NAME]: schema },
     }),
     roots: {},
@@ -229,9 +229,9 @@ describe('contractToPostgresDatabaseSchemaNode', () => {
     const contract: PostgresContract = {
       target: 'postgres',
       targetFamily: 'sql',
-      profileHash: profileHash('sha256:same-name-cross-schema'),
+      profileHash: profileHash('same-name-cross-schema'),
       storage: new SqlStorage({
-        storageHash: coreHash('sha256:same-name-cross-schema'),
+        storageHash: coreHash('same-name-cross-schema'),
         namespaces: {
           public: new PostgresSchema({
             id: 'public',
@@ -319,9 +319,9 @@ describe('contractToPostgresDatabaseSchemaNode — FK resolvedReferencedNamespac
     return {
       target: 'postgres',
       targetFamily: 'sql',
-      profileHash: profileHash('sha256:fk-resolution-test'),
+      profileHash: profileHash('fk-resolution-test'),
       storage: new SqlStorage({
-        storageHash: coreHash('sha256:fk-resolution-test'),
+        storageHash: coreHash('fk-resolution-test'),
         namespaces: { [SCHEMA_NAME]: schema },
       }),
       roots: {},
@@ -394,9 +394,9 @@ describe('contractToPostgresDatabaseSchemaNode — unbound-slot projection', () 
     return {
       target: 'postgres',
       targetFamily: 'sql',
-      profileHash: profileHash('sha256:unbound-slot-projection-test'),
+      profileHash: profileHash('unbound-slot-projection-test'),
       storage: new SqlStorage({
-        storageHash: coreHash('sha256:unbound-slot-projection-test'),
+        storageHash: coreHash('unbound-slot-projection-test'),
         namespaces,
       }),
       roots: {},
@@ -491,9 +491,9 @@ describe('contractToPostgresDatabaseSchemaNode — native_enum projection', () =
     return {
       target: 'postgres',
       targetFamily: 'sql',
-      profileHash: profileHash('sha256:native-enum-projection-test'),
+      profileHash: profileHash('native-enum-projection-test'),
       storage: new SqlStorage({
-        storageHash: coreHash('sha256:native-enum-projection-test'),
+        storageHash: coreHash('native-enum-projection-test'),
         namespaces: { auth: schema },
       }),
       roots: {},

@@ -36,7 +36,7 @@ function table(columns: Record<string, StorageColumn>): StorageTable {
 
 function contract(tables: Record<string, StorageTable>): Contract<SqlStorage> {
   const storage = new SqlStorage({
-    storageHash: 'sha256:test' as StorageHashBase<string>,
+    storageHash: 'test' as StorageHashBase<string>,
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
         id: UNBOUND_NAMESPACE_ID,
@@ -47,7 +47,7 @@ function contract(tables: Record<string, StorageTable>): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     storage,
     domain: applicationDomainOf({ models: {} }),
     roots: {},

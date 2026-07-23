@@ -52,7 +52,7 @@ function makeStorageCollection(data: MongoCollectionData): MongoCollection {
 
 function makeContract(
   collections: Record<string, MongoCollectionData>,
-  storageHash = 'sha256:test-storage',
+  storageHash = 'test-storage',
 ): MongoContract {
   const builtCollections: Record<string, MongoCollection> = {};
   for (const [name, data] of Object.entries(collections)) {
@@ -61,7 +61,7 @@ function makeContract(
   return {
     target: 'mongo',
     targetFamily: 'mongo',
-    profileHash: 'sha256:test-profile',
+    profileHash: 'test-profile',
     capabilities: {},
     extensionPacks: {},
     meta: {},
@@ -1389,7 +1389,7 @@ describe('MongoMigrationPlanner', () => {
     it('sets destination storageHash from contract', () => {
       const contract = makeContract({ users: {} });
       const plan = planSuccess(planner, contract, emptyIR());
-      expect(plan.destination.storageHash).toBe('sha256:test-storage');
+      expect(plan.destination.storageHash).toBe('test-storage');
     });
 
     it('does not include profileHash in destination (migrations use storageHash only)', () => {
@@ -1618,8 +1618,8 @@ describe('MongoMigrationPlanner', () => {
     it('reflects fromContract.storage.storageHash when fromContract is supplied', () => {
       // Distinct storage hashes so the assertion fails if `origin` is
       // accidentally derived from `destination` instead of `fromContract`.
-      const contract = makeContract({}, 'sha256:destination-only');
-      const fromContract = makeContract({}, 'sha256:from-only');
+      const contract = makeContract({}, 'destination-only');
+      const fromContract = makeContract({}, 'from-only');
       const result = planner.plan({
         contract,
         schema: emptyIR(),
@@ -1630,7 +1630,7 @@ describe('MongoMigrationPlanner', () => {
       });
       expect(result.kind).toBe('success');
       if (result.kind !== 'success') throw new Error('Expected success');
-      expect(result.plan.origin).toEqual({ storageHash: 'sha256:from-only' });
+      expect(result.plan.origin).toEqual({ storageHash: 'from-only' });
     });
 
     it('is null when fromContract is null', () => {
@@ -1653,19 +1653,19 @@ describe('MongoMigrationPlanner', () => {
     it("identifies as the 'mongo' target with no operations and the supplied destination hash", () => {
       const empty = planner.emptyMigration({
         packageDir: '/tmp/migration-pkg',
-        fromHash: 'sha256:00',
-        toHash: 'sha256:01',
+        fromHash: '00',
+        toHash: '01',
         snapshotsImportPath: '../../snapshots',
       });
 
       expect(empty.targetId).toBe('mongo');
       expect(empty.operations).toEqual([]);
-      expect(empty.destination).toEqual({ storageHash: 'sha256:01' });
+      expect(empty.destination).toEqual({ storageHash: '01' });
     });
 
     it('renders a migration.ts stub that imports Migration and calls MigrationCLI.run', () => {
-      const fromHash = `sha256:${'0'.repeat(64)}`;
-      const toHash = `sha256:${'1'.repeat(64)}`;
+      const fromHash = '0'.repeat(64);
+      const toHash = '1'.repeat(64);
       const empty = planner.emptyMigration({
         packageDir: '/tmp/migration-pkg',
         fromHash,
@@ -1690,19 +1690,19 @@ describe('MongoMigrationPlanner', () => {
     it('produces a plan whose origin reflects the supplied fromHash', () => {
       const empty = planner.emptyMigration({
         packageDir: '/tmp/migration-pkg',
-        fromHash: 'sha256:00',
-        toHash: 'sha256:01',
+        fromHash: '00',
+        toHash: '01',
         snapshotsImportPath: '../../snapshots',
       });
 
-      expect(empty.origin).toEqual({ storageHash: 'sha256:00' });
+      expect(empty.origin).toEqual({ storageHash: '00' });
     });
 
     it('treats a null fromHash as a null origin', () => {
       const empty = planner.emptyMigration({
         packageDir: '/tmp/migration-pkg',
         fromHash: null,
-        toHash: 'sha256:01',
+        toHash: '01',
         snapshotsImportPath: '../../snapshots',
       });
 
@@ -1732,7 +1732,7 @@ describe('MongoMigrationPlanner', () => {
         entries: { collection: builtCollections, valueSet: valueSets },
       });
       const storage = new MongoStorage({
-        storageHash: coreHash('sha256:test-storage'),
+        storageHash: coreHash('test-storage'),
         namespaces: { __unbound__: namespace },
       });
       return { ...base, storage };

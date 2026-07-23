@@ -197,8 +197,8 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         driver: driver!,
         space: APP_SPACE_ID,
         destination: {
-          storageHash: 'sha256:other-contract',
-          profileHash: 'sha256:other-profile',
+          storageHash: 'other-contract',
+          profileHash: 'other-profile',
           invariants: [],
         },
       });
@@ -208,8 +208,8 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         targetId: 'postgres',
         spaceId: APP_SPACE_ID,
         origin: {
-          storageHash: 'sha256:expected-origin',
-          profileHash: 'sha256:expected-profile',
+          storageHash: 'expected-origin',
+          profileHash: 'expected-profile',
         },
         destination: toPlanContractInfo(contract),
         operations: [],
@@ -241,8 +241,8 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         ['app'],
       );
       expect(markerRow.rows[0]).toMatchObject({
-        core_hash: 'sha256:other-contract',
-        profile_hash: 'sha256:other-profile',
+        core_hash: 'other-contract',
+        profile_hash: 'other-profile',
       });
 
       const ledgerCount = await driver!.query<{ count: string }>(

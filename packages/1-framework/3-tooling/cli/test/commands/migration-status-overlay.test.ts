@@ -109,10 +109,10 @@ describe('appliedHashesFromLedger', () => {
   it('collects exact migration hashes from ledger rows', () => {
     expect(
       appliedHashesFromLedger([
-        { migrationHash: 'sha256:a' },
-        { migrationHash: 'sha256:b' },
-        { migrationHash: 'sha256:a' },
+        { migrationHash: 'a' },
+        { migrationHash: 'b' },
+        { migrationHash: 'a' },
       ]),
-    ).toEqual(new Set(['sha256:a', 'sha256:b']));
+    ).toEqual(new Set(['a', 'b']));
   });
 });

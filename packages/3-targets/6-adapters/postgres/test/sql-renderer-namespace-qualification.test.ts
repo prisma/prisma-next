@@ -36,13 +36,13 @@ const emptyLookup: CodecLookup = {
 const publicContract = {
   target: 'postgres',
   targetFamily: 'sql',
-  profileHash: 'sha256:test-profile',
+  profileHash: 'test-profile',
   roots: {},
   capabilities: {},
   extensionPacks: {},
   meta: {},
   storage: new SqlStorage({
-    storageHash: 'sha256:test-core-public' as StorageHashBase<'sha256:test-core-public'>,
+    storageHash: 'test-core-public' as StorageHashBase<'test-core-public'>,
     namespaces: {
       public: new PostgresSchema({
         id: 'public',

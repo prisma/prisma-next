@@ -16,11 +16,11 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:89be7f7a0e01dca5206d3665bf034e6c3b92b1b77d9336c1e299a131319f4f6a'>;
+  StorageHashBase<'89be7f7a0e01dca5206d3665bf034e6c3b92b1b77d9336c1e299a131319f4f6a'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:b5689b5ab97f808cfa98afa9bb2b762a559d895cef8c68395c9ab4611166f605'>;
+  ExecutionHashBase<'b5689b5ab97f808cfa98afa9bb2b762a559d895cef8c68395c9ab4611166f605'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:3cc333ecad9f3f4c7229370a9d2c37e908cdce0f8d2e9fb132d50605b024eff2'>;
+  ProfileHashBase<'3cc333ecad9f3f4c7229370a9d2c37e908cdce0f8d2e9fb132d50605b024eff2'>;
 
 export type CodecTypes = SqliteTypes;
 export type LaneCodecTypes = CodecTypes;

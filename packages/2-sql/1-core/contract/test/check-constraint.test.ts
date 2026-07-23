@@ -114,7 +114,7 @@ describe('StorageTableSchema validates checks', () => {
 
   function makeRawStorage(tableExtra: Record<string, unknown>) {
     return {
-      storageHash: 'sha256:test',
+      storageHash: 'test',
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,

@@ -123,9 +123,9 @@ function buildContract(policies: readonly PostgresRlsPolicy[]): Contract<SqlStor
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:collect-ext-test'),
+    profileHash: profileHash('collect-ext-test'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:collect-ext-test'),
+      storageHash: coreHash('collect-ext-test'),
       namespaces: { [SCHEMA_NAME]: schema },
     }),
     roots: {},

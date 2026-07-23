@@ -19,9 +19,9 @@ function entry(
 ): LedgerEntryRecord {
   return {
     space: 'app',
-    migrationHash: 'sha256:abc',
+    migrationHash: 'abc',
     from: null,
-    to: 'sha256:dest',
+    to: 'dest',
     appliedAt: new Date('2026-06-01T08:00:00.000Z'),
     operationCount: 1,
     ...overrides,
@@ -69,7 +69,7 @@ describe('renderMigrationLogTable', () => {
       entry({
         migrationName: '20260301_init',
         from: null,
-        to: 'sha256:ef9de27abc',
+        to: 'ef9de27abc',
         operationCount: 5,
         appliedAt: new Date('2026-06-01T08:00:00.000Z'),
       }),
@@ -89,14 +89,14 @@ describe('renderMigrationLogTable', () => {
         entry({
           migrationName: '20260301_init',
           from: null,
-          to: 'sha256:ef9de27abc',
+          to: 'ef9de27abc',
           operationCount: 5,
           appliedAt: new Date('2026-06-01T08:00:00.000Z'),
         }),
         entry({
           migrationName: '20260302_add_users',
-          from: 'sha256:ef9de27abc',
-          to: 'sha256:abcd1234def',
+          from: 'ef9de27abc',
+          to: 'abcd1234def',
           operationCount: 12,
           appliedAt: new Date('2026-06-02T10:30:00.000Z'),
         }),
@@ -167,7 +167,7 @@ describe('renderMigrationLogTable', () => {
         entry({
           migrationName: '20260301_init',
           from: null,
-          to: 'sha256:ef9de27abc',
+          to: 'ef9de27abc',
           appliedAt: new Date('2026-06-01T08:00:00.000Z'),
         }),
       ],
@@ -274,8 +274,8 @@ describe('renderMigrationLogTable with ANSI styler', () => {
       [
         entry({
           migrationName: '20260603T0915_migration',
-          from: 'sha256:4cb4256abcdef',
-          to: 'sha256:ef9de27abcdef',
+          from: '4cb4256abcdef',
+          to: 'ef9de27abcdef',
           operationCount: 3,
           appliedAt: new Date('2026-06-03T09:15:00.000Z'),
         }),
@@ -302,14 +302,14 @@ describe('renderMigrationLogTable with ANSI styler', () => {
           space: 'app',
           migrationName: '20260301_init',
           from: null,
-          to: 'sha256:ef9de27abc',
+          to: 'ef9de27abc',
           appliedAt: new Date('2026-06-01T08:00:00.000Z'),
         }),
         entry({
           space: 'audit',
           migrationName: '20260302_audit',
           from: null,
-          to: 'sha256:aaaaaaaaaaa',
+          to: 'aaaaaaaaaaa',
           appliedAt: new Date('2026-06-01T08:00:00.002Z'),
         }),
       ],
@@ -348,10 +348,10 @@ describe('serializeLedgerEntriesForJson', () => {
 
   it('uses name and hash field names (not migrationName/migrationHash)', () => {
     const json = serializeLedgerEntriesForJson([
-      entry({ migrationName: '001_init', migrationHash: 'sha256:deadbeef' }),
+      entry({ migrationName: '001_init', migrationHash: 'deadbeef' }),
     ]);
     expect(json[0]).toHaveProperty('name', '001_init');
-    expect(json[0]).toHaveProperty('hash', 'sha256:deadbeef');
+    expect(json[0]).toHaveProperty('hash', 'deadbeef');
     expect(json[0]).not.toHaveProperty('migrationName');
     expect(json[0]).not.toHaveProperty('migrationHash');
   });

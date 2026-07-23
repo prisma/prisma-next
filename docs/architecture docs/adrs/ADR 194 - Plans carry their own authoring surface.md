@@ -10,7 +10,7 @@ class AddPostsAuthorIndex extends Migration {
     return [createIndex('posts', [{ field: 'authorId', direction: 1 }])];
   }
   override describe() {
-    return { from: 'sha256:v1', to: 'sha256:v2', labels: ['add-index'] };
+    return { from: 'v1', to: 'v2', labels: ['add-index'] };
   }
 }
 ```

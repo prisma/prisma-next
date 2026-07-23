@@ -34,7 +34,7 @@ export function mongoContractJson(params: {
   return {
     targetFamily: 'mongo',
     target: 'mongo',
-    profileHash: 'sha256:test',
+    profileHash: 'test',
     roots: params.roots ?? { items: crossRef('Item') },
     domain: applicationDomainOf({ models, namespaceId: UNBOUND_DOMAIN_NAMESPACE_ID }),
     storage: {

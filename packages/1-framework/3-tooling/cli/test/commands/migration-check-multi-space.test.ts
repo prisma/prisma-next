@@ -30,9 +30,9 @@ import {
  * silently.
  */
 
-const HASH_APP = `sha256:${'a'.repeat(64)}`;
-const HASH_EXT = `sha256:${'b'.repeat(64)}`;
-const HASH_DANGLING = `sha256:${'c'.repeat(64)}`;
+const HASH_APP = `${'a'.repeat(64)}`;
+const HASH_EXT = `${'b'.repeat(64)}`;
+const HASH_DANGLING = `${'c'.repeat(64)}`;
 
 const ADDITIVE_OP: MigrationPlanOperation = {
   id: 'table.users',

@@ -146,18 +146,26 @@ function findHeadMigrationDir(migrationsDir, headHash) {
  * Rewrite the `to:` hash literal in a `migration.ts` file.
  *
  * Matches the pattern:
- *   to: 'sha256:<hex>',
+ *   to: '<hex>',
  * or
- *   to: "sha256:<hex>",
+ *   to: "<hex>",
  * (with optional surrounding whitespace) and replaces the hash value.
  *
- * Throws if the pattern is not found exactly once.
+ * New-shape migrations (post TML-2892) carry no hash literals: they import the
+ * committed `end-contract.json` and the `Migration` base derives `describe()`'s
+ * from/to from that JSON's `storage.storageHash`. For that shape there is
+ * nothing to rewrite here; the caller syncs end-contract.json before re-emitting.
+ *
+ * Throws if the pattern is not found exactly once (old shape only).
  */
 function rewriteMigrationToHash(migrationTsPath, newHash) {
   const src = readFileSync(migrationTsPath, 'utf8');
-  // Match the `to:` property value -- either single or double-quoted sha256 hash.
-  const pattern = /(to:\s*['"])sha256:[0-9a-f]+(['"])/g;
+  // Match the `to:` property value -- either single or double-quoted bare-hex hash.
+  const pattern = /(to:\s*['"])(?:[0-9a-f]{64}|empty)(['"])/g;
   const matches = [...src.matchAll(pattern)];
+  if (src.includes('endContractJson = endContract') && matches.length === 0) {
+    return false;
+  }
   if (matches.length === 0) {
     throw new Error(
       `regen-extension-migrations: could not find 'to: ...' hash literal in ${migrationTsPath}`,
@@ -251,7 +259,7 @@ async function processExtension(extDir) {
 
   const contractJson = readJson(contractJsonPath);
   const newHash = contractJson?.storage?.storageHash;
-  if (typeof newHash !== 'string' || !newHash.startsWith('sha256:')) {
+  if (typeof newHash !== 'string' || !/^(?:[0-9a-f]{64}|empty)$/.test(newHash)) {
     throw new Error(
       `regen-extension-migrations: could not read storage.storageHash from ${contractJsonPath}`,
     );

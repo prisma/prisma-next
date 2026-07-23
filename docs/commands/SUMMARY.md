@@ -41,7 +41,7 @@ prisma-next db update --db $DATABASE_URL
 
 ```
 ✔ Database already matches contract
-  Signature: sha256:abc123...
+  Signature: abc123...
 ```
 
 **When this happens**: You run `db init` and then immediately run `db update` without changing the contract. Or you run `db update` twice in a row. The command is idempotent.
@@ -58,7 +58,7 @@ Example: you added a `nickname` column to the `user` table in your contract.
 │
 └─ Add column nickname on user [additive]
 
-Destination hash: sha256:new-hash...
+Destination hash: new-hash...
 
 This is a dry run. No changes were applied.
 Run without --dry-run to apply changes.
@@ -69,7 +69,7 @@ For SQL targets, plan mode also prints a DDL preview derived from planned operat
 **Apply mode** (default):
 ```
 ✔ Applied 1 operation(s)
-  Signature: sha256:new-hash...
+  Signature: new-hash...
 ```
 
 The planner supports three operation classes:

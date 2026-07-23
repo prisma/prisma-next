@@ -60,9 +60,9 @@ const TARGET_FAMILY = 'mock';
 const SCHEMA_VERSION = '1.0.0';
 const CREATED_AT = '2026-02-25T14:30:00.000Z';
 
-const HASH_A = `sha256:${'a'.repeat(64)}`;
-const HASH_B = `sha256:${'b'.repeat(64)}`;
-const HASH_C = `sha256:${'c'.repeat(64)}`;
+const HASH_A = `${'a'.repeat(64)}`;
+const HASH_B = `${'b'.repeat(64)}`;
+const HASH_C = `${'c'.repeat(64)}`;
 
 const ADDITIVE_OPS: readonly MigrationPlanOperation[] = [
   { id: 'table.users', label: 'Create table users', operationClass: 'additive' },

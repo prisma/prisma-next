@@ -69,7 +69,7 @@ describe('migrate — pending migration resolution', {
 
     await writeAttestedMigration(migrationsDir, {
       from: null,
-      to: 'sha256:hash-a',
+      to: 'hash-a',
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'initial',
@@ -86,7 +86,7 @@ describe('migrate — pending migration resolution', {
     expect(path).not.toBeNull();
     expect(path).toHaveLength(1);
     expect(path![0]!.from).toBe(EMPTY_CONTRACT_HASH);
-    expect(path![0]!.to).toBe('sha256:hash-a');
+    expect(path![0]!.to).toBe('hash-a');
   });
 
   it('finds pending path for multi-step migration', async () => {
@@ -96,15 +96,15 @@ describe('migrate — pending migration resolution', {
 
     await writeAttestedMigration(migrationsDir, {
       from: null,
-      to: 'sha256:hash-a',
+      to: 'hash-a',
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'add_user',
     });
 
     await writeAttestedMigration(migrationsDir, {
-      from: 'sha256:hash-a',
-      to: 'sha256:hash-b',
+      from: 'hash-a',
+      to: 'hash-b',
       ops: [createTableOp('post')],
       timestamp: new Date(2026, 0, 2, 10, 0),
       slug: 'add_post',
@@ -115,15 +115,15 @@ describe('migrate — pending migration resolution', {
     const graph = reconstructGraph(attested);
     const leaf = findLeaf(graph);
 
-    const path = findPath(graph, 'sha256:hash-a', leaf!);
+    const path = findPath(graph, 'hash-a', leaf!);
     expect(path).toHaveLength(1);
-    expect(path![0]!.from).toBe('sha256:hash-a');
-    expect(path![0]!.to).toBe('sha256:hash-b');
+    expect(path![0]!.from).toBe('hash-a');
+    expect(path![0]!.to).toBe('hash-b');
 
     const fullPath = findPath(graph, EMPTY_CONTRACT_HASH, leaf!);
     expect(fullPath).toHaveLength(2);
-    expect(fullPath![0]!.to).toBe('sha256:hash-a');
-    expect(fullPath![1]!.to).toBe('sha256:hash-b');
+    expect(fullPath![0]!.to).toBe('hash-a');
+    expect(fullPath![1]!.to).toBe('hash-b');
   });
 
   it('finds path to an explicit destination hash', async () => {
@@ -133,15 +133,15 @@ describe('migrate — pending migration resolution', {
 
     await writeAttestedMigration(migrationsDir, {
       from: null,
-      to: 'sha256:hash-a',
+      to: 'hash-a',
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'add_user',
     });
 
     await writeAttestedMigration(migrationsDir, {
-      from: 'sha256:hash-a',
-      to: 'sha256:hash-b',
+      from: 'hash-a',
+      to: 'hash-b',
       ops: [createTableOp('post')],
       timestamp: new Date(2026, 0, 2, 10, 0),
       slug: 'add_post',
@@ -151,9 +151,9 @@ describe('migrate — pending migration resolution', {
     const attested = packages;
     const graph = reconstructGraph(attested);
 
-    const pathToContractA = findPath(graph, EMPTY_CONTRACT_HASH, 'sha256:hash-a');
+    const pathToContractA = findPath(graph, EMPTY_CONTRACT_HASH, 'hash-a');
     expect(pathToContractA).toHaveLength(1);
-    expect(pathToContractA![0]!.to).toBe('sha256:hash-a');
+    expect(pathToContractA![0]!.to).toBe('hash-a');
   });
 
   it('returns empty path when marker already at leaf', async () => {
@@ -163,7 +163,7 @@ describe('migrate — pending migration resolution', {
 
     await writeAttestedMigration(migrationsDir, {
       from: null,
-      to: 'sha256:hash-a',
+      to: 'hash-a',
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'initial',
@@ -174,7 +174,7 @@ describe('migrate — pending migration resolution', {
     const graph = reconstructGraph(attested);
     const leaf = findLeaf(graph);
 
-    const path = findPath(graph, 'sha256:hash-a', leaf!);
+    const path = findPath(graph, 'hash-a', leaf!);
     expect(path).toHaveLength(0);
   });
 
@@ -185,7 +185,7 @@ describe('migrate — pending migration resolution', {
 
     await writeAttestedMigration(migrationsDir, {
       from: null,
-      to: 'sha256:hash-a',
+      to: 'hash-a',
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'initial',
@@ -196,7 +196,7 @@ describe('migrate — pending migration resolution', {
     const graph = reconstructGraph(attested);
     const leaf = findLeaf(graph);
 
-    const path = findPath(graph, 'sha256:unknown-hash', leaf!);
+    const path = findPath(graph, 'unknown-hash', leaf!);
     expect(path).toBeNull();
   });
 
@@ -213,7 +213,7 @@ describe('migrate — pending migration resolution', {
 
     await writeAttestedMigration(migrationsDir, {
       from: null,
-      to: 'sha256:hash-a',
+      to: 'hash-a',
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'initial',
@@ -224,7 +224,7 @@ describe('migrate — pending migration resolution', {
       formatMigrationDirName(new Date(2026, 0, 2), 'invalid-hash'),
     );
     const baseMetadata = {
-      from: 'sha256:hash-a',
+      from: 'hash-a',
       to: EMPTY_CONTRACT_HASH,
       providedInvariants: [],
       createdAt: new Date().toISOString(),
@@ -251,15 +251,15 @@ describe('migrate — pending migration resolution', {
 
     await writeAttestedMigration(migrationsDir, {
       from: null,
-      to: 'sha256:hash-a',
+      to: 'hash-a',
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'initial',
     });
 
     await writeAttestedMigration(migrationsDir, {
-      from: 'sha256:hash-a',
-      to: 'sha256:hash-b',
+      from: 'hash-a',
+      to: 'hash-b',
       ops: [createTableOp('post')],
       timestamp: new Date(2026, 0, 2, 10, 0),
       slug: 'add_post',
@@ -282,15 +282,15 @@ describe('migrate — pending migration resolution', {
 
     const m1 = await writeAttestedMigration(migrationsDir, {
       from: null,
-      to: 'sha256:hash-a',
+      to: 'hash-a',
       ops: [createTableOp('user')],
       timestamp: new Date(2026, 0, 1, 10, 0),
       slug: 'first',
     });
 
     const m2 = await writeAttestedMigration(migrationsDir, {
-      from: 'sha256:hash-a',
-      to: 'sha256:hash-b',
+      from: 'hash-a',
+      to: 'hash-b',
       ops: [createTableOp('post')],
       timestamp: new Date(2026, 0, 2, 10, 0),
       slug: 'second',

@@ -5,7 +5,7 @@ import { type CachePayload, cacheAnnotation } from '../src/cache-annotation';
 const baseMeta: PlanMeta = {
   target: 'postgres',
   targetFamily: 'sql',
-  storageHash: 'sha256:test',
+  storageHash: 'test',
   lane: 'orm',
 };
 

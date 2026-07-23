@@ -20,7 +20,7 @@ export function createTestContract(
   });
   return createContract<SqlStorage>({
     storage: new SqlStorage({
-      storageHash: (overrides.storageHash ?? 'sha256:test') as never,
+      storageHash: (overrides.storageHash ?? 'test') as never,
       namespaces: { [UNBOUND_NAMESPACE_ID]: unboundNs },
     }),
   });

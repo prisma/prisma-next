@@ -156,10 +156,10 @@ namespace public {
           },
         },
       },
-      storage: { storageHash: coreHash('sha256:test'), namespaces: {} },
+      storage: { storageHash: coreHash('test'), namespaces: {} },
       capabilities: {},
       extensionPacks: {},
-      profileHash: profileHash('sha256:test-profile'),
+      profileHash: profileHash('test-profile'),
       meta: {},
     });
 

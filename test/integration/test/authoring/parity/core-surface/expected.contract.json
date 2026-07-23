@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "profileHash": "9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "post": {
       "model": "Post",
@@ -324,7 +324,7 @@
         "id": "public"
       }
     },
-    "storageHash": "sha256:001f0568c44676d5972dd207a36062961203faf813f92ed81a3178d9d5db684d",
+    "storageHash": "001f0568c44676d5972dd207a36062961203faf813f92ed81a3178d9d5db684d",
     "types": {
       "Email": {
         "codecId": "pg/text@1",

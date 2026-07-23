@@ -10,7 +10,7 @@ describe('SqlContractSerializer edge cases', () => {
   it('handles storage with null tables', () => {
     const contractInput = validSqlContractJson({
       storage: storageWithNamespacedTables({
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         tables: null,
       }),
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
@@ -20,7 +20,7 @@ describe('SqlContractSerializer edge cases', () => {
 
   it('handles storage without tables property', () => {
     const contractInput = validSqlContractJson({
-      storage: { storageHash: 'sha256:test' },
+      storage: { storageHash: 'test' },
       // biome-ignore lint/suspicious/noExplicitAny: testing invalid input
     }) as any;
     expect(() => validateSqlContractFully<Contract<SqlStorage>>(contractInput)).toThrow();
@@ -48,7 +48,7 @@ describe('SqlContractSerializer edge cases', () => {
         },
       },
       storage: storageWithNamespacedTables({
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         tables: {
           user: {
             columns: {
@@ -71,7 +71,7 @@ describe('SqlContractSerializer edge cases', () => {
   it('handles table without columns in normalization', () => {
     const contractInput = validSqlContractJson({
       storage: storageWithNamespacedTables({
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         tables: {
           User: {
             primaryKey: { columns: ['id'] },
@@ -104,7 +104,7 @@ describe('SqlContractSerializer edge cases', () => {
         },
       },
       storage: storageWithNamespacedTables({
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         tables: {
           user: {
             columns: {
@@ -141,7 +141,7 @@ describe('SqlContractSerializer edge cases', () => {
         },
       },
       storage: storageWithNamespacedTables({
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         tables: {
           user: {
             columns: {
@@ -190,7 +190,7 @@ describe('SqlContractSerializer edge cases', () => {
         },
       },
       storage: storageWithNamespacedTables({
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         tables: {
           user: {
             columns: {

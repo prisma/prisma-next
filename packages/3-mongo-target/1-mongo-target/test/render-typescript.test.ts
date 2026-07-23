@@ -13,8 +13,8 @@ const SNAPSHOTS_IMPORT_PATH = '../../snapshots';
 const FROM_HEX = 'a'.repeat(64);
 const TO_HEX = 'b'.repeat(64);
 const META = {
-  from: `sha256:${FROM_HEX}`,
-  to: `sha256:${TO_HEX}`,
+  from: FROM_HEX,
+  to: TO_HEX,
   snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
 } as const;
 
@@ -68,8 +68,8 @@ describe('renderCallsToTypeScript', () => {
 
     expect(output).not.toContain('describe()');
     // The hash values are no longer literal-embedded — they come from the JSON.
-    expect(output).not.toContain(META.from);
-    expect(output).not.toContain(META.to);
+    expect(output).not.toContain(`'${META.from}'`);
+    expect(output).not.toContain(`'${META.to}'`);
   });
 
   it('renders a compilable merged import block when from === to (E4)', () => {

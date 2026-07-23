@@ -23,7 +23,7 @@ const BULK_CODEC_ID = 'test/bulk-transform';
 const baseMeta: PlanMeta = {
   target: 'mongo',
   targetFamily: 'mongo',
-  storageHash: 'sha256:test',
+  storageHash: 'test',
   lane: 'orm',
 };
 

@@ -33,9 +33,9 @@ function buildContract(): Contract<SqlStorage> {
   return {
     target: 'sqlite',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:sibling-scoping-test'),
+    profileHash: profileHash('sibling-scoping-test'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:sibling-scoping-test'),
+      storageHash: coreHash('sibling-scoping-test'),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: sqliteCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,

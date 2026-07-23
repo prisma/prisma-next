@@ -140,7 +140,7 @@ describe('contract DSL authoring surface', () => {
     });
 
     const contract = defineTestContract({
-      storageHash: 'sha256:contract-dsl',
+      storageHash: 'contract-dsl',
       foreignKeyDefaults: { constraint: true, index: false },
       types,
       models: {
@@ -163,7 +163,7 @@ describe('contract DSL authoring surface', () => {
     >;
 
     expect(contract.target).toBe('postgres');
-    expect(contract.storage.storageHash).toMatch(/^sha256:/);
+    expect(contract.storage.storageHash).toBe('contract-dsl');
     expect(storageTables['app_user']).toMatchObject({
       primaryKey: { columns: ['id'], name: 'app_user_pkey' },
       uniques: [{ columns: ['email'], name: 'app_user_email_key' }],

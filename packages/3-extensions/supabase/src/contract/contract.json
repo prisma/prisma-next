@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "profileHash": "9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "audit_log_entries": {
       "model": "AuditLogEntries",
@@ -8342,7 +8342,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:1856d476008cdfac9fd383f74be8015f6cb313515966c3c6cba4067f5bc15858",
+    "storageHash": "1856d476008cdfac9fd383f74be8015f6cb313515966c3c6cba4067f5bc15858",
     "types": {
       "CreatedAt": {
         "codecId": "pg/timestamp@1",

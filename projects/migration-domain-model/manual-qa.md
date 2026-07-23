@@ -16,7 +16,7 @@
 **The fix / what changed**, in five user-mental-model bullets:
 
 1. The forward-execution verb is `prisma-next migrate --to <contract>` everywhere — same in dev, staging, production. There is no `migrate dev` / `migrate deploy` split.
-2. Refs are top-level: `prisma-next ref set production sha256:abc…`, `prisma-next ref list`, `prisma-next ref delete production`. There is no `migration ref` namespace and no `ref get`.
+2. Refs are top-level: `prisma-next ref set production abc…`, `prisma-next ref list`, `prisma-next ref delete production`. There is no `migration ref` namespace and no `ref get`.
 3. Asking the system what's going on uses purpose-specific verbs: `migration status` for path/pending, `migration log` for executed history, `migration list` for what's on disk, `migration graph` for topology, `migration show <m>` for one migration's details, `migration check` for integrity. None of `--graph`, `--all`, `--limit`, `--ref` survives on `status`; invoking them redirects.
 4. Everywhere you name a contract — `migrate --to`, `db update --to`, `db sign --contract`, `migration plan --from`, `migration status --to/--from`, `ref set <name> <contract>` — the same five reference forms work: storage hash, hash prefix, ref name, migration directory name, `<dir>^`.
 5. The conceptual reference for the migration system now lives at `docs/design/10-domains/migration/README.md`. The subsystem doc at `docs/architecture docs/subsystems/7. Migration System.md` cross-links it and focuses on implementation.
@@ -103,7 +103,7 @@ For each of the following invocations, run the command and observe stderr + exit
 
 1. `prisma-next migration apply` → expected `Use \`prisma-next migrate --to <contract>\` instead.`
 2. `prisma-next migration apply --to production` → same as above (the `--to` arg shouldn't change the redirect target).
-3. `prisma-next migration ref set staging sha256:abc` → expected `Use \`prisma-next ref set|list|delete\` instead.`
+3. `prisma-next migration ref set staging abc` → expected `Use \`prisma-next ref set|list|delete\` instead.`
 4. `prisma-next migration ref` (no subcommand) → expected `Use \`prisma-next ref set|list|delete\` instead.`
 5. `prisma-next migration status --graph` → expected `Use \`prisma-next migration graph\` to view the migration graph.`
 6. `prisma-next migration status --all` → expected `Use \`prisma-next migration log --db <url>\` to view the full execution history.`
@@ -174,7 +174,7 @@ For each of the following invocations, run the command and observe stderr + exit
    ```
    Read the exit code and the human-readable output.
 
-2. **Plant the corruption.** Pick a non-initial migration (e.g. `20260422T0742_migration`). Edit its **`end-contract.json`** (NOT `migration.json`) and replace `storage.storageHash` with an obviously-wrong hash, e.g. `sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd`. Save.
+2. **Plant the corruption.** Pick a non-initial migration (e.g. `20260422T0742_migration`). Edit its **`end-contract.json`** (NOT `migration.json`) and replace `storage.storageHash` with an obviously-wrong hash, e.g. `dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd`. Save.
 
    The recipe must target `end-contract.json` rather than `migration.json` because PN-005 is the *within-migration snapshot-consistency* check — it detects drift between the manifest's `metadata.to` and the recorded snapshot's `storageHash`. Mutating `migration.json` invalidates the `migrationHash` first, which makes the loader throw PN-001 (HASH_MISMATCH) before PN-005 has a chance to fire.
 
@@ -182,7 +182,7 @@ For each of the following invocations, run the command and observe stderr + exit
    ```bash
    # Inspect the original first so you can restore by memory or by git
    cat migrations/app/20260422T0742_migration/end-contract.json | head -20
-   # Hand-edit end-contract.json: change "storageHash": "sha256:..." to "sha256:dddd…"
+   # Hand-edit end-contract.json: change "storageHash": "..." to "dddd…"
    ```
 
 3. **Hot check, graph-wide (corruption-positive).**

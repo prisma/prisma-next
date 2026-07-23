@@ -16,7 +16,7 @@ import { encodeParam, encodeParams } from '../src/codecs/encoding';
 import { defineTestCodec } from './test-codec';
 import { buildTestContractCodecs } from './utils';
 
-const TEST_HASH = coreHash('sha256:test');
+const TEST_HASH = coreHash('test');
 
 interface ParamSpec {
   readonly value: unknown;

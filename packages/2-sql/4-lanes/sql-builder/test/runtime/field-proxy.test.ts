@@ -75,7 +75,7 @@ describe('createFieldProxy', () => {
       foreignKeys: [],
     };
     const storage = new SqlStorage({
-      storageHash: coreHash('sha256:h'),
+      storageHash: coreHash('h'),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,

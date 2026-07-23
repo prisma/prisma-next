@@ -39,7 +39,7 @@ export interface TolerantRefsResult {
 }
 
 const REF_NAME_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\/[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/;
-const REF_VALUE_PATTERN = /^sha256:(empty|[0-9a-f]{64})$/;
+const REF_VALUE_PATTERN = /^(empty|[0-9a-f]{64})$/;
 
 export function validateRefName(name: string): boolean {
   if (name.length === 0) return false;

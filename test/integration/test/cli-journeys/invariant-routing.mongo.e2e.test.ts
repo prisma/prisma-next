@@ -232,7 +232,7 @@ import { RawUpdateManyCommand, RawAggregateCommand } from '@prisma-next/mongo-qu
 
 const planMeta = {
   target: 'mongo',
-  storageHash: 'sha256:hand-authored',
+  storageHash: 'hand-authored',
   lane: 'mongo-raw',
   paramDescriptors: [],
 };

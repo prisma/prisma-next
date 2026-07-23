@@ -345,7 +345,7 @@ describe('formatSchemaVerifyOutput', () => {
     code: 'CONTRACT.SCHEMA_VERIFICATION_FAILED',
     summary: 'Database schema does not satisfy contract (1 failure)',
     contract: {
-      storageHash: 'sha256:test',
+      storageHash: 'test',
     },
     target: {
       expected: 'postgres',
@@ -585,8 +585,8 @@ describe('formatSchemaVerifyJson', () => {
       ok: true,
       summary: 'Database schema satisfies contract',
       contract: {
-        storageHash: 'sha256:test',
-        profileHash: 'sha256:profile',
+        storageHash: 'test',
+        profileHash: 'profile',
       },
       target: {
         expected: 'postgres',
@@ -610,8 +610,8 @@ describe('formatSchemaVerifyJson', () => {
 
     expect(parsed.ok).toBe(true);
     expect(parsed.summary).toBe('Database schema satisfies contract');
-    expect(parsed.contract.storageHash).toBe('sha256:test');
-    expect(parsed.contract.profileHash).toBe('sha256:profile');
+    expect(parsed.contract.storageHash).toBe('test');
+    expect(parsed.contract.profileHash).toBe('profile');
     expect(parsed.target.expected).toBe('postgres');
     expect(parsed.schema.issues).toEqual([]);
     expect(parsed.meta?.contractPath).toBe('./contract.json');
@@ -624,7 +624,7 @@ describe('formatSchemaVerifyJson', () => {
       ok: true,
       summary: 'Test',
       contract: {
-        storageHash: 'sha256:test',
+        storageHash: 'test',
       },
       target: {
         expected: 'postgres',
@@ -654,7 +654,7 @@ describe('formatSchemaVerifyJson', () => {
       ok: true,
       summary: 'Database schema satisfies contract',
       contract: {
-        storageHash: 'sha256:test',
+        storageHash: 'test',
       },
       target: {
         expected: 'postgres',
@@ -685,7 +685,7 @@ describe('formatSchemaVerifyJson', () => {
       code: 'CONTRACT.SCHEMA_VERIFICATION_FAILED',
       summary: 'Database schema does not satisfy contract',
       contract: {
-        storageHash: 'sha256:test',
+        storageHash: 'test',
       },
       target: {
         expected: 'postgres',
@@ -726,7 +726,7 @@ describe('formatSchemaVerifyJson', () => {
       code: 'CONTRACT.MARKER_REQUIRED',
       summary: 'Database schema has 1 unclaimed element (not in any contract)',
       contract: {
-        storageHash: 'sha256:test',
+        storageHash: 'test',
       },
       target: {
         expected: 'postgres',
@@ -758,8 +758,8 @@ describe('formatSignOutput', () => {
     ok: true,
     summary: 'Database signed (marker created)',
     contract: {
-      storageHash: 'sha256:abc123',
-      profileHash: 'sha256:def456',
+      storageHash: 'abc123',
+      profileHash: 'def456',
     },
     target: {
       expected: 'postgres',
@@ -788,18 +788,18 @@ describe('formatSignOutput', () => {
 
     expect(stripped).toContain('✔ Database signed');
     expect(stripped).toContain('from: none');
-    expect(stripped).toContain('to:   sha256:abc123');
+    expect(stripped).toContain('to:   abc123');
   });
 
   it('renders success message for updated marker', () => {
     const result = createSignResult({
-      summary: 'Database signed (marker updated from sha256:old-hash)',
+      summary: 'Database signed (marker updated from old-hash)',
       marker: {
         created: false,
         updated: true,
         previous: {
-          storageHash: 'sha256:old-hash',
-          profileHash: 'sha256:old-profile-hash',
+          storageHash: 'old-hash',
+          profileHash: 'old-profile-hash',
         },
       },
     });
@@ -809,8 +809,8 @@ describe('formatSignOutput', () => {
     const stripped = stripAnsi(output);
 
     expect(stripped).toContain('✔ Database signed');
-    expect(stripped).toContain('from: sha256:old-hash');
-    expect(stripped).toContain('to:   sha256:abc123');
+    expect(stripped).toContain('from: old-hash');
+    expect(stripped).toContain('to:   abc123');
   });
 
   it('renders success message for already up-to-date marker', () => {
@@ -820,7 +820,7 @@ describe('formatSignOutput', () => {
         created: false,
         updated: false,
         previous: {
-          storageHash: 'sha256:abc123',
+          storageHash: 'abc123',
         },
       },
     });
@@ -830,8 +830,8 @@ describe('formatSignOutput', () => {
     const stripped = stripAnsi(output);
 
     expect(stripped).toContain('✔ Database signed');
-    expect(stripped).toContain('from: sha256:abc123');
-    expect(stripped).toContain('to:   sha256:abc123');
+    expect(stripped).toContain('from: abc123');
+    expect(stripped).toContain('to:   abc123');
   });
 
   it('includes hashes in verbose mode', () => {
@@ -843,20 +843,20 @@ describe('formatSignOutput', () => {
 
     expect(stripped).toContain('✔ Database signed');
     expect(stripped).toContain('from: none');
-    expect(stripped).toContain('to:   sha256:abc123');
-    expect(stripped).toContain('profileHash: sha256:def456');
+    expect(stripped).toContain('to:   abc123');
+    expect(stripped).toContain('profileHash: def456');
     expect(stripped).toContain('Total time: 42ms');
   });
 
   it('includes previous hashes in verbose mode when marker was updated', () => {
     const result = createSignResult({
-      summary: 'Database signed (marker updated from sha256:old-hash)',
+      summary: 'Database signed (marker updated from old-hash)',
       marker: {
         created: false,
         updated: true,
         previous: {
-          storageHash: 'sha256:old-hash',
-          profileHash: 'sha256:old-profile-hash',
+          storageHash: 'old-hash',
+          profileHash: 'old-profile-hash',
         },
       },
     });
@@ -866,9 +866,9 @@ describe('formatSignOutput', () => {
     const stripped = stripAnsi(output);
 
     expect(stripped).toContain('✔ Database signed');
-    expect(stripped).toContain('from: sha256:old-hash');
-    expect(stripped).toContain('to:   sha256:abc123');
-    expect(stripped).toContain('previous profileHash: sha256:old-profile-hash');
+    expect(stripped).toContain('from: old-hash');
+    expect(stripped).toContain('to:   abc123');
+    expect(stripped).toContain('previous profileHash: old-profile-hash');
   });
 
   it('returns empty string in quiet mode', () => {
@@ -886,8 +886,8 @@ describe('formatSignJson', () => {
     ok: true,
     summary: 'Database signed (marker created)',
     contract: {
-      storageHash: 'sha256:abc123',
-      profileHash: 'sha256:def456',
+      storageHash: 'abc123',
+      profileHash: 'def456',
     },
     target: {
       expected: 'postgres',
@@ -914,8 +914,8 @@ describe('formatSignJson', () => {
 
     expect(parsed.ok).toBe(true);
     expect(parsed.summary).toBe('Database signed (marker created)');
-    expect(parsed.contract.storageHash).toBe('sha256:abc123');
-    expect(parsed.contract.profileHash).toBe('sha256:def456');
+    expect(parsed.contract.storageHash).toBe('abc123');
+    expect(parsed.contract.profileHash).toBe('def456');
     expect(parsed.marker.created).toBe(true);
     expect(parsed.marker.updated).toBe(false);
     expect(parsed.timings.total).toBe(42);
@@ -923,13 +923,13 @@ describe('formatSignJson', () => {
 
   it('formats updated marker result as JSON', () => {
     const result = createSignResult({
-      summary: 'Database signed (marker updated from sha256:old-hash)',
+      summary: 'Database signed (marker updated from old-hash)',
       marker: {
         created: false,
         updated: true,
         previous: {
-          storageHash: 'sha256:old-hash',
-          profileHash: 'sha256:old-profile-hash',
+          storageHash: 'old-hash',
+          profileHash: 'old-profile-hash',
         },
       },
     });
@@ -937,11 +937,11 @@ describe('formatSignJson', () => {
     const parsed = JSON.parse(output) as SignDatabaseResult;
 
     expect(parsed.ok).toBe(true);
-    expect(parsed.summary).toBe('Database signed (marker updated from sha256:old-hash)');
+    expect(parsed.summary).toBe('Database signed (marker updated from old-hash)');
     expect(parsed.marker.created).toBe(false);
     expect(parsed.marker.updated).toBe(true);
-    expect(parsed.marker.previous?.storageHash).toBe('sha256:old-hash');
-    expect(parsed.marker.previous?.profileHash).toBe('sha256:old-profile-hash');
+    expect(parsed.marker.previous?.storageHash).toBe('old-hash');
+    expect(parsed.marker.previous?.profileHash).toBe('old-profile-hash');
   });
 
   it('formats already up-to-date marker result as JSON', () => {

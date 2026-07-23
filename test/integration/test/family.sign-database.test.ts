@@ -159,8 +159,8 @@ describe('family instance sign', () => {
         `);
         // Write initial marker with different hash
         await seedTestMarker(client, {
-          storageHash: 'sha256:old-hash',
-          profileHash: 'sha256:old-profile-hash',
+          storageHash: 'old-hash',
+          profileHash: 'old-profile-hash',
           contractJson: { target: 'postgres' },
           canonicalVersion: 1,
         });
@@ -203,8 +203,8 @@ describe('family instance sign', () => {
               created: false,
               updated: true,
               previous: {
-                storageHash: 'sha256:old-hash',
-                profileHash: 'sha256:old-profile-hash',
+                storageHash: 'old-hash',
+                profileHash: 'old-profile-hash',
               },
             },
             contract: {
@@ -218,7 +218,7 @@ describe('family instance sign', () => {
           const marker = await familyInstance.readMarker({ driver, space: APP_SPACE_ID });
           expect(marker).not.toBeNull();
           expect(marker?.storageHash).toBe(validatedContract.storage.storageHash);
-          expect(marker?.storageHash).not.toBe('sha256:old-hash');
+          expect(marker?.storageHash).not.toBe('old-hash');
         } finally {
           await driver.close();
         }

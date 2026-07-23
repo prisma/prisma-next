@@ -18,7 +18,7 @@ import { PostgresMigration } from '../../src/core/migrations/postgres-migration'
 
 class SchemaRequiredProbe extends PostgresMigration {
   override describe() {
-    return { from: null, to: 'sha256:0' };
+    return { from: null, to: '0' };
   }
 
   override get operations() {

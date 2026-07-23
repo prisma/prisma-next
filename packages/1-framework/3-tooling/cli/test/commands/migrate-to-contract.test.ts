@@ -42,9 +42,9 @@ vi.mock('../../src/control-api/client', () => ({
   createControlClient: mocks.createControlClient,
 }));
 
-const EMPTY = 'sha256:empty';
-const C1 = `sha256:${'1'.repeat(64)}`;
-const C2 = `sha256:${'2'.repeat(64)}`;
+const EMPTY = 'empty';
+const C1 = `${'1'.repeat(64)}`;
+const C2 = `${'2'.repeat(64)}`;
 const SCHEMA_VERSION = '1.0.0';
 const TARGET = 'mock';
 const TARGET_FAMILY = 'mock';

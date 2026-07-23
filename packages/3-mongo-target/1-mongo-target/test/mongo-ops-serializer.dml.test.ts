@@ -389,7 +389,7 @@ describe('deserializeMongoQueryPlan', () => {
       ),
       meta: {
         target: 'mongo',
-        storageHash: 'sha256:abc',
+        storageHash: 'abc',
         lane: 'mongo-raw',
       },
     };
@@ -398,7 +398,7 @@ describe('deserializeMongoQueryPlan', () => {
     expect(result.collection).toBe('users');
     expect(result.command.kind).toBe('rawUpdateMany');
     expect(result.meta.target).toBe('mongo');
-    expect(result.meta.storageHash).toBe('sha256:abc');
+    expect(result.meta.storageHash).toBe('abc');
     expect(result.meta.lane).toBe('mongo-raw');
   });
 
@@ -411,7 +411,7 @@ describe('deserializeMongoQueryPlan', () => {
       ]),
       meta: {
         target: 'mongo',
-        storageHash: 'sha256:def',
+        storageHash: 'def',
         lane: 'mongo-pipeline',
       },
     };
@@ -429,18 +429,16 @@ describe('deserializeMongoQueryPlan', () => {
       command: new RawInsertOneCommand('users', { name: 'test' }),
       meta: {
         target: 'mongo',
-        storageHash: 'sha256:abc',
+        storageHash: 'abc',
         lane: 'mongo-raw',
         targetFamily: 'mongo',
-        profileHash: 'sha256:profile',
+        profileHash: 'profile',
       },
     };
     const json = JSON.parse(JSON.stringify(plan));
     const result = deserializeMongoQueryPlan(json);
     expect((result.meta as unknown as Record<string, unknown>)['targetFamily']).toBe('mongo');
-    expect((result.meta as unknown as Record<string, unknown>)['profileHash']).toBe(
-      'sha256:profile',
-    );
+    expect((result.meta as unknown as Record<string, unknown>)['profileHash']).toBe('profile');
   });
 
   it('preserves annotations in meta when present', () => {
@@ -449,7 +447,7 @@ describe('deserializeMongoQueryPlan', () => {
       command: new RawInsertOneCommand('users', { name: 'test' }),
       meta: {
         target: 'mongo',
-        storageHash: 'sha256:abc',
+        storageHash: 'abc',
         lane: 'mongo-raw',
         annotations: { intent: 'write' },
       },

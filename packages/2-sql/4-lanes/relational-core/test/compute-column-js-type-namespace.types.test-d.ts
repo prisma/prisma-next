@@ -142,7 +142,7 @@ type FixtureTypeMaps = TypeMaps<
 
 type TwoNamespaceContract = Omit<Contract<SqlStorage>, 'storage' | 'domain'> & {
   readonly storage: {
-    readonly storageHash: StorageHashBase<'sha256:two-namespace-resolver-fixture'>;
+    readonly storageHash: StorageHashBase<'two-namespace-resolver-fixture'>;
     readonly namespaces: {
       readonly public: {
         readonly id: 'public';

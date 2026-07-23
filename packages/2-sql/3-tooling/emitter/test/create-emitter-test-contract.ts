@@ -33,7 +33,7 @@ export function createEmitterTestContract(
     extensionPacks: {},
     capabilities: {},
     meta: {},
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     ...rest,
     storage: resolvedStorage as Contract['storage'],
   };

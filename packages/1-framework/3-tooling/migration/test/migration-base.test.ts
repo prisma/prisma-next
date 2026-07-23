@@ -54,7 +54,7 @@ describe('Migration', () => {
           return [];
         }
         override describe() {
-          return { from: null, to: 'sha256:to' };
+          return { from: null, to: 'to' };
         }
       }
 
@@ -68,17 +68,17 @@ describe('Migration', () => {
           return [];
         }
         override describe() {
-          return { from: 'sha256:abc', to: 'sha256:def' };
+          return { from: 'abc', to: 'def' };
         }
       }
 
-      expect(new NonBaselineMigration().origin).toEqual({ storageHash: 'sha256:abc' });
+      expect(new NonBaselineMigration().origin).toEqual({ storageHash: 'abc' });
     });
   });
 
   describe('derived describe() from contract JSON', () => {
-    const endJson = { storage: { storageHash: 'sha256:endhash' } };
-    const startJson = { storage: { storageHash: 'sha256:starthash' } };
+    const endJson = { storage: { storageHash: 'endhash' } };
+    const startJson = { storage: { storageHash: 'starthash' } };
 
     it('derives to from endContractJson.storage.storageHash and from:null when no start', async () => {
       class M extends Migration {
@@ -89,9 +89,9 @@ describe('Migration', () => {
         }
       }
       const m = new M();
-      expect(m.describe()).toEqual({ from: null, to: 'sha256:endhash' });
+      expect(m.describe()).toEqual({ from: null, to: 'endhash' });
       expect(m.origin).toBeNull();
-      expect(m.destination).toEqual({ storageHash: 'sha256:endhash' });
+      expect(m.destination).toEqual({ storageHash: 'endhash' });
     });
 
     it('derives from from startContractJson.storage.storageHash when present', async () => {
@@ -104,8 +104,8 @@ describe('Migration', () => {
         }
       }
       const m = new M();
-      expect(m.describe()).toEqual({ from: 'sha256:starthash', to: 'sha256:endhash' });
-      expect(m.origin).toEqual({ storageHash: 'sha256:starthash' });
+      expect(m.describe()).toEqual({ from: 'starthash', to: 'endhash' });
+      expect(m.origin).toEqual({ storageHash: 'starthash' });
     });
 
     it('throws a clear error when neither endContractJson nor a describe() override is present', async () => {
@@ -126,10 +126,10 @@ describe('Migration', () => {
           return [];
         }
         override describe() {
-          return { from: null, to: 'sha256:overridden' };
+          return { from: null, to: 'overridden' };
         }
       }
-      expect(new M().describe()).toEqual({ from: null, to: 'sha256:overridden' });
+      expect(new M().describe()).toEqual({ from: null, to: 'overridden' });
     });
   });
 
@@ -222,7 +222,7 @@ describe('buildMigrationArtifacts', () => {
 
     expect(metadata.from).toBe('abc');
     expect(metadata.to).toBe('def');
-    expect(metadata.migrationHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(metadata.migrationHash).toMatch(/^[a-f0-9]{64}$/);
     expect(metadata.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
     expect(JSON.parse(metadataJson)).toEqual(metadata);
@@ -230,21 +230,21 @@ describe('buildMigrationArtifacts', () => {
 
   it('preserves createdAt from existing metadata', async () => {
     const existingMetadata: Partial<MigrationMetadata> = {
-      from: 'sha256:from',
-      to: 'sha256:to',
+      from: 'from',
+      to: 'to',
       createdAt: '2026-01-15T10:00:00.000Z',
     };
 
     const { metadata } = await buildMigrationArtifacts(
       makeMigration([{ id: 'op1', label: 'Edited op', operationClass: 'additive' }], {
-        from: 'sha256:from',
-        to: 'sha256:to',
+        from: 'from',
+        to: 'to',
       }),
       existingMetadata,
     );
 
     expect(metadata.createdAt).toBe(existingMetadata.createdAt);
-    expect(metadata.migrationHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(metadata.migrationHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it('throws when operations is not an array', async () => {
@@ -327,7 +327,7 @@ describe('buildMigrationArtifacts', () => {
       buildMigrationArtifacts(
         makeMigration([{ id: 'op1', label: 'Op 1', operationClass: 'additive' }], {
           from: '',
-          to: 'sha256:abc',
+          to: 'abc',
         }),
         null,
       ),

@@ -39,11 +39,11 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:deea76c69cfebee2f62b4419407b0bb82193ece65dd393cc2983f2c27311d289'>;
+  StorageHashBase<'deea76c69cfebee2f62b4419407b0bb82193ece65dd393cc2983f2c27311d289'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:b6740166f10149e86e0e83710d377bb3c9df8aa49d2150770a50d7a76dbc816d'>;
+  ExecutionHashBase<'b6740166f10149e86e0e83710d377bb3c9df8aa49d2150770a50d7a76dbc816d'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
+  ProfileHashBase<'9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
 
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;

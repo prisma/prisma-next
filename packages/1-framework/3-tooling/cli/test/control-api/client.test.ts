@@ -664,7 +664,7 @@ describe('ControlClient progress emission', () => {
       const mockFamilyInstance = {
         introspect: async () => ({ tables: {} }),
         deserializeContract: (ir: unknown) => ir as Contract,
-        readMarker: async () => ({ storageHash: 'sha256:origin' }),
+        readMarker: async () => ({ storageHash: 'origin' }),
         readAllMarkers: async () => new Map(),
       } as unknown as ControlFamilyInstance<string, unknown>;
 
@@ -680,7 +680,7 @@ describe('ControlClient progress emission', () => {
             kind: 'success',
             plan: {
               targetId: 'postgres',
-              destination: { storageHash: 'sha256:dest' },
+              destination: { storageHash: 'dest' },
               operations: [
                 {
                   id: 'op1',
@@ -739,7 +739,7 @@ describe('ControlClient progress emission', () => {
       const result = await client.dbUpdate({
         contract: {
           target: 'postgres',
-          storage: { storageHash: 'sha256:fixture', tables: {}, namespaces: {} },
+          storage: { storageHash: 'fixture', tables: {}, namespaces: {} },
         },
         mode: 'apply',
         connection: 'postgres://test',
@@ -801,7 +801,7 @@ describe('ControlClient progress emission', () => {
       const result = await client.dbUpdate({
         contract: {
           target: 'postgres',
-          storage: { storageHash: 'sha256:fixture', tables: {}, namespaces: {} },
+          storage: { storageHash: 'fixture', tables: {}, namespaces: {} },
         },
         mode: 'plan',
         connection: 'postgres://test',
@@ -827,7 +827,7 @@ describe('ControlClient progress emission', () => {
       const result = await client.dbUpdate({
         contract: {
           target: 'postgres',
-          storage: { storageHash: 'sha256:fixture', tables: {}, namespaces: {} },
+          storage: { storageHash: 'fixture', tables: {}, namespaces: {} },
         },
         mode: 'plan',
         connection: 'postgres://test',
@@ -849,18 +849,18 @@ describe('ControlClient progress emission', () => {
         {
           space: 'app',
           migrationName: '001_init',
-          migrationHash: 'sha256:mig-init',
+          migrationHash: 'mig-init',
           from: null,
-          to: 'sha256:dest',
+          to: 'dest',
           appliedAt: new Date('2024-06-01T12:00:00.000Z'),
           operationCount: 1,
         },
         {
           space: 'audit',
           migrationName: '001_init',
-          migrationHash: 'sha256:mig-audit',
+          migrationHash: 'mig-audit',
           from: null,
-          to: 'sha256:audit-dest',
+          to: 'audit-dest',
           appliedAt: new Date('2024-06-01T12:00:01.000Z'),
           operationCount: 2,
         },
@@ -910,8 +910,8 @@ describe('ControlClient progress emission', () => {
         createMockComponents();
 
       const expectedMarker = {
-        storageHash: 'sha256:abc',
-        profileHash: 'sha256:def',
+        storageHash: 'abc',
+        profileHash: 'def',
         contractJson: null,
         canonicalVersion: 1,
         updatedAt: new Date(),

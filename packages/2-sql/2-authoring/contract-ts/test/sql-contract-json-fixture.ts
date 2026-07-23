@@ -32,7 +32,7 @@ export function validSqlContractJson(overrides: Record<string, unknown> = {}) {
     schemaVersion: '1',
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: 'sha256:test',
+    profileHash: 'test',
     capabilities: {},
     extensionPacks: {},
     meta: {},
@@ -46,7 +46,7 @@ export function validSqlContractJson(overrides: Record<string, unknown> = {}) {
     storage:
       storage ??
       storageWithNamespacedTables({
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         tables: defaultTables,
       }),
     ...rest,
@@ -76,7 +76,7 @@ export function domainModelsRecord(
 
 export function sqlStorageFixture(tables: Record<string, unknown>) {
   return {
-    storageHash: 'sha256:test',
+    storageHash: 'test',
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,

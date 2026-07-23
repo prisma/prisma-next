@@ -35,13 +35,13 @@ const emptyLookup: CodecLookup = {
 const contract = new SqlContractSerializer().deserializeContract({
   target: 'postgres',
   targetFamily: 'sql',
-  profileHash: 'sha256:raw-expr-test',
+  profileHash: 'raw-expr-test',
   roots: {},
   capabilities: {},
   extensionPacks: {},
   meta: {},
   storage: {
-    storageHash: 'sha256:raw-expr-core',
+    storageHash: 'raw-expr-core',
     namespaces: {
       __unbound__: {
         id: '__unbound__',

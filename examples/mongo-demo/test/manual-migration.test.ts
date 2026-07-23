@@ -71,9 +71,9 @@ describe('planner-generated migration (20260626T1605_add_user_role_enum)', {
   it('migration.json has expected structure', () => {
     const manifest = JSON.parse(readFileSync(resolve(migrationDir, 'migration.json'), 'utf-8'));
 
-    expect(manifest.migrationHash).toMatch(/^sha256:/);
-    expect(manifest.from).toMatch(/^sha256:/);
-    expect(manifest.to).toMatch(/^sha256:/);
+    expect(manifest.migrationHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(manifest.from).toMatch(/^[0-9a-f]{64}$/);
+    expect(manifest.to).toMatch(/^[0-9a-f]{64}$/);
     expect(manifest.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
@@ -97,7 +97,7 @@ describe('planner-generated migration (20260626T1605_add_user_role_enum)', {
         plan: {
           targetId: 'mongo',
           destination: {
-            storageHash: 'sha256:250af57beb0580c2c9562789d5d05ae39bcfabd08b2eca8367f59a70fa724b7d',
+            storageHash: '250af57beb0580c2c9562789d5d05ae39bcfabd08b2eca8367f59a70fa724b7d',
           },
           operations: JSON.parse(opsJson),
         },
@@ -105,7 +105,7 @@ describe('planner-generated migration (20260626T1605_add_user_role_enum)', {
         // this test feeds ops.json to the runner without a full contract.
         destinationContract: {
           storage: {
-            storageHash: 'sha256:250af57beb0580c2c9562789d5d05ae39bcfabd08b2eca8367f59a70fa724b7d',
+            storageHash: '250af57beb0580c2c9562789d5d05ae39bcfabd08b2eca8367f59a70fa724b7d',
             namespaces: {
               __unbound__: {
                 id: '__unbound__',
@@ -120,11 +120,10 @@ describe('planner-generated migration (20260626T1605_add_user_role_enum)', {
         strictVerification: false,
         migrationEdges: [
           {
-            migrationHash:
-              'sha256:250af57beb0580c2c9562789d5d05ae39bcfabd08b2eca8367f59a70fa724b7d',
+            migrationHash: '250af57beb0580c2c9562789d5d05ae39bcfabd08b2eca8367f59a70fa724b7d',
             dirName: 'planner-generated-migration',
             from: '',
-            to: 'sha256:250af57beb0580c2c9562789d5d05ae39bcfabd08b2eca8367f59a70fa724b7d',
+            to: '250af57beb0580c2c9562789d5d05ae39bcfabd08b2eca8367f59a70fa724b7d',
             operationCount: ops.length,
           },
         ],

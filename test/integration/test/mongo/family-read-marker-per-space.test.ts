@@ -62,8 +62,8 @@ describe('MongoFamilyInstance per-space readMarker', {
 
   it('returns the marker doc for an extension space', async () => {
     await controlAdapter.initMarker(new MongoControlDriver(db, client), EXT_SPACE, {
-      storageHash: 'sha256:ext-storage',
-      profileHash: 'sha256:ext-profile',
+      storageHash: 'ext-storage',
+      profileHash: 'ext-profile',
     });
 
     const driver = await mongoControlDriver.create(replSet.getUri(dbName));
@@ -71,8 +71,8 @@ describe('MongoFamilyInstance per-space readMarker', {
       const family = makeFamily();
       const marker = await family.readMarker({ driver, space: EXT_SPACE });
       expect(marker).not.toBeNull();
-      expect(marker?.storageHash).toBe('sha256:ext-storage');
-      expect(marker?.profileHash).toBe('sha256:ext-profile');
+      expect(marker?.storageHash).toBe('ext-storage');
+      expect(marker?.profileHash).toBe('ext-profile');
     } finally {
       await driver.close();
     }
@@ -91,12 +91,12 @@ describe('MongoFamilyInstance per-space readMarker', {
 
   it('readAllMarkers returns one entry per space', async () => {
     await controlAdapter.initMarker(new MongoControlDriver(db, client), APP_SPACE_ID, {
-      storageHash: 'sha256:app-storage',
-      profileHash: 'sha256:app-profile',
+      storageHash: 'app-storage',
+      profileHash: 'app-profile',
     });
     await controlAdapter.initMarker(new MongoControlDriver(db, client), EXT_SPACE, {
-      storageHash: 'sha256:ext-storage',
-      profileHash: 'sha256:ext-profile',
+      storageHash: 'ext-storage',
+      profileHash: 'ext-profile',
     });
 
     const driver = await mongoControlDriver.create(replSet.getUri(dbName));
@@ -104,8 +104,8 @@ describe('MongoFamilyInstance per-space readMarker', {
       const family = makeFamily();
       const markers = await family.readAllMarkers({ driver });
       expect(markers.size).toBe(2);
-      expect(markers.get(APP_SPACE_ID)?.storageHash).toBe('sha256:app-storage');
-      expect(markers.get(EXT_SPACE)?.storageHash).toBe('sha256:ext-storage');
+      expect(markers.get(APP_SPACE_ID)?.storageHash).toBe('app-storage');
+      expect(markers.get(EXT_SPACE)?.storageHash).toBe('ext-storage');
     } finally {
       await driver.close();
     }

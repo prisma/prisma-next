@@ -32,7 +32,7 @@ import { Migration } from '@prisma-next/family-mongo/migration'
 
 class M extends Migration {
   override describe() {
-    return { from: 'sha256:abc', to: 'sha256:def' }
+    return { from: 'abc', to: 'def' }
   }
 
   override get operations() {

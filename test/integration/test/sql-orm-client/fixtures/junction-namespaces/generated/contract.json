@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "profileHash": "9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "public.roles": {
       "model": "Role",
@@ -528,10 +528,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:9fee7f94437d541740f445b7ea7a0711dc1159aa6fcb72ca01dbd1429cc712a7"
+    "storageHash": "9fee7f94437d541740f445b7ea7a0711dc1159aa6fcb72ca01dbd1429cc712a7"
   },
   "execution": {
-    "executionHash": "sha256:5490973cc21d1fd23f1e45116370d72be3baa125f32dadcba9ea213f1962ca2b",
+    "executionHash": "5490973cc21d1fd23f1e45116370d72be3baa125f32dadcba9ea213f1962ca2b",
     "mutations": {
       "defaults": [
         {

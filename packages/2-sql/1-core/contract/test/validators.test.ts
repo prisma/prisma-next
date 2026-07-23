@@ -63,7 +63,7 @@ describe('SQL contract validators', () => {
 
     it('throws on invalid storage structure', () => {
       const invalid = {
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
@@ -76,7 +76,7 @@ describe('SQL contract validators', () => {
 
     it('invalid storage error carries CONTRACT.VALIDATION_FAILED', () => {
       const invalid = {
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
@@ -91,7 +91,7 @@ describe('SQL contract validators', () => {
 
     it('throws on invalid table structure', () => {
       const invalid = {
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
@@ -110,7 +110,7 @@ describe('SQL contract validators', () => {
 
     it('throws on invalid nativeType', () => {
       const invalid = {
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
@@ -131,7 +131,7 @@ describe('SQL contract validators', () => {
 
     it('throws on invalid nullable type', () => {
       const invalid = {
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
@@ -152,7 +152,7 @@ describe('SQL contract validators', () => {
 
     it('throws when column declares both typeParams and typeRef', () => {
       const invalid = {
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
@@ -709,7 +709,7 @@ describe('SQL contract validators', () => {
 
     it('throws on invalid referential action string', () => {
       const invalid = {
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
@@ -1395,7 +1395,7 @@ describe('SQL contract validators', () => {
 
     function makeStorageWithCheckRef(ref: Record<string, unknown>) {
       return {
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,

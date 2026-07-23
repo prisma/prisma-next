@@ -1857,8 +1857,8 @@ describe('PostgresControlAdapter', () => {
 
   describe('readMarker', () => {
     const validMarkerRow = {
-      core_hash: 'sha256:abc',
-      profile_hash: 'sha256:def',
+      core_hash: 'abc',
+      profile_hash: 'def',
       contract_json: null,
       canonical_version: null,
       updated_at: new Date('2024-01-01T00:00:00Z'),
@@ -1942,8 +1942,8 @@ describe('PostgresControlAdapter', () => {
           rows: [
             {
               space: 'app',
-              core_hash: 'sha256:abc',
-              profile_hash: 'sha256:def',
+              core_hash: 'abc',
+              profile_hash: 'def',
               contract_json: null,
               canonical_version: null,
               updated_at: new Date('2024-01-01T00:00:00Z'),

@@ -56,11 +56,11 @@ const testContract: MongoContract = {
         },
       },
     },
-    storageHash: coreHash('sha256:mongo-sign-test'),
+    storageHash: coreHash('mongo-sign-test'),
   },
   capabilities: {},
   extensionPacks: {},
-  profileHash: profileHash('sha256:mongo-sign-test'),
+  profileHash: profileHash('mongo-sign-test'),
   meta: {},
 };
 
@@ -232,9 +232,9 @@ describe('mongo db sign command (e2e)', { timeout: timeouts.spinUpMongoMemorySer
         ...testContract,
         storage: {
           ...testContract.storage,
-          storageHash: coreHash('sha256:mongo-sign-test-updated'),
+          storageHash: coreHash('mongo-sign-test-updated'),
         },
-        profileHash: profileHash('sha256:mongo-sign-test-updated'),
+        profileHash: profileHash('mongo-sign-test-updated'),
       };
       writeContractJson(testSetup.testDir, updatedContract);
 

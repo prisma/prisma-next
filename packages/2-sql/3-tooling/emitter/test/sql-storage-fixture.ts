@@ -18,7 +18,7 @@ export function namespacedSqlStorage(parts: {
   readonly types?: Record<string, unknown>;
 }): EmitterTestStorage {
   return {
-    storageHash: coreHash('sha256:test'),
+    storageHash: coreHash('test'),
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: makeRawNamespace(UNBOUND_NAMESPACE_ID, { table: parts.tables }),
     },
@@ -62,7 +62,7 @@ export function normalizeRootSqlStorage(
         }),
       ) as Readonly<Record<string, StorageNamespace>>;
       const rawHash = s['storageHash'];
-      const storageHash = typeof rawHash === 'string' ? rawHash : 'sha256:test';
+      const storageHash = typeof rawHash === 'string' ? rawHash : 'test';
       return {
         storageHash: coreHash(storageHash),
         namespaces: lifted,

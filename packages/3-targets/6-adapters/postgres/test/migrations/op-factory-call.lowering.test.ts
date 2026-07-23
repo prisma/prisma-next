@@ -53,8 +53,8 @@ import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
 const SNAPSHOTS_IMPORT_PATH = '../../snapshots';
 const META = {
-  from: `sha256:${'a'.repeat(64)}`,
-  to: `sha256:${'b'.repeat(64)}`,
+  from: 'a'.repeat(64),
+  to: 'b'.repeat(64),
 } as const;
 const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 

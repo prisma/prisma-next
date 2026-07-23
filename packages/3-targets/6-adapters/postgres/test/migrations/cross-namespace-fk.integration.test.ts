@@ -32,9 +32,9 @@ function buildCrossNamespaceFkContract(): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:cross-ns-fk'),
+    profileHash: profileHash('cross-ns-fk'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:cross-ns-fk'),
+      storageHash: coreHash('cross-ns-fk'),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,

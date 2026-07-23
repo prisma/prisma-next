@@ -317,7 +317,7 @@ function buildExtContractAndTable() {
   });
   const contract = createContract<PostgresContract['storage']>({
     storage: new SqlStorage({
-      storageHash: 'sha256:test' as SqlStorage['storageHash'],
+      storageHash: 'test' as SqlStorage['storageHash'],
       namespaces: { [UNBOUND_NAMESPACE_ID]: ns },
     }),
   }) as PostgresContract;

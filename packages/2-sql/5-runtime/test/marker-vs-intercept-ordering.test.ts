@@ -36,11 +36,11 @@ import { createTestRuntime as createRuntime, descriptorsFromCodecs } from './uti
 const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
   target: 'postgres',
-  profileHash: profileHash('sha256:test'),
+  profileHash: profileHash('test'),
   domain: applicationDomainOf({ models: {} }),
   roots: {},
   storage: new SqlStorage({
-    storageHash: coreHash('sha256:test'),
+    storageHash: coreHash('test'),
     namespaces: {
       __unbound__: createTestSqlNamespace({ id: '__unbound__', entries: { table: {} } }),
     },
@@ -77,8 +77,8 @@ function createStubAdapter(codecs: ReadonlyArray<Codec<string>>) {
         ({
           kind: 'present',
           record: {
-            storageHash: 'sha256:stale',
-            profileHash: 'sha256:test',
+            storageHash: 'stale',
+            profileHash: 'test',
             contractJson: null,
             canonicalVersion: 1,
             updatedAt: new Date('2026-01-01T00:00:00Z'),

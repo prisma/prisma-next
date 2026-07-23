@@ -63,7 +63,7 @@ function buildContract(
     roots: {},
     models: {},
     storage: {
-      storageHash: 'sha256:test',
+      storageHash: 'test',
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
@@ -73,7 +73,7 @@ function buildContract(
     },
     capabilities: {},
     extensionPacks: {},
-    profileHash: 'sha256:profile',
+    profileHash: 'profile',
     meta: {},
     ...overrides,
   } as unknown as MongoContract;
@@ -119,8 +119,8 @@ describe('verifyMongoSchema', () => {
       expect(result.ok).toBe(true);
       expect(result.code).toBeUndefined();
       expect(result.schema.issues).toEqual([]);
-      expect(result.contract.storageHash).toBe('sha256:test');
-      expect(result.contract.profileHash).toBe('sha256:profile');
+      expect(result.contract.storageHash).toBe('test');
+      expect(result.contract.profileHash).toBe('profile');
       expect(result.target.expected).toBe('mongo');
       expect(result.meta?.strict).toBe(true);
       expect(typeof result.timings.total).toBe('number');
@@ -1377,7 +1377,7 @@ describe('verifyMongoSchema', () => {
     function minimalContract(): MongoContract {
       return {
         storage: {
-          storageHash: 'sha256:authoring-test',
+          storageHash: 'authoring-test',
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: { id: UNBOUND_NAMESPACE_ID, entries: { collection: {} } },
           },

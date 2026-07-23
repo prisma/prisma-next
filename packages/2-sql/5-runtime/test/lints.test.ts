@@ -36,7 +36,7 @@ function createMiddlewareContext(): SqlMiddlewareContext {
 
 const baseMeta: PlanMeta = {
   target: 'postgres',
-  storageHash: 'sha256:test',
+  storageHash: 'test',
   lane: 'dsl',
 };
 

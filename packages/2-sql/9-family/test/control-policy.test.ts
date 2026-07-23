@@ -15,7 +15,7 @@ function makeContract(
   defaultControlPolicy?: Contract<SqlStorage>['defaultControlPolicy'],
 ): Contract<SqlStorage> {
   const storage = new SqlStorage({
-    storageHash: coreHash('sha256:test'),
+    storageHash: coreHash('test'),
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
         id: UNBOUND_NAMESPACE_ID,
@@ -26,7 +26,7 @@ function makeContract(
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     storage,
     domain: applicationDomainOf({ models: {} }),
     roots: {},

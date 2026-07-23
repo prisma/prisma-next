@@ -56,9 +56,9 @@ function buildContract(): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:sibling-scoping-test'),
+    profileHash: profileHash('sibling-scoping-test'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:sibling-scoping-test'),
+      storageHash: coreHash('sibling-scoping-test'),
       namespaces: { [UNBOUND_NAMESPACE_ID]: schema },
     }),
     roots: {},
@@ -151,9 +151,9 @@ function buildContractWithSecondNamespace(): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:sibling-scoping-cross-namespace-test'),
+    profileHash: profileHash('sibling-scoping-cross-namespace-test'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:sibling-scoping-cross-namespace-test'),
+      storageHash: coreHash('sibling-scoping-cross-namespace-test'),
       namespaces: { [UNBOUND_NAMESPACE_ID]: publicSchema, tenant_b: tenantBSchema },
     }),
     roots: {},

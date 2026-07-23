@@ -104,8 +104,7 @@ function abbreviateHash(hash: string, hashLength: number, emptySource: string): 
   if (hash === EMPTY_CONTRACT_HASH) {
     return emptySource;
   }
-  const stripped = hash.startsWith('sha256:') ? hash.slice(7) : hash;
-  return stripped.slice(0, hashLength);
+  return hash.slice(0, hashLength);
 }
 
 interface ContractOverlayNames {

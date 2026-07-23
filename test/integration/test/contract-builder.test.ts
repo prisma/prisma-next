@@ -25,7 +25,7 @@ describe('builder integration', () => {
       family: sqlFamilyPack,
       target: postgresPack,
       createNamespace: postgresCreateNamespace,
-      storageHash: 'sha256:test-core',
+      storageHash: 'test-core',
       models: {
         User: model('User', {
           fields: {
@@ -42,7 +42,7 @@ describe('builder integration', () => {
       target: 'postgres',
       targetFamily: 'sql',
       storage: expect.objectContaining({
-        storageHash: 'sha256:test-core',
+        storageHash: 'test-core',
         namespaces: expect.objectContaining({
           public: expect.objectContaining({
             entries: expect.objectContaining({
@@ -133,7 +133,7 @@ describe('builder integration', () => {
       family: sqlFamilyPack,
       target: postgresPack,
       createNamespace: postgresCreateNamespace,
-      storageHash: 'sha256:test-core',
+      storageHash: 'test-core',
       models: {
         User: model('User', {
           fields: {
@@ -154,7 +154,7 @@ describe('builder integration', () => {
       family: sqlFamilyPack,
       target: postgresPack,
       createNamespace: postgresCreateNamespace,
-      storageHash: 'sha256:test-core',
+      storageHash: 'test-core',
       models: {
         User: model('User', {
           fields: {
@@ -197,7 +197,7 @@ describe('builder integration', () => {
       family: sqlFamilyPack,
       target: postgresPack,
       createNamespace: postgresCreateNamespace,
-      storageHash: 'sha256:test-core',
+      storageHash: 'test-core',
       models: {
         User: model('User', {
           fields: {
@@ -243,7 +243,7 @@ describe('builder integration', () => {
       family: sqlFamilyPack,
       target: postgresPack,
       createNamespace: postgresCreateNamespace,
-      storageHash: 'sha256:test-core',
+      storageHash: 'test-core',
       models: {
         User: model('User', {
           fields: {
@@ -398,7 +398,7 @@ describe('builder integration', () => {
         family: sqlFamilyPack,
         target: postgresPack,
         createNamespace: postgresCreateNamespace,
-        storageHash: 'sha256:test-core',
+        storageHash: 'test-core',
         models: { User, Post },
       });
 
@@ -471,7 +471,7 @@ describe('builder integration', () => {
         family: sqlFamilyPack,
         target: postgresPack,
         createNamespace: postgresCreateNamespace,
-        storageHash: 'sha256:test-core',
+        storageHash: 'test-core',
         models: { User, Role, UserRole },
       });
 

@@ -583,7 +583,7 @@ function createTestContract(
     storage?: Partial<Omit<SqlStorageInput, 'storageHash'>>;
   },
 ): Contract<SqlStorage> {
-  const storageHashValue = coreHash('sha256:contract');
+  const storageHashValue = coreHash('contract');
   const defaultTables = {
     user: {
       columns: {
@@ -637,7 +637,7 @@ function createTestContract(
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     storage: new SqlStorage({
       ...(storageInput.types !== undefined ? { types: storageInput.types } : {}),
       namespaces,

@@ -49,8 +49,8 @@ import { PostgresRlsPolicy } from '../../src/core/postgres-rls-policy';
 import * as migrationFacade from '../../src/exports/migration';
 
 const SNAPSHOTS_IMPORT_PATH = '../../snapshots';
-const FROM_HASH = `sha256:${'a'.repeat(64)}`;
-const TO_HASH = `sha256:${'b'.repeat(64)}`;
+const FROM_HASH = 'a'.repeat(64);
+const TO_HASH = 'b'.repeat(64);
 const FROM_HEX = 'a'.repeat(64);
 const TO_HEX = 'b'.repeat(64);
 
@@ -97,8 +97,10 @@ describe('renderCallsToTypeScript (postgres)', () => {
     });
 
     expect(output).not.toContain('describe()');
-    expect(output).not.toContain(FROM_HASH);
-    expect(output).not.toContain(TO_HASH);
+    expect(output).not.toContain(`'${FROM_HASH}'`);
+    expect(output).not.toContain(`'${TO_HASH}'`);
+    expect(output).not.toContain(`"${FROM_HASH}"`);
+    expect(output).not.toContain(`"${TO_HASH}"`);
   });
 
   it('renders the baseline shape for from: null (no start imports, Migration<never, End>)', () => {

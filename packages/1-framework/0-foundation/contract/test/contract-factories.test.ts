@@ -17,8 +17,8 @@ describe('createContract', () => {
     expect(contract.capabilities).toEqual({});
     expect(contract.extensionPacks).toEqual({});
     expect(contract.meta).toEqual({});
-    expect(contract.storage.storageHash).toMatch(/^sha256:/);
-    expect(contract.profileHash).toMatch(/^sha256:/);
+    expect(contract.storage.storageHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(contract.profileHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it('respects overrides', () => {
@@ -47,7 +47,7 @@ describe('createContract', () => {
       },
     });
     expect(contract.execution).toBeDefined();
-    expect(contract.execution!.executionHash).toMatch(/^sha256:/);
+    expect(contract.execution!.executionHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it('computes different storageHash for different storage', () => {
@@ -93,6 +93,6 @@ describe('createSqlContract', () => {
     expect(unbound).toBeDefined();
     const tables = unbound!.entries['table'] as Record<string, unknown>;
     expect(tables).toHaveProperty('user');
-    expect(contract.storage.storageHash).toMatch(/^sha256:/);
+    expect(contract.storage.storageHash).toMatch(/^[a-f0-9]{64}$/);
   });
 });

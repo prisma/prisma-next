@@ -15,7 +15,7 @@ import type { MigrationMetadata } from './metadata';
  * `migration.json` / `ops.json`, and `refs/head.json` to the framework's
  * typed surfaces. TypeScript widens JSON imports to a structural record
  * that does not preserve readonly modifiers or branded scalars (e.g.
- * `StorageHashBase<'sha256:...'>`), so authoring the descriptor inline
+ * `StorageHashBase<'abc123...'>`), so authoring the descriptor inline
  * forces every wiring site to cast through `unknown`. This helper
  * encapsulates the single narrowing point: descriptor sources stay
  * cast-free, and the (necessary) coercion is colocated with the

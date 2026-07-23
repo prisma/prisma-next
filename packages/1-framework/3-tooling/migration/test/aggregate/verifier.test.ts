@@ -67,7 +67,7 @@ const FULL_SCHEMA_VERIFY = (
   return {
     ok: true,
     summary: 'Database schema satisfies contract',
-    contract: { storageHash: 'sha256:test' },
+    contract: { storageHash: 'test' },
     target: { expected: 'postgres' },
     schema: {
       issues: extras.map((name) => ({
@@ -103,7 +103,7 @@ describe('verifyMigration', () => {
   describe('markerCheck', () => {
     it('reports `absent` when the space has no marker row', () => {
       const aggregate = makeAggregate({
-        app: makeSpace({ spaceId: 'app', headHash: 'sha256:app-head' }),
+        app: makeSpace({ spaceId: 'app', headHash: 'app-head' }),
       });
       const result = verifyMigration({
         aggregate,
@@ -122,12 +122,12 @@ describe('verifyMigration', () => {
       const aggregate = makeAggregate({
         app: makeSpace({
           spaceId: 'app',
-          headHash: 'sha256:app-head',
+          headHash: 'app-head',
           invariants: ['inv-1'],
         }),
       });
       const markers = new Map<string, ContractMarkerRecordLike>([
-        ['app', { storageHash: 'sha256:app-head', invariants: ['inv-1'] }],
+        ['app', { storageHash: 'app-head', invariants: ['inv-1'] }],
       ]);
       const result = verifyMigration({
         aggregate,
@@ -143,10 +143,10 @@ describe('verifyMigration', () => {
 
     it('reports `hashMismatch` when marker hash differs from head ref', () => {
       const aggregate = makeAggregate({
-        app: makeSpace({ spaceId: 'app', headHash: 'sha256:expected' }),
+        app: makeSpace({ spaceId: 'app', headHash: 'expected' }),
       });
       const markers = new Map<string, ContractMarkerRecordLike>([
-        ['app', { storageHash: 'sha256:actual', invariants: [] }],
+        ['app', { storageHash: 'actual', invariants: [] }],
       ]);
       const result = verifyMigration({
         aggregate,
@@ -159,24 +159,24 @@ describe('verifyMigration', () => {
       });
       expect(result.assertOk().markerCheck.perSpace.get('app')).toEqual({
         kind: 'hashMismatch',
-        markerHash: 'sha256:actual',
-        expected: 'sha256:expected',
+        markerHash: 'actual',
+        expected: 'expected',
       });
     });
 
     it('reports `missingInvariants` when the head ref declares invariants the marker lacks', () => {
       const aggregate = makeAggregate({
-        app: makeSpace({ spaceId: 'app', headHash: 'sha256:h' }),
+        app: makeSpace({ spaceId: 'app', headHash: 'h' }),
         extensions: [
           makeSpace({
             spaceId: 'cipher',
-            headHash: 'sha256:cipher',
+            headHash: 'cipher',
             invariants: ['cipher:create-v1', 'cipher:rotate-v1'],
           }),
         ],
       });
       const markers = new Map<string, ContractMarkerRecordLike>([
-        ['cipher', { storageHash: 'sha256:cipher', invariants: ['cipher:create-v1'] }],
+        ['cipher', { storageHash: 'cipher', invariants: ['cipher:create-v1'] }],
       ]);
       const result = verifyMigration({
         aggregate,
@@ -195,12 +195,12 @@ describe('verifyMigration', () => {
 
     it('lists orphan markers (rows for non-aggregate spaces)', () => {
       const aggregate = makeAggregate({
-        app: makeSpace({ spaceId: 'app', headHash: 'sha256:h' }),
+        app: makeSpace({ spaceId: 'app', headHash: 'h' }),
       });
       const markers = new Map<string, ContractMarkerRecordLike>([
-        ['app', { storageHash: 'sha256:h', invariants: [] }],
-        ['cipher', { storageHash: 'sha256:cipher', invariants: [] }],
-        ['vector', { storageHash: 'sha256:vector', invariants: [] }],
+        ['app', { storageHash: 'h', invariants: [] }],
+        ['cipher', { storageHash: 'cipher', invariants: [] }],
+        ['vector', { storageHash: 'vector', invariants: [] }],
       ]);
       const result = verifyMigration({
         aggregate,
@@ -221,11 +221,11 @@ describe('verifyMigration', () => {
   describe('schemaCheck', () => {
     it('each space view shows its declared nodes only, no extras', () => {
       const aggregate = makeAggregate({
-        app: makeSpace({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
+        app: makeSpace({ spaceId: 'app', headHash: 'h', tables: { user: {} } }),
         extensions: [
           makeSpace({
             spaceId: 'cipher',
-            headHash: 'sha256:cipher',
+            headHash: 'cipher',
             tables: { cipher_state: {} },
           }),
         ],
@@ -257,11 +257,11 @@ describe('verifyMigration', () => {
 
     it('reports a table no space declares once in the unclaimed list', () => {
       const aggregate = makeAggregate({
-        app: makeSpace({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
+        app: makeSpace({ spaceId: 'app', headHash: 'h', tables: { user: {} } }),
         extensions: [
           makeSpace({
             spaceId: 'cipher',
-            headHash: 'sha256:cipher',
+            headHash: 'cipher',
             tables: { cipher_state: {} },
           }),
         ],
@@ -291,11 +291,11 @@ describe('verifyMigration', () => {
 
     it('deduplicates and sorts multiple undeclared tables into one list', () => {
       const aggregate = makeAggregate({
-        app: makeSpace({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
+        app: makeSpace({ spaceId: 'app', headHash: 'h', tables: { user: {} } }),
         extensions: [
           makeSpace({
             spaceId: 'cipher',
-            headHash: 'sha256:cipher',
+            headHash: 'cipher',
             tables: { cipher_state: {} },
           }),
         ],
@@ -324,7 +324,7 @@ describe('verifyMigration', () => {
 
     it('single-space: an undeclared table is unclaimed, not a node in the space view', () => {
       const aggregate = makeAggregate({
-        app: makeSpace({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
+        app: makeSpace({ spaceId: 'app', headHash: 'h', tables: { user: {} } }),
       });
       const liveSchema = {
         tables: { user: { columns: {} }, legacy_events: { columns: {} } },
@@ -347,11 +347,11 @@ describe('verifyMigration', () => {
 
     it('leaves the unclaimed list empty when every live table is declared by some space', () => {
       const aggregate = makeAggregate({
-        app: makeSpace({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
+        app: makeSpace({ spaceId: 'app', headHash: 'h', tables: { user: {} } }),
         extensions: [
           makeSpace({
             spaceId: 'cipher',
-            headHash: 'sha256:cipher',
+            headHash: 'cipher',
             tables: { cipher_state: {} },
           }),
         ],
@@ -380,7 +380,7 @@ describe('verifyMigration', () => {
 
     it('returns notOk(introspectionFailure) when verifySchemaForSpace throws', () => {
       const aggregate = makeAggregate({
-        app: makeSpace({ spaceId: 'app', headHash: 'sha256:h', tables: { user: {} } }),
+        app: makeSpace({ spaceId: 'app', headHash: 'h', tables: { user: {} } }),
       });
 
       const result = verifyMigration({
@@ -403,7 +403,7 @@ describe('verifyMigration', () => {
     it('threads the verifier mode (strict / lenient) to the per-space callback verbatim', () => {
       let observedMode: 'strict' | 'lenient' | undefined;
       const aggregate = makeAggregate({
-        app: makeSpace({ spaceId: 'app', headHash: 'sha256:h' }),
+        app: makeSpace({ spaceId: 'app', headHash: 'h' }),
       });
 
       verifyMigration({

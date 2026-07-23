@@ -50,11 +50,11 @@ const baseContract: MongoContract = {
         },
       },
     },
-    storageHash: coreHash('sha256:verify-test'),
+    storageHash: coreHash('verify-test'),
   },
   capabilities: {},
   extensionPacks: {},
-  profileHash: profileHash('sha256:verify-test'),
+  profileHash: profileHash('verify-test'),
   meta: {},
 };
 
@@ -135,7 +135,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
 
     it('returns CONTRACT.MARKER_MISMATCH when storage hash differs', async () => {
       await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
-        storageHash: coreHash('sha256:old-hash'),
+        storageHash: coreHash('old-hash'),
         profileHash: baseContract.profileHash,
       });
 
@@ -154,7 +154,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
     it('returns CONTRACT.MARKER_MISMATCH when profile hash differs', async () => {
       await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
         storageHash: baseContract.storage.storageHash,
-        profileHash: profileHash('sha256:old-profile'),
+        profileHash: profileHash('old-profile'),
       });
 
       const instance = createInstance();
@@ -340,7 +340,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
         ...baseContract,
         storage: {
           ...baseContract.storage,
-          storageHash: coreHash('sha256:updated-contract'),
+          storageHash: coreHash('updated-contract'),
         },
       };
 
@@ -369,7 +369,7 @@ describe('db verify + db sign for Mongo (end-to-end)', {
         ...baseContract,
         storage: {
           ...baseContract.storage,
-          storageHash: coreHash('sha256:updated-contract'),
+          storageHash: coreHash('updated-contract'),
         },
       };
 

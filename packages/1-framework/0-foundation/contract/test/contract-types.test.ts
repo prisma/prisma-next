@@ -29,16 +29,16 @@ describe('unified contract types', () => {
 
   describe('StorageBase', () => {
     it('carries branded storageHash', () => {
-      const hash = 'sha256:abc123' as StorageHashBase<'sha256:abc123'>;
+      const hash = 'abc123' as StorageHashBase<'abc123'>;
       const storage = { storageHash: hash, namespaces: {} };
-      expect(storage.storageHash).toBe('sha256:abc123');
+      expect(storage.storageHash).toBe('abc123');
     });
   });
 
   describe('Contract<TStorage>', () => {
     it('accepts a full contract value', () => {
-      const hash = 'sha256:abc123' as StorageHashBase<'sha256:abc123'>;
-      const profHash = 'sha256:prof' as ProfileHashBase<'sha256:prof'>;
+      const hash = 'abc123' as StorageHashBase<'abc123'>;
+      const profHash = 'prof' as ProfileHashBase<'prof'>;
       const contract: Contract = {
         target: 'postgres',
         targetFamily: 'sql',
@@ -63,9 +63,9 @@ describe('unified contract types', () => {
     });
 
     it('accepts optional execution', () => {
-      const hash = 'sha256:abc123' as StorageHashBase<'sha256:abc123'>;
-      const execHash = 'sha256:exec456' as ExecutionHashBase<'sha256:exec456'>;
-      const profHash = 'sha256:prof789' as ProfileHashBase<'sha256:prof789'>;
+      const hash = 'abc123' as StorageHashBase<'abc123'>;
+      const execHash = 'exec456' as ExecutionHashBase<'exec456'>;
+      const profHash = 'prof789' as ProfileHashBase<'prof789'>;
       const contract: Contract = {
         target: 'postgres',
         targetFamily: 'sql',
@@ -81,8 +81,8 @@ describe('unified contract types', () => {
         },
         profileHash: profHash,
       };
-      expect(contract.execution?.executionHash).toBe('sha256:exec456');
-      expect(contract.profileHash).toBe('sha256:prof789');
+      expect(contract.execution?.executionHash).toBe('exec456');
+      expect(contract.profileHash).toBe('prof789');
     });
   });
 
@@ -97,8 +97,8 @@ describe('unified contract types', () => {
         );
       }
 
-      const hash = 'sha256:abc123' as StorageHashBase<'sha256:abc123'>;
-      const profHash = 'sha256:prof' as ProfileHashBase<'sha256:prof'>;
+      const hash = 'abc123' as StorageHashBase<'abc123'>;
+      const profHash = 'prof' as ProfileHashBase<'prof'>;
       const contract: Contract = {
         target: 'postgres',
         targetFamily: 'sql',

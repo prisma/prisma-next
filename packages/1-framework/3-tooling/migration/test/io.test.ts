@@ -77,7 +77,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
   it('reads the end contract snapshot from the store, keyed by metadata.to', async () => {
     const dir = join(tmpDir, '20260225T1430_snapshots');
-    const toHash = `sha256:${'e'.repeat(64)}`;
+    const toHash = 'e'.repeat(64);
     const { metadata } = await writeTestPackage(dir, { to: toHash });
     const endJson = await writeEndContractSnapshot(tmpDir, metadata.to, { marker: 'end' });
 
@@ -90,8 +90,8 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     // The edge's before-state is the predecessor's end snapshot by chain
     // construction, so the loader never surfaces the from-hash's entry.
     const dir = join(tmpDir, '20260225T1430_start_ignored');
-    const fromHash = `sha256:${'5'.repeat(64)}`;
-    const toHash = `sha256:${'6'.repeat(64)}`;
+    const fromHash = '5'.repeat(64);
+    const toHash = '6'.repeat(64);
     const { metadata } = await writeTestPackage(dir, { from: fromHash, to: toHash });
     await writeEndContractSnapshot(tmpDir, fromHash, { marker: 'start' });
     const endJson = await writeEndContractSnapshot(tmpDir, metadata.to, { marker: 'end' });
@@ -114,7 +114,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
   it('treats a malformed end snapshot as absent instead of failing the load', async () => {
     const dir = join(tmpDir, '20260225T1430_bad_snapshot');
-    const toHash = `sha256:${'7'.repeat(64)}`;
+    const toHash = '7'.repeat(64);
     const { metadata } = await writeTestPackage(dir, { to: toHash });
     const snapshotDir = contractSnapshotDir(tmpDir, metadata.to);
     await mkdir(snapshotDir, { recursive: true });
@@ -129,7 +129,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     // `undefined` is the single "no snapshot" sentinel downstream; a null
     // contract is not a storable state.
     const dir = join(tmpDir, '20260225T1430_null_snapshot');
-    const toHash = `sha256:${'8'.repeat(64)}`;
+    const toHash = '8'.repeat(64);
     const { metadata } = await writeTestPackage(dir, { to: toHash });
     const snapshotDir = contractSnapshotDir(tmpDir, metadata.to);
     await mkdir(snapshotDir, { recursive: true });
@@ -699,8 +699,8 @@ describe('readMigrationsDir', () => {
   it('returns a hashMismatch problem and retains the package when a child package is tampered', async () => {
     const intactDir = join(tmpDir, '20260225T1400_intact');
     const tamperedDir = join(tmpDir, '20260225T1500_tampered');
-    const intactHash = `sha256:${'1'.repeat(64)}`;
-    const tamperedHash = `sha256:${'2'.repeat(64)}`;
+    const intactHash = '1'.repeat(64);
+    const tamperedHash = '2'.repeat(64);
 
     await writeTestPackage(intactDir, { to: intactHash });
     await writeTestPackage(tamperedDir, { to: tamperedHash });
@@ -848,7 +848,7 @@ describe('copyFilesWithRename', () => {
     await mkdir(sourceDir, { recursive: true });
     const sourceJson = join(sourceDir, 'contract.json');
     const sourceDts = join(sourceDir, 'contract.d.ts');
-    const jsonPayload = JSON.stringify({ storage: { storageHash: 'sha256:abc' } });
+    const jsonPayload = JSON.stringify({ storage: { storageHash: 'abc' } });
     const dtsPayload = 'export type StorageHash = string;';
     await writeFile(sourceJson, jsonPayload);
     await writeFile(sourceDts, dtsPayload);

@@ -79,9 +79,7 @@ withTempDir(({ createTempDir }) => {
         const planAgain = await runMigrationPlan(ctx, ['--name', 'catch-up', '--json']);
         expect(planAgain.exitCode, 'P4.02: plan from db ref').toBe(0);
         const planResult = parseJsonOutput<{ from: string }>(planAgain);
-        expect(planResult.from, 'P4.02: from is db ref not empty sentinel').not.toBe(
-          'sha256:empty',
-        );
+        expect(planResult.from, 'P4.02: from is db ref not empty sentinel').not.toBe('empty');
         const dirsAfterPlan = readdirSync(migrationsDir).filter((d) => !d.startsWith('.'));
         expect(dirsAfterPlan, 'P4.02: orphaned add-name only — no greenfield init').toHaveLength(1);
         expect(dirsAfterPlan[0], 'P4.02: surviving migration is add-name').toMatch(/_add_name$/);

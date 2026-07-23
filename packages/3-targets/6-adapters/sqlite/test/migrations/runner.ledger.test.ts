@@ -88,7 +88,7 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
     const destHash = contract.storage.storageHash;
     const edges: readonly AggregateMigrationEdgeRef[] = [
       {
-        migrationHash: 'sha256:mig-single',
+        migrationHash: 'mig-single',
         dirName: '001_single',
         from: EMPTY_CONTRACT_HASH,
         to: destHash,
@@ -136,7 +136,7 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
     expect(rows[0]).toMatchObject({
       space: LEDGER_TEST_SPACE_ID,
       migration_name: '001_single',
-      migration_hash: 'sha256:mig-single',
+      migration_hash: 'mig-single',
       origin_core_hash: EMPTY_CONTRACT_HASH,
       destination_core_hash: destHash,
     });
@@ -151,7 +151,7 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
       {
         space: LEDGER_TEST_SPACE_ID,
         migrationName: '001_single',
-        migrationHash: 'sha256:mig-single',
+        migrationHash: 'mig-single',
         from: null,
         to: destHash,
         operationCount: 1,
@@ -169,7 +169,7 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
     const destHash = contract.storage.storageHash;
     const edges: readonly AggregateMigrationEdgeRef[] = [
       {
-        migrationHash: 'sha256:mig-single',
+        migrationHash: 'mig-single',
         dirName: '001_single',
         from: EMPTY_CONTRACT_HASH,
         to: destHash,
@@ -218,26 +218,26 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
     testDb = createTestDatabase();
     const { driver } = testDb;
     const runner = sqliteTargetDescriptor.createRunner(familyInstance);
-    const hashA = 'sha256:ledger-mid-a';
-    const hashB = 'sha256:ledger-mid-b';
+    const hashA = 'ledger-mid-a';
+    const hashB = 'ledger-mid-b';
     const destHash = contract.storage.storageHash;
     const edges: readonly AggregateMigrationEdgeRef[] = [
       {
-        migrationHash: 'sha256:mig-a',
+        migrationHash: 'mig-a',
         dirName: '001_a',
         from: EMPTY_CONTRACT_HASH,
         to: hashA,
         operationCount: 1,
       },
       {
-        migrationHash: 'sha256:mig-b',
+        migrationHash: 'mig-b',
         dirName: '002_b',
         from: hashA,
         to: hashB,
         operationCount: 2,
       },
       {
-        migrationHash: 'sha256:mig-c',
+        migrationHash: 'mig-c',
         dirName: '003_c',
         from: hashB,
         to: destHash,
@@ -356,7 +356,7 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
       {
         space: LEDGER_TEST_SPACE_ID,
         migrationName: '001_a',
-        migrationHash: 'sha256:mig-a',
+        migrationHash: 'mig-a',
         from: null,
         to: hashA,
         operationCount: 1,
@@ -364,7 +364,7 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
       {
         space: LEDGER_TEST_SPACE_ID,
         migrationName: '002_b',
-        migrationHash: 'sha256:mig-b',
+        migrationHash: 'mig-b',
         from: hashA,
         to: hashB,
         operationCount: 2,
@@ -372,7 +372,7 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
       {
         space: LEDGER_TEST_SPACE_ID,
         migrationName: '003_c',
-        migrationHash: 'sha256:mig-c',
+        migrationHash: 'mig-c',
         from: hashB,
         to: destHash,
         operationCount: 1,
@@ -450,7 +450,7 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
     const destHash = contract.storage.storageHash;
     const edges: readonly AggregateMigrationEdgeRef[] = [
       {
-        migrationHash: 'sha256:mig-single',
+        migrationHash: 'mig-single',
         dirName: '001_single',
         from: EMPTY_CONTRACT_HASH,
         to: destHash,
@@ -501,9 +501,9 @@ describe('SqliteMigrationRunner - per-edge ledger', { timeout: timeouts.database
       [
         'audit',
         '002_audit',
-        'sha256:audit-mig',
+        'audit-mig',
         EMPTY_CONTRACT_HASH,
-        'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         null,
         null,
         '[]',

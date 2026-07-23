@@ -22,9 +22,9 @@ import {
 import type { ContractIR } from '../../src/utils/ref-advancement';
 
 const E = EMPTY_CONTRACT_HASH;
-const HASH_A = `sha256:${'a'.repeat(64)}`;
-const HASH_B = `sha256:${'b'.repeat(64)}`;
-const HASH_ORPHAN = `sha256:${'d'.repeat(64)}`;
+const HASH_A = `${'a'.repeat(64)}`;
+const HASH_B = `${'b'.repeat(64)}`;
+const HASH_ORPHAN = `${'d'.repeat(64)}`;
 
 let migrationCounter = 0;
 
@@ -36,7 +36,7 @@ function makePkg(from: string, to: string, dirName: string): OnDiskMigrationPack
     metadata: {
       from: from === E ? null : from,
       to,
-      migrationHash: `sha256:mig-${migrationCounter.toString().padStart(64, '0')}`,
+      migrationHash: `mig-${migrationCounter.toString().padStart(64, '0')}`,
       createdAt: `2026-03-01T09:00:00.${migrationCounter.toString().padStart(3, '0')}Z`,
       providedInvariants: [],
     },
@@ -50,7 +50,7 @@ function sampleContractIR(storageHash: string): ContractIR {
       schemaVersion: '1',
       targetFamily: 'sql',
       target: 'postgres',
-      profileHash: `sha256:${'p'.repeat(64)}`,
+      profileHash: `${'p'.repeat(64)}`,
       storage: { storageHash },
       domain: applicationDomainOf({ models: {} }),
       roots: {},

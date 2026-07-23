@@ -25,8 +25,8 @@ vi.mock('@prisma-next/config-loader', () => ({
   loadConfig: mocks.loadConfig,
 }));
 
-const FROM_HASH = 'sha256:empty';
-const TO_HASH = `sha256:${'a'.repeat(64)}`;
+const FROM_HASH = 'empty';
+const TO_HASH = `${'a'.repeat(64)}`;
 const SCHEMA_VERSION = '1.0.0';
 const TARGET = 'mock';
 const TARGET_FAMILY = 'mock';
@@ -110,7 +110,7 @@ async function setupDivergentFixture(): Promise<InvariantFixture & { refHash: st
   const migrationsDir = join(cwd, 'migrations', 'app');
   await mkdir(migrationsDir, { recursive: true });
 
-  const REF_HASH = `sha256:${'b'.repeat(64)}`;
+  const REF_HASH = `${'b'.repeat(64)}`;
 
   // Branch A (will be the marker) — EMPTY → TO_HASH.
   await writeAttestedPackage(

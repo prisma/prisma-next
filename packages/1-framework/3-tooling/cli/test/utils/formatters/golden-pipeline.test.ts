@@ -25,7 +25,7 @@ const ESC = '\x1b';
 // ---------------------------------------------------------------------------
 // The special sentinel used in golden inputs for the baseline/empty contract.
 // The golden files use '∅' as the contract identifier; the real pipeline uses
-// EMPTY_CONTRACT_HASH ('sha256:empty'). We translate when building graphs.
+// EMPTY_CONTRACT_HASH ('empty'). We translate when building graphs.
 // ---------------------------------------------------------------------------
 const GOLDEN_EMPTY_MARKER = '∅';
 

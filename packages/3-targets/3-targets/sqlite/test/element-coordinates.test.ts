@@ -18,7 +18,7 @@ const emptyTableInput = {
 describe('elementCoordinates with SqliteDatabase', () => {
   it('walks SQLite namespace tables', () => {
     const storage = new SqlStorage({
-      storageHash: coreHash('sha256:element-coordinates-sqlite'),
+      storageHash: coreHash('element-coordinates-sqlite'),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: SqliteUnboundDatabase.instance,
         main: new SqliteDatabase({ id: 'main', entries: { table: { users: emptyTableInput } } }),
@@ -38,7 +38,7 @@ describe('elementCoordinates with SqliteDatabase', () => {
 describe('coordinate-resolution acceptance — every elementCoordinates tuple resolves', () => {
   it('every coordinate from a sqlite storage resolves through entityAt', () => {
     const storage = new SqlStorage({
-      storageHash: coreHash('sha256:coord-resolution-sqlite'),
+      storageHash: coreHash('coord-resolution-sqlite'),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: SqliteUnboundDatabase.instance,
         main: new SqliteDatabase({

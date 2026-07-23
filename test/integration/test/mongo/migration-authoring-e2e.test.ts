@@ -80,7 +80,7 @@ describe('Migration authoring round-trip (factory → serialize → deserialize 
           makeFamily(),
         ),
       );
-      const destinationHash = 'sha256:authoring-test';
+      const destinationHash = 'authoring-test';
       const plan = {
         targetId: 'mongo',
         destination: { storageHash: destinationHash },
@@ -341,10 +341,10 @@ describe('Migration authoring round-trip (factory → serialize → deserialize 
             makeFamily(),
           ),
         );
-        const destinationHashV2 = 'sha256:authoring-test-v2';
+        const destinationHashV2 = 'authoring-test-v2';
         const planV2 = {
           targetId: 'mongo',
-          origin: { storageHash: 'sha256:authoring-test' },
+          origin: { storageHash: 'authoring-test' },
           destination: { storageHash: destinationHashV2 },
           operations: serialized2,
         };
@@ -394,10 +394,10 @@ describe('Migration authoring round-trip (factory → serialize → deserialize 
             makeFamily(),
           ),
         );
-        const destinationHashV3 = 'sha256:authoring-test-v3';
+        const destinationHashV3 = 'authoring-test-v3';
         const planV3 = {
           targetId: 'mongo',
-          origin: { storageHash: 'sha256:authoring-test-v2' },
+          origin: { storageHash: 'authoring-test-v2' },
           destination: { storageHash: destinationHashV3 },
           operations: serialized3,
         };

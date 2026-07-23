@@ -8,9 +8,9 @@ import { emitContractSpaceArtifacts } from '../src/emit-contract-space-artifacts
 import { MigrationToolsError } from '../src/errors';
 import { APP_SPACE_ID } from '../src/space-layout';
 
-const HASH_V1 = `sha256:${'1'.repeat(64)}`;
-const HASH_V2 = `sha256:${'2'.repeat(64)}`;
-const HASH_APP = `sha256:${'a'.repeat(64)}`;
+const HASH_V1 = '1'.repeat(64);
+const HASH_V2 = '2'.repeat(64);
+const HASH_APP = 'a'.repeat(64);
 
 function makeContract(storageHash: string, extra: Record<string, unknown> = {}): unknown {
   return { storage: { storageHash }, ...extra };

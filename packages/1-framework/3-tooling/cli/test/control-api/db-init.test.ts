@@ -28,7 +28,7 @@ function createMockFamilyInstance() {
 const dummyContract = {
   schemaVersion: '1',
   target: 'postgres',
-  storage: { storageHash: 'sha256:dummy', tables: {}, namespaces: {} },
+  storage: { storageHash: 'dummy', tables: {}, namespaces: {} },
 } as unknown as Contract;
 
 describe('executeDbInit', () => {
@@ -37,7 +37,7 @@ describe('executeDbInit', () => {
       kind: 'success',
       plan: {
         targetId: 'postgres',
-        destination: { storageHash: 'sha256:dest' },
+        destination: { storageHash: 'dest' },
         operations: [],
       },
     });

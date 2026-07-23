@@ -30,7 +30,7 @@ function buildContract(
     roots: {},
     models: {},
     storage: {
-      storageHash: 'sha256:test',
+      storageHash: 'test',
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
@@ -40,7 +40,7 @@ function buildContract(
     },
     capabilities: {},
     extensionPacks: {},
-    profileHash: 'sha256:profile',
+    profileHash: 'profile',
     meta: {},
     ...(defaultControlPolicy !== undefined ? { defaultControlPolicy } : {}),
   } as unknown as MongoContract;

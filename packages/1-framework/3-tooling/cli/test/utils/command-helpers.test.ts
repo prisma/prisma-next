@@ -111,8 +111,8 @@ describe('sanitizeErrorMessage', () => {
 describe('toPathDecisionResult', () => {
   function decision(overrides: Partial<PathDecision> = {}): PathDecision {
     return {
-      fromHash: 'sha256:from',
-      toHash: 'sha256:to',
+      fromHash: 'from',
+      toHash: 'to',
       alternativeCount: 0,
       tieBreakReasons: [],
       requiredInvariants: [],
@@ -200,8 +200,8 @@ describe('toPathDecisionResult', () => {
 describe('toStructuralEdge', () => {
   function edge(overrides: Partial<MigrationEdge> = {}): MigrationEdge {
     return {
-      from: 'sha256:from',
-      to: 'sha256:to',
+      from: 'from',
+      to: 'to',
       migrationHash: 'mh:1',
       dirName: 'm1',
       createdAt: '2026-01-01T00:00:00.000Z',

@@ -7,7 +7,7 @@ import { planFromAst } from '../src/plan';
 const CONTRACT = {
   target: 'postgres',
   targetFamily: 'sql',
-  storage: { storageHash: 'sha256:test-storage' },
+  storage: { storageHash: 'test-storage' },
 } as unknown as Contract<SqlStorage>;
 
 describe('planFromAst', () => {
@@ -20,7 +20,7 @@ describe('planFromAst', () => {
     expect(plan.meta).toEqual({
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'sha256:test-storage',
+      storageHash: 'test-storage',
       lane: 'raw',
     });
   });

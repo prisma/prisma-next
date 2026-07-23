@@ -90,7 +90,7 @@ type TestTypeMaps = TypeMaps<
 
 type TestContract = Omit<Contract<SqlStorage>, 'storage' | 'domain'> & {
   readonly storage: {
-    readonly storageHash: StorageHashBase<'sha256:family-sql-compute-column'>;
+    readonly storageHash: StorageHashBase<'family-sql-compute-column'>;
     readonly namespaces: {
       readonly public: {
         readonly id: 'public';
@@ -145,7 +145,7 @@ type NullableVectorsModel = {
 
 type NullableContract = Omit<Contract<SqlStorage>, 'storage' | 'domain'> & {
   readonly storage: {
-    readonly storageHash: StorageHashBase<'sha256:family-sql-compute-column-nullable'>;
+    readonly storageHash: StorageHashBase<'family-sql-compute-column-nullable'>;
     readonly namespaces: {
       readonly public: {
         readonly id: 'public';

@@ -12,8 +12,8 @@ import type {
   MigrationSpaceListEntry,
 } from '../../../src/utils/formatters/migration-list-types';
 
-const HASH_C = 'sha256:4cb4256c30b7a8123456789012345678901234567890123456';
-const HASH_D = 'sha256:55bada2f123456789012345678901234567890123456789012';
+const HASH_C = '4cb4256c30b7a8123456789012345678901234567890123456';
+const HASH_D = '55bada2f123456789012345678901234567890123456789012';
 
 let migrationHashSeq = 0;
 
@@ -22,7 +22,7 @@ function migration(
     Partial<Omit<MigrationListEntry, 'name' | 'toContract'>>,
 ): MigrationListEntry {
   return {
-    hash: overrides.hash ?? `sha256:styler-mig-${migrationHashSeq++}`,
+    hash: overrides.hash ?? `styler-mig-${migrationHashSeq++}`,
     fromContract: null,
     operationCount: 1,
     createdAt: '2026-01-01T00:00:00.000Z',

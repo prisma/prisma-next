@@ -114,7 +114,7 @@ describe('StorageColumn many', () => {
   describe('validateStorage', () => {
     it('accepts a column with many:true', () => {
       const raw = {
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,
@@ -139,7 +139,7 @@ describe('StorageColumn many', () => {
 
     it('rejects a column with many:42 (non-boolean)', () => {
       const raw = {
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,

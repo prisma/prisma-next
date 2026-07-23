@@ -24,7 +24,7 @@ describe('hashContent', () => {
 
   describe('determinism', () => {
     it('returns the same digest for identical input across repeated calls', async () => {
-      const input = 'sha256:abc|select 1|[42]';
+      const input = 'abc|select 1|[42]';
       const first = await hashContent(input);
       const second = await hashContent(input);
       const third = await hashContent(input);

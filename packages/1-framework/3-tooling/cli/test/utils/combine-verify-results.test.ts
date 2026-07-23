@@ -17,7 +17,7 @@ function makeResult(overrides: {
   const result: VerifyDatabaseSchemaResult = {
     ok: overrides.ok,
     summary: overrides.summary,
-    contract: { storageHash: `sha256:${overrides.spaceId}-storage` },
+    contract: { storageHash: `${overrides.spaceId}-storage` },
     target: { expected: 'postgres' },
     schema: {
       issues: overrides.issues ?? defaultIssues,
@@ -168,7 +168,7 @@ describe('combineVerifyResults', () => {
     expect(combined.result).toMatchObject({
       ok: true,
       summary: 'Schema matches contract',
-      contract: { storageHash: 'sha256:cipher-storage' },
+      contract: { storageHash: 'cipher-storage' },
     });
   });
 

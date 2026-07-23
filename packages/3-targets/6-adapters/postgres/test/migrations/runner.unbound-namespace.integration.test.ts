@@ -44,9 +44,9 @@ function buildUnboundContract(): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:unbound-multi-tenant'),
+    profileHash: profileHash('unbound-multi-tenant'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:unbound-multi-tenant'),
+      storageHash: coreHash('unbound-multi-tenant'),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,

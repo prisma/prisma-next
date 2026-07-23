@@ -35,9 +35,9 @@ function buildWidgetContract(): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:select-only'),
+    profileHash: profileHash('select-only'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:select-only'),
+      storageHash: coreHash('select-only'),
       namespaces: {
         appsch: postgresCreateNamespace({
           id: 'appsch',

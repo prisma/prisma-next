@@ -20,14 +20,14 @@ const stubLowerer: ExecuteRequestLowerer = {
 };
 
 const SNAPSHOTS_IMPORT_PATH = '../../snapshots';
-const TO_STORAGE_HASH = `sha256:${'b'.repeat(64)}`;
-const FROM_STORAGE_HASH = `sha256:${'a'.repeat(64)}`;
+const TO_STORAGE_HASH = 'b'.repeat(64);
+const FROM_STORAGE_HASH = 'a'.repeat(64);
 
 function createContract(): Contract<SqlStorage> {
   return {
     target: 'sqlite',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:profile'),
+    profileHash: profileHash('profile'),
     storage: new SqlStorage({
       storageHash: coreHash(TO_STORAGE_HASH),
       namespaces: {
@@ -187,7 +187,8 @@ describe('SqliteMigrationPlanner authoring surface', () => {
       expect(source).toContain('override readonly startContractJson = startContract;');
       expect(source).toContain('override readonly endContractJson = endContract;');
       expect(source).not.toContain('describe()');
-      expect(source).not.toContain(coreHash(FROM_STORAGE_HASH));
+      expect(source).not.toContain(`'${FROM_STORAGE_HASH}'`);
+      expect(source).not.toContain(`"${FROM_STORAGE_HASH}"`);
       expect(source).toContain('this.createTable(');
     });
   });
@@ -199,7 +200,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         {
           packageDir: '/tmp/migration-pkg',
           fromHash: null,
-          toHash: 'sha256:to',
+          toHash: 'to-hash-stub',
           snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
         },
         APP_SPACE_ID,
@@ -207,7 +208,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
 
       expect(empty.targetId).toBe('sqlite');
       expect(empty.operations).toEqual([]);
-      expect(empty.destination).toEqual({ storageHash: 'sha256:to' });
+      expect(empty.destination).toEqual({ storageHash: 'to-hash-stub' });
     });
 
     it('renders a stub that derives from/to from contract JSON and has an empty operations list', () => {

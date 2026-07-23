@@ -12,7 +12,7 @@ import sqlite from '../src/runtime/sqlite';
 const contract: Contract<SqlStorage> = createContract<SqlStorage>({
   target: 'sqlite',
   storage: new SqlStorage({
-    storageHash: coreHash('sha256:sqlite-close-test'),
+    storageHash: coreHash('sqlite-close-test'),
     namespaces: {
       __unbound__: sqliteCreateNamespace({ id: '__unbound__', entries: { table: {} } }),
     },

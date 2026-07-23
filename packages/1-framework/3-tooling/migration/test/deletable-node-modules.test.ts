@@ -45,7 +45,7 @@ import {
 import { writeTestPackage } from './fixtures';
 
 const TEST_SPACE_ID = 'test-contract-space';
-const TEST_HEAD_HASH = 'sha256:0000000000000000000000000000000000000000000000000000000000000abc';
+const TEST_HEAD_HASH = '0000000000000000000000000000000000000000000000000000000000000abc';
 const TEST_INVARIANT = 'test-contract-space:create-test_box-v1';
 
 const testContract = {
@@ -133,7 +133,7 @@ describe('per-space verifier + runner against a project with deleted node_module
     const dirs = await listContractSpaceDirectories(fixture.projectMigrationsDir);
 
     const driftedMarker: SpaceMarkerRecord = {
-      hash: 'sha256:00000000000000000000000000000000000000000000000000000000deadbeef',
+      hash: '00000000000000000000000000000000000000000000000000000000deadbeef',
       invariants: [TEST_INVARIANT],
     };
 
@@ -288,7 +288,7 @@ describe('aggregate pipeline (loader → planner → verifier) against deleted n
       verifySchemaForSpace: () => ({
         ok: true,
         summary: 'Database schema satisfies contract',
-        contract: { storageHash: 'sha256:test' },
+        contract: { storageHash: 'test' },
         target: { expected: 'postgres' },
         schema: {
           issues: [],

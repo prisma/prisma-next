@@ -17,11 +17,11 @@ import {
 const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
   target: 'postgres',
-  profileHash: profileHash('sha256:test'),
+  profileHash: profileHash('test'),
   domain: applicationDomainOf({ models: {} }),
   roots: {},
   storage: new SqlStorage({
-    storageHash: coreHash('sha256:test'),
+    storageHash: coreHash('test'),
     namespaces: {
       __unbound__: createTestSqlNamespace({
         id: '__unbound__',
@@ -80,7 +80,7 @@ describe('composed runtime mutation default generators', () => {
       contract: {
         ...testContract,
         execution: {
-          executionHash: executionHash('sha256:test'),
+          executionHash: executionHash('test'),
           mutations: {
             defaults: [
               {
@@ -127,7 +127,7 @@ describe('composed runtime mutation default generators', () => {
       contract: {
         ...testContract,
         execution: {
-          executionHash: executionHash('sha256:test'),
+          executionHash: executionHash('test'),
           mutations: {
             defaults: [
               {
@@ -202,7 +202,7 @@ describe('composed runtime mutation default generators', () => {
         contract: {
           ...testContract,
           execution: {
-            executionHash: executionHash('sha256:test'),
+            executionHash: executionHash('test'),
             mutations: {
               defaults: [
                 {
@@ -236,7 +236,7 @@ describe('composed runtime mutation default generators', () => {
         contract: {
           ...testContract,
           execution: {
-            executionHash: executionHash('sha256:test'),
+            executionHash: executionHash('test'),
             mutations: {
               defaults: [
                 {

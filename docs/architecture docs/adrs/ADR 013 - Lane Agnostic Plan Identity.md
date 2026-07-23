@@ -47,8 +47,8 @@ Define a lane-agnostic Plan identity and hashing method that relies only on exec
 
 ## Serialization
 - Build a canonical string N = `target | coreHash | sqlNormalized | paramsShapeJson`
-- Compute `planId = sha256(N)` as `sha256:<hex>`
-- Compute `sqlFingerprint = sha256(sqlNormalized)` as `sha256:<hex>`
+- Compute `planId = sha256(N)` as `<hex>`
+- Compute `sqlFingerprint = sha256(sqlNormalized)` as `<hex>`
 
 ## Rationale
 - `target` and `coreHash` ensure identity changes when the backend or contract changes, even if SQL text coincidentally matches

@@ -14,7 +14,7 @@ const emptyTableInput = {
 describe('elementCoordinates with SqlStorage', () => {
   it('walks SQL namespace table entries', () => {
     const storage = new SqlStorage({
-      storageHash: coreHash('sha256:element-coordinates-sql'),
+      storageHash: coreHash('element-coordinates-sql'),
       namespaces: {
         app: createTestSqlNamespace({ id: 'app', entries: { table: { users: emptyTableInput } } }),
       },
@@ -33,7 +33,7 @@ describe('elementCoordinates with SqlStorage', () => {
 describe('coordinate-resolution acceptance — every elementCoordinates tuple resolves', () => {
   it('every coordinate from a sql storage resolves through entityAt', () => {
     const storage = new SqlStorage({
-      storageHash: coreHash('sha256:coord-resolution-sql'),
+      storageHash: coreHash('coord-resolution-sql'),
       namespaces: {
         app: createTestSqlNamespace({
           id: 'app',

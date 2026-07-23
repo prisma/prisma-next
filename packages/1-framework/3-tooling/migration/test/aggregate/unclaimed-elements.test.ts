@@ -89,7 +89,7 @@ function makeResult(args: {
     ok: args.ok,
     ...(args.ok ? {} : { code: 'CONTRACT.MARKER_REQUIRED' }),
     summary: args.ok ? 'Database schema satisfies contract' : 'does not satisfy',
-    contract: { storageHash: 'sha256:x' },
+    contract: { storageHash: 'x' },
     target: { expected: 'postgres' },
     schema: {
       issues: args.issues ?? [],

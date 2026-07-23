@@ -87,11 +87,11 @@ function minimal(overrides?: Record<string, unknown>): Contract {
                 : undefined,
             ),
           }),
-    storage: { storageHash: coreHash('sha256:stub'), namespaces: {} },
+    storage: { storageHash: coreHash('stub'), namespaces: {} },
     extensionPacks: {},
     capabilities: {},
     meta: {},
-    profileHash: profileHash('sha256:stub'),
+    profileHash: profileHash('stub'),
     ...rest,
   };
 }
@@ -100,7 +100,7 @@ const UNBOUND = '__unbound__';
 
 function unboundStorage(tables: Record<string, unknown>): Record<string, unknown> {
   return {
-    storageHash: 'sha256:stub',
+    storageHash: 'stub',
     namespaces: {
       [UNBOUND]: { id: UNBOUND, entries: { table: tables } },
     },
@@ -150,7 +150,7 @@ describe('canonicalizeContractToObject', () => {
         targetFamily: 'mongo',
         target: 'mongo',
         storage: {
-          storageHash: 'sha256:stub',
+          storageHash: 'stub',
           namespaces: {
             [UNBOUND]: {
               id: UNBOUND,
@@ -202,47 +202,47 @@ describe('canonicalizeContractToObject', () => {
 
   it('includes execution when provided', () => {
     const input = minimal({
-      execution: { executionHash: 'sha256:exec', mutations: { defaults: [] } },
+      execution: { executionHash: 'exec', mutations: { defaults: [] } },
     });
     const result = canonicalizeContractToObject(input);
     expect(result['execution']).toEqual({
-      executionHash: 'sha256:exec',
+      executionHash: 'exec',
       mutations: { defaults: [] },
     });
   });
 
   it('includes storageHash when provided inside storage', () => {
     const result = canonicalizeContractToObject(
-      minimal({ storage: { storageHash: 'sha256:abc', namespaces: {} } }),
+      minimal({ storage: { storageHash: 'abc', namespaces: {} } }),
     );
-    expect(drill(result, 'storage')['storageHash']).toBe('sha256:abc');
+    expect(drill(result, 'storage')['storageHash']).toBe('abc');
   });
 
   it('includes profileHash', () => {
-    const result = canonicalizeContractToObject(minimal({ profileHash: 'sha256:def' }));
-    expect(result['profileHash']).toBe('sha256:def');
+    const result = canonicalizeContractToObject(minimal({ profileHash: 'def' }));
+    expect(result['profileHash']).toBe('def');
   });
 
   it('keeps storageHash inside storage', () => {
     const result = canonicalizeContractToObject(
-      minimal({ storage: { storageHash: 'sha256:s', namespaces: {} } }),
+      minimal({ storage: { storageHash: 's', namespaces: {} } }),
     );
     expect(result).not.toHaveProperty('storageHash');
-    expect(drill(result, 'storage')['storageHash']).toBe('sha256:s');
+    expect(drill(result, 'storage')['storageHash']).toBe('s');
   });
 
   it('keeps executionHash inside execution', () => {
     const result = canonicalizeContractToObject(
       minimal({
-        execution: { executionHash: 'sha256:e', mutations: { defaults: [] } },
+        execution: { executionHash: 'e', mutations: { defaults: [] } },
       }),
     );
     expect(result).not.toHaveProperty('executionHash');
-    expect(drill(result, 'execution')['executionHash']).toBe('sha256:e');
+    expect(drill(result, 'execution')['executionHash']).toBe('e');
   });
 
   it('places profileHash in canonical top-level order', () => {
-    const result = canonicalizeContractToObject(minimal({ profileHash: 'sha256:p' }));
+    const result = canonicalizeContractToObject(minimal({ profileHash: 'p' }));
     const keys = Object.keys(result);
     const ordered = keys.filter((k) => ['profileHash', 'roots'].includes(k));
     expect(ordered).toEqual(['profileHash', 'roots']);
@@ -493,7 +493,7 @@ describe('default omission', () => {
   it('preserves empty execution.mutations.defaults', () => {
     const result = canonicalizeContractToObject(
       minimal({
-        execution: { executionHash: 'sha256:exec', mutations: { defaults: [] } },
+        execution: { executionHash: 'exec', mutations: { defaults: [] } },
       }),
     );
     const mutations = drill(result, 'execution', 'mutations');
@@ -616,7 +616,7 @@ describe('index and unique sorting', () => {
 
   it('handles storage without namespaces (no-op)', () => {
     const result = canonicalizeContractToObject(
-      minimal({ storage: { storageHash: 'sha256:stub', namespaces: {} } }),
+      minimal({ storage: { storageHash: 'stub', namespaces: {} } }),
     );
     expect(result['storage']).toBeDefined();
   });
@@ -693,7 +693,7 @@ describe('index and unique sorting', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: {
-          storageHash: 'sha256:stub',
+          storageHash: 'stub',
           namespaces: {
             broken: null as unknown as Record<string, unknown>,
           },
@@ -708,7 +708,7 @@ describe('index and unique sorting', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: {
-          storageHash: 'sha256:stub',
+          storageHash: 'stub',
           namespaces: {
             [UNBOUND]: {
               id: UNBOUND,
@@ -743,8 +743,8 @@ describe('canonicalizeContract', () => {
 
   it('produces identical output as JSON.stringify of canonicalizeContractToObject', () => {
     const input = minimal({
-      storage: { storageHash: 'sha256:test', namespaces: {} },
-      profileHash: 'sha256:profile',
+      storage: { storageHash: 'test', namespaces: {} },
+      profileHash: 'profile',
     });
     const objResult = canonicalizeContractToObject(input);
     const strResult = canonicalizeContract(input);
@@ -810,7 +810,7 @@ describe('typeParams canonicalization', () => {
   it('strips empty storage.types[].typeParams even when SQL shouldPreserveEmpty hook is provided', () => {
     const result = canonicalizeContractToObject(
       minimal({
-        storage: { storageHash: 'sha256:stub', types: { MyType: { typeParams: {} } } },
+        storage: { storageHash: 'stub', types: { MyType: { typeParams: {} } } },
       }),
       { shouldPreserveEmpty: sqlPreserveEmpty },
     );
@@ -822,7 +822,7 @@ describe('typeParams canonicalization', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: {
-          storageHash: 'sha256:stub',
+          storageHash: 'stub',
           namespaces: {},
           types: { MyType: { typeParams: {} } },
         },
@@ -836,7 +836,7 @@ describe('typeParams canonicalization', () => {
     const result = canonicalizeContractToObject(
       minimal({
         storage: {
-          storageHash: 'sha256:stub',
+          storageHash: 'stub',
           namespaces: {},
           types: { MyType: { typeParams: { length: 10 } } },
         },

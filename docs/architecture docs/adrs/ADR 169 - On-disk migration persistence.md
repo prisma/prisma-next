@@ -93,7 +93,7 @@ If migration N fails, migrations 1..N-1 are already committed. Re-running `migra
 ### 6. "From" contract resolution
 
 `migration plan` determines the "from" contract by resolving the latest migration target:
-- **No migrations**: Assume `sha256:empty` (new project). The converted schema IR is empty.
+- **No migrations**: Assume `empty` (new project). The converted schema IR is empty.
 - **Linear history**: The target is unambiguous — the one reachable node with no outgoing edges.
 - **Branching**: `findLeaf` throws `AMBIGUOUS_TARGET` listing both branch tips. The user must resolve manually (delete one branch, re-plan) or pass `--from <hash>`.
 - **Cycles without exit**: `findLeaf` throws `NO_TARGET`. The user must pass `--from <hash>` to specify the planning origin explicitly.

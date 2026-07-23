@@ -25,9 +25,9 @@ function buildArrayContract(): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:native-array-columns'),
+    profileHash: profileHash('native-array-columns'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:native-array-columns'),
+      storageHash: coreHash('native-array-columns'),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,

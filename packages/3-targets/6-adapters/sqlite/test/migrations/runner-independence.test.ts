@@ -50,14 +50,14 @@ import {
  * `packages/3-targets/6-adapters/postgres/test/migrations/runner-independence.integration.test.ts`.
  */
 
-const STORAGE_HASH_C1 = `sha256:${'1'.repeat(64)}`;
-const STORAGE_HASH_C2 = `sha256:${'2'.repeat(64)}`;
+const STORAGE_HASH_C1 = '1'.repeat(64);
+const STORAGE_HASH_C2 = '2'.repeat(64);
 
 function buildAppContract(version: 1 | 2): Contract<SqlStorage> {
   return {
     target: 'sqlite',
     targetFamily: 'sql',
-    profileHash: profileHash(`sha256:runner-independence-v${version}`),
+    profileHash: profileHash(`runner-independence-v${version}`),
     storage: new SqlStorage({
       storageHash: coreHash(version === 1 ? STORAGE_HASH_C1 : STORAGE_HASH_C2),
       namespaces: {

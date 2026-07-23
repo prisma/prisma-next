@@ -62,7 +62,7 @@ function makeContract(
       }>;
     }
   >,
-  storageHash = 'sha256:dest',
+  storageHash = 'dest',
 ): MongoContract {
   const storageCollections: Record<string, Record<string, unknown>> = {};
   for (const [name, def] of Object.entries(collections)) {
@@ -164,7 +164,7 @@ describe('MongoMigrationRunner schema verification (integration)', () => {
     expect(result.ok).toBe(true);
 
     const marker = await controlAdapter.readMarker(new MongoControlDriver(db, client), 'app');
-    expect(marker?.storageHash).toBe('sha256:dest');
+    expect(marker?.storageHash).toBe('dest');
 
     const ledgerEntries = await db
       .collection('_prisma_migrations')
@@ -234,7 +234,7 @@ describe('MongoMigrationRunner schema verification (integration)', () => {
       new MongoControlDriver(db, client),
       'app',
     );
-    expect(markerAfterRecovery?.storageHash).toBe('sha256:dest');
+    expect(markerAfterRecovery?.storageHash).toBe('dest');
 
     const ledgerAfterRecovery = await db
       .collection('_prisma_migrations')
@@ -265,7 +265,7 @@ describe('MongoMigrationRunner schema verification (integration)', () => {
     expect(result.ok).toBe(true);
 
     const marker = await controlAdapter.readMarker(new MongoControlDriver(db, client), 'app');
-    expect(marker?.storageHash).toBe('sha256:dest');
+    expect(marker?.storageHash).toBe('dest');
 
     const ledgerEntries = await db
       .collection('_prisma_migrations')

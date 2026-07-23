@@ -145,7 +145,7 @@ class StubInspectionExecutor implements MongoInspectionCommandVisitor<Promise<Ro
 const RUN_COLLECTION = 'users';
 const PLAN_META = {
   target: 'mongo' as const,
-  storageHash: 'sha256:test',
+  storageHash: 'test',
   lane: 'mongo-raw',
 };
 
@@ -191,7 +191,7 @@ function serializedOperations(ops: readonly AnyMongoMigrationOperation[]): reado
 function makePlan(ops: readonly AnyMongoMigrationOperation[]): MigrationPlan {
   return {
     targetId: 'mongo',
-    destination: { storageHash: 'sha256:dest' },
+    destination: { storageHash: 'dest' },
     // The runner's deserializer re-hydrates class instances from the JSON form,
     // so callers always hand it a pre-serialized operations list.
     operations: serializedOperations(ops) as unknown as MigrationPlan['operations'],
@@ -252,7 +252,7 @@ function makeContract(profileHash: string): MongoContract {
   return {
     profileHash,
     storage: {
-      storageHash: 'sha256:dest',
+      storageHash: 'dest',
       namespaces: {
         __unbound__: {
           id: '__unbound__',
@@ -273,7 +273,7 @@ async function execute(
   return harness.runner.execute({
     plan,
     migrationEdges: synthEdges(plan),
-    destinationContract: makeContract('sha256:dest'),
+    destinationContract: makeContract('dest'),
     policy: ALL_POLICY,
     frameworkComponents: [],
     ...(executionChecks ? { executionChecks } : {}),
@@ -465,7 +465,7 @@ describe('MongoMigrationRunner schema verification', () => {
     const result = await runner.execute({
       plan: driftPlan,
       migrationEdges: synthEdges(driftPlan),
-      destinationContract: makeContract('sha256:dest'),
+      destinationContract: makeContract('dest'),
       policy: ALL_POLICY,
       frameworkComponents: [],
       executionChecks: { prechecks: false, postchecks: false, idempotencyChecks: false },
@@ -485,8 +485,8 @@ describe('MongoMigrationRunner schema verification', () => {
     const trackingReadMarker: MarkerOperations = {
       ...ops,
       readMarker: async () => ({
-        storageHash: 'sha256:dest',
-        profileHash: 'sha256:dest',
+        storageHash: 'dest',
+        profileHash: 'dest',
         contractJson: null,
         canonicalVersion: null,
         updatedAt: new Date(),
@@ -515,14 +515,14 @@ describe('MongoMigrationRunner schema verification', () => {
     const runner = new MongoMigrationRunner(deps);
     const noOpPlan: MigrationPlan = {
       targetId: 'mongo',
-      origin: { storageHash: 'sha256:dest' },
-      destination: { storageHash: 'sha256:dest' },
+      origin: { storageHash: 'dest' },
+      destination: { storageHash: 'dest' },
       operations: [] as unknown as MigrationPlan['operations'],
     };
     const result = await runner.execute({
       plan: noOpPlan,
       migrationEdges: synthEdges(noOpPlan),
-      destinationContract: makeContract('sha256:dest'),
+      destinationContract: makeContract('dest'),
       policy: ALL_POLICY,
       frameworkComponents: [],
     });
@@ -540,7 +540,7 @@ describe('MongoMigrationRunner schema verification', () => {
     const result = await runner.execute({
       plan: warnPlan,
       migrationEdges: synthEdges(warnPlan),
-      destinationContract: makeContract('sha256:dest'),
+      destinationContract: makeContract('dest'),
       policy: ALL_POLICY,
       frameworkComponents: [],
       strictVerification: false,
@@ -592,7 +592,7 @@ function makeLedgerPlan(
     targetId: 'mongo',
     spaceId: LEDGER_TEST_SPACE_ID,
     origin: null,
-    destination: { storageHash: options.destinationHash ?? 'sha256:dest' },
+    destination: { storageHash: options.destinationHash ?? 'dest' },
     operations: serializedOperations(ops) as unknown as MigrationPlan['operations'],
   };
 }
@@ -606,10 +606,10 @@ const LEDGER_EXECUTION_CHECKS: MigrationRunnerExecutionChecks = {
 describe('MongoMigrationRunner - per-edge ledger', () => {
   it('writes one ledger entry for a single-edge apply with space, name, hash, from/to, and that edge ops', async () => {
     const { runner, ledgerEntries } = makeLedgerHarness();
-    const destHash = 'sha256:dest';
+    const destHash = 'dest';
     const edges: readonly AggregateMigrationEdgeRef[] = [
       {
-        migrationHash: 'sha256:mig-single',
+        migrationHash: 'mig-single',
         dirName: '001_single',
         from: EMPTY_CONTRACT_HASH,
         to: destHash,
@@ -634,7 +634,7 @@ describe('MongoMigrationRunner - per-edge ledger', () => {
       from: EMPTY_CONTRACT_HASH,
       to: destHash,
       migrationName: '001_single',
-      migrationHash: 'sha256:mig-single',
+      migrationHash: 'mig-single',
     });
     const storedOps = ledgerEntries[0]?.operations as Array<{ id: string }>;
     expect(storedOps).toHaveLength(1);
@@ -643,26 +643,26 @@ describe('MongoMigrationRunner - per-edge ledger', () => {
 
   it('writes N ledger entries in walk order for multi-edge apply with ops attributed per edge', async () => {
     const { runner, ledgerEntries } = makeLedgerHarness();
-    const hashA = 'sha256:ledger-mid-a';
-    const hashB = 'sha256:ledger-mid-b';
-    const destHash = 'sha256:dest';
+    const hashA = 'ledger-mid-a';
+    const hashB = 'ledger-mid-b';
+    const destHash = 'dest';
     const edges: readonly AggregateMigrationEdgeRef[] = [
       {
-        migrationHash: 'sha256:mig-a',
+        migrationHash: 'mig-a',
         dirName: '001_a',
         from: EMPTY_CONTRACT_HASH,
         to: hashA,
         operationCount: 1,
       },
       {
-        migrationHash: 'sha256:mig-b',
+        migrationHash: 'mig-b',
         dirName: '002_b',
         from: hashA,
         to: hashB,
         operationCount: 2,
       },
       {
-        migrationHash: 'sha256:mig-c',
+        migrationHash: 'mig-c',
         dirName: '003_c',
         from: hashB,
         to: destHash,
@@ -694,19 +694,19 @@ describe('MongoMigrationRunner - per-edge ledger', () => {
       edgeId: `${EMPTY_CONTRACT_HASH}->${hashA}`,
       from: EMPTY_CONTRACT_HASH,
       to: hashA,
-      migrationHash: 'sha256:mig-a',
+      migrationHash: 'mig-a',
     });
     expect(ledgerEntries[1]).toMatchObject({
       edgeId: `${hashA}->${hashB}`,
       from: hashA,
       to: hashB,
-      migrationHash: 'sha256:mig-b',
+      migrationHash: 'mig-b',
     });
     expect(ledgerEntries[2]).toMatchObject({
       edgeId: `${hashB}->${destHash}`,
       from: hashB,
       to: destHash,
-      migrationHash: 'sha256:mig-c',
+      migrationHash: 'mig-c',
     });
 
     const opCounts = ledgerEntries.map((e) => (e.operations as unknown[]).length);
@@ -719,10 +719,10 @@ describe('MongoMigrationRunner - per-edge ledger', () => {
 
   it('throws when migrationEdges operationCount sum does not match plan.operations length', async () => {
     const { runner } = makeLedgerHarness();
-    const destHash = 'sha256:dest';
+    const destHash = 'dest';
     const edges: readonly AggregateMigrationEdgeRef[] = [
       {
-        migrationHash: 'sha256:mig-single',
+        migrationHash: 'mig-single',
         dirName: '001_single',
         from: EMPTY_CONTRACT_HASH,
         to: destHash,
@@ -745,7 +745,7 @@ describe('MongoMigrationRunner - per-edge ledger', () => {
 
   it('writes one synthesised ledger entry with empty migration name for synth apply with a single synth edge', async () => {
     const { runner, ledgerEntries } = makeLedgerHarness();
-    const destHash = 'sha256:dest';
+    const destHash = 'dest';
     const plan = makeLedgerPlan([createCollection('ledger_synth')], { destinationHash: destHash });
     const synthEdges: readonly AggregateMigrationEdgeRef[] = [
       {

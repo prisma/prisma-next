@@ -89,7 +89,7 @@ withTempDir(({ createTempDir }) => {
         // `migrationHash` is the content-address over `(manifest, [])`.
         // The author re-emits after filling in placeholders to rewrite
         // both `ops.json` and `migrationHash`.
-        expect(manifestBefore.migrationHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+        expect(manifestBefore.migrationHash).toMatch(/^[a-f0-9]{64}$/);
         expect(JSON.parse(readFileSync(join(migrationDir, 'ops.json'), 'utf-8'))).toEqual([]);
 
         const filled = injectMigrationSqlDbSetup(scaffold)
@@ -126,7 +126,7 @@ withTempDir(({ createTempDir }) => {
         const manifestAfter = JSON.parse(
           readFileSync(join(migrationDir, 'migration.json'), 'utf-8'),
         );
-        expect(manifestAfter.migrationHash).toMatch(/^sha256:/);
+        expect(manifestAfter.migrationHash).toMatch(/^[a-f0-9]{64}$/);
 
         const apply1 = await runMigrate(ctx);
         expect(apply1.exitCode, `apply: ${apply1.stdout}\n${apply1.stderr}`).toBe(0);

@@ -17,13 +17,13 @@ import {
 /**
  * `checkSnapshotConsistency` reads the destination snapshot keyed by
  * `pkg.metadata.to`. Nothing in the on-disk manifest schema validates that
- * `to` is a well-formed `sha256:<64hex>` value (`io.ts` only checks it is a
+ * `to` is a well-formed `64-hex` value (`io.ts` only checks it is a
  * non-empty string), so a hand-edited or corrupted `migration.json` can
  * carry a malformed `to`. This must surface as a clean `MIGRATION.CHECK_SNAPSHOT_UNPARSEABLE`
  * failure, not an unhandled crash.
  */
 
-const HASH_APP = `sha256:${'a'.repeat(64)}`;
+const HASH_APP = 'a'.repeat(64);
 const MALFORMED_HASH = 'not-a-sha256-hash';
 
 const ADDITIVE_OP: MigrationPlanOperation = {
@@ -87,7 +87,7 @@ async function checkFromDisk(migrationsDir: string): Promise<MigrationCheckResul
 }
 
 describe('migration check — snapshot consistency with a malformed to-hash', () => {
-  it('surfaces MIGRATION.CHECK_SNAPSHOT_UNPARSEABLE instead of crashing when metadata.to is not sha256:<64hex>', async () => {
+  it('surfaces MIGRATION.CHECK_SNAPSHOT_UNPARSEABLE instead of crashing when metadata.to is not 64-hex', async () => {
     const { migrationsRoot } = await setupFixture();
     await writePackageWithTo(migrationsRoot, '20260101T0000_init', MALFORMED_HASH);
 

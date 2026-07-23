@@ -17,8 +17,8 @@ function createPlanResult(overrides?: Partial<MigrationCommandResult>): Migratio
     plan: {
       targetId: 'postgres',
       destination: {
-        storageHash: 'sha256:dest-hash',
-        profileHash: 'sha256:dest-profile',
+        storageHash: 'dest-hash',
+        profileHash: 'dest-profile',
       },
       operations: [
         {
@@ -46,7 +46,7 @@ function createApplyResult(overrides?: Partial<MigrationCommandResult>): Migrati
     plan: {
       targetId: 'postgres',
       destination: {
-        storageHash: 'sha256:dest-hash',
+        storageHash: 'dest-hash',
       },
       operations: [
         {
@@ -61,7 +61,7 @@ function createApplyResult(overrides?: Partial<MigrationCommandResult>): Migrati
       operationsExecuted: 1,
     },
     marker: {
-      storageHash: 'sha256:dest-hash',
+      storageHash: 'dest-hash',
     },
     summary: 'Applied 1 operation(s), signature updated',
     timings: { total: 100 },
@@ -92,7 +92,7 @@ describe('formatMigrationPlanOutput', () => {
     const output = formatMigrationPlanOutput(result, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('sha256:dest-hash');
+    expect(stripped).toContain('dest-hash');
   });
 
   it('shows dry run note', () => {
@@ -117,7 +117,7 @@ describe('formatMigrationPlanOutput', () => {
 
   it('handles zero operations', () => {
     const result = createPlanResult({
-      plan: { targetId: 'postgres', destination: { storageHash: 'sha256:same' }, operations: [] },
+      plan: { targetId: 'postgres', destination: { storageHash: 'same' }, operations: [] },
       summary: 'Planned 0 operation(s)',
     });
     const flags = parseGlobalFlags({ 'no-color': true });
@@ -130,7 +130,7 @@ describe('formatMigrationPlanOutput', () => {
 
   it('prints a Warnings block when planner warnings are present', () => {
     const result = createPlanResult({
-      plan: { targetId: 'postgres', destination: { storageHash: 'sha256:same' }, operations: [] },
+      plan: { targetId: 'postgres', destination: { storageHash: 'same' }, operations: [] },
       summary: 'Planned 0 operation(s)',
       warnings: [
         {
@@ -150,7 +150,7 @@ describe('formatMigrationPlanOutput', () => {
 
   it('omits the Warnings block when warnings are absent', () => {
     const result = createPlanResult({
-      plan: { targetId: 'postgres', destination: { storageHash: 'sha256:same' }, operations: [] },
+      plan: { targetId: 'postgres', destination: { storageHash: 'same' }, operations: [] },
       summary: 'Planned 0 operation(s)',
     });
     const stripped = stripAnsi(
@@ -174,7 +174,7 @@ describe('formatMigrationPlanOutput', () => {
     const result = createPlanResult({
       plan: {
         targetId: 'postgres',
-        destination: { storageHash: 'sha256:dest-hash' },
+        destination: { storageHash: 'dest-hash' },
         operations: [
           {
             id: 'column.user.nickname',
@@ -211,12 +211,12 @@ describe('formatMigrationPlanOutput', () => {
 
   it('shows planned ref advancement when plannedAdvanceRef is set', () => {
     const result = createPlanResult({
-      plannedAdvanceRef: { name: 'db', hash: 'sha256:planned-hash' },
+      plannedAdvanceRef: { name: 'db', hash: 'planned-hash' },
     });
     const flags = parseGlobalFlags({ 'no-color': true });
     const stripped = stripAnsi(formatMigrationPlanOutput(result, flags));
 
-    expect(stripped).toContain('Would advance ref "db" → sha256:planned-hash');
+    expect(stripped).toContain('Would advance ref "db" → planned-hash');
   });
 
   it('omits planned ref advancement when plannedAdvanceRef is null', () => {
@@ -267,22 +267,22 @@ describe('formatMigrationApplyOutput', () => {
     // result carries no per-space breakdown we fall back to a labelled
     // `App-space marker:` line that names what the hash covers; the
     // across-spaces block lives in the per-space output (see other tests).
-    expect(stripped).toContain('App-space marker: sha256:dest-hash');
-    expect(stripped).not.toContain('Signature: sha256:dest-hash');
+    expect(stripped).toContain('App-space marker: dest-hash');
+    expect(stripped).not.toContain('Signature: dest-hash');
   });
 
   it('shows profile hash when present', () => {
     const result = createApplyResult({
       marker: {
-        storageHash: 'sha256:dest-hash',
-        profileHash: 'sha256:dest-profile',
+        storageHash: 'dest-hash',
+        profileHash: 'dest-profile',
       },
     });
     const flags = parseGlobalFlags({ 'no-color': true });
     const output = formatMigrationApplyOutput(result, flags);
     const stripped = stripAnsi(output);
 
-    expect(stripped).toContain('Profile hash: sha256:dest-profile');
+    expect(stripped).toContain('Profile hash: dest-profile');
   });
 
   it('returns empty string in quiet mode', () => {
@@ -314,7 +314,7 @@ describe('formatMigrationApplyOutput', () => {
             operationClass: 'additive',
           },
         ],
-        marker: { storageHash: 'sha256:pgvector-head' },
+        marker: { storageHash: 'pgvector-head' },
       },
       {
         spaceId: 'app',
@@ -326,7 +326,7 @@ describe('formatMigrationApplyOutput', () => {
             operationClass: 'additive',
           },
         ],
-        marker: { storageHash: 'sha256:app-head' },
+        marker: { storageHash: 'app-head' },
       },
     ];
 
@@ -341,8 +341,8 @@ describe('formatMigrationApplyOutput', () => {
 
     it('surfaces every per-space marker on apply (AC4)', () => {
       const block = formatPerSpaceBlock(perSpace, 'apply', false).join('\n');
-      expect(block).toContain('marker: sha256:pgvector-head');
-      expect(block).toContain('marker: sha256:app-head');
+      expect(block).toContain('marker: pgvector-head');
+      expect(block).toContain('marker: app-head');
     });
 
     it('omits per-space markers in plan mode (no marker yet)', () => {
@@ -353,7 +353,7 @@ describe('formatMigrationApplyOutput', () => {
     it('formatMigrationApplyOutput uses the per-space block in place of the legacy `Signature:` line when perSpace is present', () => {
       const result = createApplyResult({
         execution: { operationsPlanned: 2, operationsExecuted: 2 },
-        marker: { storageHash: 'sha256:app-head' },
+        marker: { storageHash: 'app-head' },
         perSpace,
         summary: 'Applied 2 operation(s) across 2 space(s), database signed',
       });
@@ -363,8 +363,8 @@ describe('formatMigrationApplyOutput', () => {
       expect(stripped).toContain('Applied 2 operation(s) across 2 contract spaces');
       expect(stripped).toContain('Extension space: pgvector');
       expect(stripped).toContain('App space');
-      expect(stripped).toContain('marker: sha256:pgvector-head');
-      expect(stripped).toContain('marker: sha256:app-head');
+      expect(stripped).toContain('marker: pgvector-head');
+      expect(stripped).toContain('marker: app-head');
       // Legacy single-line signature must not reappear.
       expect(stripped).not.toContain('Signature:');
       // Next-step hint surfaces the canonical follow-up command (AC6).
@@ -376,11 +376,11 @@ describe('formatMigrationApplyOutput', () => {
     const result = createApplyResult({
       plan: {
         targetId: 'postgres',
-        destination: { storageHash: 'sha256:same' },
+        destination: { storageHash: 'same' },
         operations: [],
       },
       execution: { operationsPlanned: 0, operationsExecuted: 0 },
-      marker: { storageHash: 'sha256:same' },
+      marker: { storageHash: 'same' },
       summary: 'Database already matches contract, signature updated',
     });
     const flags = parseGlobalFlags({ 'no-color': true });
@@ -393,12 +393,12 @@ describe('formatMigrationApplyOutput', () => {
 
   it('shows advanced ref when advancedRef is set', () => {
     const result = createApplyResult({
-      advancedRef: { name: 'db', hash: 'sha256:applied-hash' },
+      advancedRef: { name: 'db', hash: 'applied-hash' },
     });
     const flags = parseGlobalFlags({ 'no-color': true });
     const stripped = stripAnsi(formatMigrationApplyOutput(result, flags));
 
-    expect(stripped).toContain('Advanced ref "db" → sha256:applied-hash');
+    expect(stripped).toContain('Advanced ref "db" → applied-hash');
   });
 
   it('omits advanced ref line when advancedRef is null', () => {
@@ -428,7 +428,7 @@ describe('formatMigrationJson', () => {
       mode: 'plan',
       plan: {
         targetId: 'postgres',
-        destination: { storageHash: 'sha256:dest-hash' },
+        destination: { storageHash: 'dest-hash' },
         operations: expect.arrayContaining([
           expect.objectContaining({ id: 'column.user.nickname', operationClass: 'additive' }),
         ]),
@@ -454,27 +454,27 @@ describe('formatMigrationJson', () => {
       ok: true,
       mode: 'apply',
       execution: { operationsPlanned: 1, operationsExecuted: 1 },
-      marker: { storageHash: 'sha256:dest-hash' },
+      marker: { storageHash: 'dest-hash' },
     });
   });
 
   it('includes plannedAdvanceRef in plan JSON output when set', () => {
     const result = createPlanResult({
-      plannedAdvanceRef: { name: 'staging', hash: 'sha256:planned-hash' },
+      plannedAdvanceRef: { name: 'staging', hash: 'planned-hash' },
     });
     const parsed = JSON.parse(formatMigrationJson(result)) as MigrationCommandResult;
 
-    expect(parsed.plannedAdvanceRef).toEqual({ name: 'staging', hash: 'sha256:planned-hash' });
+    expect(parsed.plannedAdvanceRef).toEqual({ name: 'staging', hash: 'planned-hash' });
     expect(parsed.advancedRef).toBeUndefined();
   });
 
   it('includes advancedRef in apply JSON output when set', () => {
     const result = createApplyResult({
-      advancedRef: { name: 'db', hash: 'sha256:applied-hash' },
+      advancedRef: { name: 'db', hash: 'applied-hash' },
     });
     const parsed = JSON.parse(formatMigrationJson(result)) as MigrationCommandResult;
 
-    expect(parsed.advancedRef).toEqual({ name: 'db', hash: 'sha256:applied-hash' });
+    expect(parsed.advancedRef).toEqual({ name: 'db', hash: 'applied-hash' });
     expect(parsed.plannedAdvanceRef).toBeUndefined();
   });
 
@@ -505,7 +505,7 @@ describe('formatMigrationPlanOutput — preview block rendering', () => {
     const result = createPlanResult({
       plan: {
         targetId: 'postgres',
-        destination: { storageHash: 'sha256:dest-hash' },
+        destination: { storageHash: 'dest-hash' },
         operations: [{ id: 'op1', label: 'op1', operationClass: 'additive' }],
         preview: {
           statements: [
@@ -536,7 +536,7 @@ describe('formatMigrationPlanOutput — preview block rendering', () => {
     const result = createPlanResult({
       plan: {
         targetId: 'mongo',
-        destination: { storageHash: 'sha256:dest-hash' },
+        destination: { storageHash: 'dest-hash' },
         operations: [{ id: 'op1', label: 'op1', operationClass: 'additive' }],
         preview: {
           statements: [
@@ -567,7 +567,7 @@ describe('formatMigrationPlanOutput — preview block rendering', () => {
     const result = createPlanResult({
       plan: {
         targetId: 'postgres',
-        destination: { storageHash: 'sha256:dest-hash' },
+        destination: { storageHash: 'dest-hash' },
         operations: [],
         preview: { statements: [] },
       },

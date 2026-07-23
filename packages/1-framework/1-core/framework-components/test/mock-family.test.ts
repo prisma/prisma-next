@@ -88,13 +88,13 @@ const ctx: RuntimeMiddlewareContext = {
 
 const meta: PlanMeta = {
   target: 'mock',
-  storageHash: 'sha256:test-core',
+  storageHash: 'test-core',
   lane: 'raw-sql',
 };
 
 describe('RuntimeCore with mock family', () => {
   it('executes plans without SQL dependencies', async () => {
-    const contract: MockContract = { target: 'mock', storageHash: 'sha256:test-core' };
+    const contract: MockContract = { target: 'mock', storageHash: 'test-core' };
     const runtime = new MockRuntime([], ctx, contract, [{ id: 1, name: 'test' }]);
 
     const plan: MockPlan = { draftId: 'd-1', meta };
@@ -106,14 +106,14 @@ describe('RuntimeCore with mock family', () => {
   });
 
   it('rejects plans whose `lower` raises (cross-family pre-execution validation)', async () => {
-    const contract: MockContract = { target: 'mock', storageHash: 'sha256:test-core' };
+    const contract: MockContract = { target: 'mock', storageHash: 'test-core' };
     const runtime = new MockRuntime([], ctx, contract, []);
 
     const invalidPlan: MockPlan = {
       draftId: 'd-2',
       meta: {
         target: 'other',
-        storageHash: 'sha256:other-core',
+        storageHash: 'other-core',
         lane: 'raw-sql',
       },
     };
@@ -141,7 +141,7 @@ describe('RuntimeCore with mock family', () => {
       },
     };
 
-    const contract: MockContract = { target: 'mock', storageHash: 'sha256:test-core' };
+    const contract: MockContract = { target: 'mock', storageHash: 'test-core' };
     const runtime = new MockRuntime([middleware], ctx, contract, [{ id: 1 }]);
 
     await runtime.execute({ draftId: 'd-3', meta }).toArray();
@@ -152,7 +152,7 @@ describe('RuntimeCore with mock family', () => {
   });
 
   it('exposes `close()` for resource teardown', async () => {
-    const contract: MockContract = { target: 'mock', storageHash: 'sha256:test-core' };
+    const contract: MockContract = { target: 'mock', storageHash: 'test-core' };
     const runtime = new MockRuntime([], ctx, contract, []);
 
     await expect(runtime.close()).resolves.toBeUndefined();

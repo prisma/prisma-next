@@ -6,8 +6,8 @@ describe('errorNoInvariantPath', () => {
     {
       dirName: '20260424T0900_add_posts_table',
       migrationHash: 'mh:abc',
-      from: 'sha256:empty',
-      to: 'sha256:a94b',
+      from: 'empty',
+      to: 'a94b',
       invariants: [],
     },
   ];

@@ -18,7 +18,7 @@ describe('SqlContractSerializer structural validation', () => {
   it('rejects missing uniques array', () => {
     const input = validSqlContractJson({
       storage: storageWithNamespacedTables({
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         tables: {
           User: {
             columns: {
@@ -37,7 +37,7 @@ describe('SqlContractSerializer structural validation', () => {
   it('rejects missing indexes array', () => {
     const input = validSqlContractJson({
       storage: storageWithNamespacedTables({
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         tables: {
           User: {
             columns: {
@@ -56,7 +56,7 @@ describe('SqlContractSerializer structural validation', () => {
   it('rejects missing foreignKeys array', () => {
     const input = validSqlContractJson({
       storage: storageWithNamespacedTables({
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         tables: {
           User: {
             columns: {
@@ -80,7 +80,7 @@ describe('SqlContractSerializer structural validation', () => {
   it('rejects table without columns property', () => {
     const input = validSqlContractJson({
       storage: storageWithNamespacedTables({
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         tables: {
           User: {
             primaryKey: { columns: ['id'] },
@@ -98,7 +98,7 @@ describe('SqlContractSerializer structural validation', () => {
     const input = {
       ...validSqlContractJson(),
       storage: storageWithNamespacedTables({
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         tables: {
           User: {
             columns: null,
@@ -117,7 +117,7 @@ describe('SqlContractSerializer structural validation', () => {
   it('accepts table with empty columns object', () => {
     const input = validSqlContractJson({
       storage: storageWithNamespacedTables({
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         tables: {
           User: {
             columns: {},
@@ -135,7 +135,7 @@ describe('SqlContractSerializer structural validation', () => {
     const input = {
       ...validSqlContractJson(),
       storage: storageWithNamespacedTables({
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         tables: {
           User: {
             columns: {
@@ -201,7 +201,7 @@ describe('SqlContractSerializer structural validation', () => {
         },
       },
       storage: storageWithNamespacedTables({
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         tables: {
           user: {
             columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
@@ -257,7 +257,7 @@ describe('SqlContractSerializer structural validation', () => {
         },
       },
       storage: storageWithNamespacedTables({
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         tables: {
           User: {
             columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
@@ -327,7 +327,7 @@ describe('SqlContractSerializer structural validation', () => {
         },
       },
       storage: storageWithNamespacedTables({
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         tables: {
           User: {
             columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },
@@ -373,7 +373,7 @@ describe('SqlContractSerializer structural validation', () => {
   it('validates FK entries with source/target coordinates only', () => {
     const input = validSqlContractJson({
       storage: storageWithNamespacedTables({
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         tables: {
           user: {
             columns: { id: { codecId: 'pg/text@1', nativeType: 'text', nullable: false } },

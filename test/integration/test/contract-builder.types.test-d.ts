@@ -44,7 +44,7 @@ test('builder contract types match fixture contract types', () => {
     family: sqlFamilyPack,
     target: postgresPack,
     createNamespace: postgresCreateNamespace,
-    storageHash: 'sha256:test-core',
+    storageHash: 'test-core',
     models: {
       User: model('User', {
         fields: {
@@ -79,7 +79,7 @@ test('ResultType inference works identically to fixture contract', () => {
     family: sqlFamilyPack,
     target: postgresPack,
     createNamespace: postgresCreateNamespace,
-    storageHash: 'sha256:test-core',
+    storageHash: 'test-core',
     models: {
       User: model('User', {
         fields: {
@@ -151,7 +151,7 @@ test('refined object contract preserves downstream model token inference', () =>
     family: sqlFamilyPack,
     target: postgresPack,
     createNamespace: postgresCreateNamespace,
-    storageHash: 'sha256:test-refined',
+    storageHash: 'test-refined',
     models: {
       User,
       Post,
@@ -544,7 +544,7 @@ const enumContract = defineContract({
   family: sqlFamilyPack,
   target: postgresPack,
   createNamespace: postgresCreateNamespace,
-  storageHash: 'sha256:test-enum',
+  storageHash: 'test-enum',
   enums: { Role, Status, PriorityInt },
   models: {
     Account: model('Account', {

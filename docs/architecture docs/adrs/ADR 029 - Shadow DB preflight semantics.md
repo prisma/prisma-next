@@ -21,14 +21,14 @@ Both modes share the same job envelope, diagnostics schema, and exit codes, enab
   "mode": "shadow" | "explainOnly",
   "target": {
     "adapter": "postgres",
-    "profileHash": "sha256:...",
+    "profileHash": "...",
     "version": "15"
   },
   "contract": {
-    "toHash": "sha256:to...",
+    "toHash": "to...",
     "toContract": { /* complete destination contract JSON */ },
     "migrationsPath": "migrations/",
-    "fromHashHint": "sha256:from..."
+    "fromHashHint": "from..."
   },
   "plans": [
     { "kind": "dsl", "plan": { /* Plan JSON, annotations only, no params */ } }

@@ -31,9 +31,7 @@ export function computeMigrationId(manifest: MigrationManifest, ops: MigrationOp
   const canonicalOps = canonicalizeJson(ops);
 
   const partHashes = [canonicalManifest, canonicalOps].map(sha256Hex);
-  const hash = sha256Hex(canonicalizeJson(partHashes));
-
-  return `sha256:${hash}`;
+  return sha256Hex(canonicalizeJson(partHashes));
 }
 ```
 

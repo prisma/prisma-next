@@ -50,9 +50,9 @@ function buildCrossSpaceFkContract(targetNamespaceId: string): Contract<SqlStora
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:cross-space-fk-ddl'),
+    profileHash: profileHash('cross-space-fk-ddl'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:cross-space-fk-ddl'),
+      storageHash: coreHash('cross-space-fk-ddl'),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -105,9 +105,9 @@ function buildLocalFkContract(): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:local-fk-regression'),
+    profileHash: profileHash('local-fk-regression'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:local-fk-regression'),
+      storageHash: coreHash('local-fk-regression'),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,

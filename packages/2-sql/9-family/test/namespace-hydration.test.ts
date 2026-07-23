@@ -78,10 +78,10 @@ describe('SqlContractSerializer — fail-closed at hydration boundary', () => {
     const json = {
       targetFamily: 'sql',
       target: 'sql',
-      profileHash: 'sha256:test',
+      profileHash: 'test',
       roots: {},
       storage: {
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,

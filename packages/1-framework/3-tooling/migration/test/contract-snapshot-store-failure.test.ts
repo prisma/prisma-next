@@ -48,7 +48,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { CONTRACT_SNAPSHOTS_DIRNAME } from '@prisma-next/framework-components/control';
 import { contractSnapshotDir, writeContractSnapshot } from '../src/contract-snapshot-store';
 
-const STORAGE_HASH = `sha256:${'a'.repeat(64)}`;
+const STORAGE_HASH = 'a'.repeat(64);
 
 function contractFixture(storageHash: string) {
   return { storage: { storageHash }, target: 'postgres' };

@@ -6,7 +6,7 @@ import type { MongoQueryPlan } from '../src/query-plan';
 
 const meta: PlanMeta = {
   target: 'mongodb',
-  storageHash: 'sha256:test',
+  storageHash: 'test',
   lane: 'mongo',
 };
 
