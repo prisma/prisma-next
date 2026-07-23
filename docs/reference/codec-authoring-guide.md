@@ -17,7 +17,7 @@ The framework imports live at `@prisma-next/framework-components/codec`:
 - `ColumnHelperFor<D>` / `ColumnHelperForStrict<D>` — `satisfies` shapes for per-codec helpers.
 - `column(codecFactory, codecId, typeParams, nativeType)` — column-spec packager (`nativeType` is the database spelling for migrations and contract meta).
 - `voidParamsSchema` — Standard Schema validator for `P = void` (non-parameterized codecs).
-- `Codec<...>`, `CodecDescriptor<P>`, `AnyCodecDescriptor` — consumer-facing interfaces (consumers depend on these; authors extend the `*Impl` classes).
+- `Codec<...>`, `CodecDescriptor<P>`, `AnyCodecDescriptor` — consumer-facing interfaces (consumers depend on these; target-neutral authors extend the `*Impl` classes, while target-bound SQL authors use target-owned bases).
 
 SQL codecs use the same framework `CodecImpl` base. Their `encodeJson` and `decodeJson` methods define the codec's JSON-safe contract representation; `decode` remains responsible for the driver's ordinary column wire value. Keep that representation stable and mutually consistent, and keep `decodeJson` compatible with the values the current SQL JSON renderer returns for the codec. This distinction matters for types such as PostgreSQL `bytea` and extension-defined types whose values inside database-produced JSON may differ from their normal driver representation.
 
@@ -34,12 +34,13 @@ import type { JsonValue } from '@prisma-next/contract/types';
 import {
   type CodecCallContext,
   type CodecInstanceContext,
-  CodecDescriptorImpl,
   CodecImpl,
   type ColumnHelperFor,
   column,
   voidParamsSchema,
 } from '@prisma-next/framework-components/codec';
+import type { ProjectionExpr } from '@prisma-next/sql-relational-core/ast';
+import { PostgresCodecDescriptor } from '@prisma-next/target-postgres/codec-descriptor';
 
 class PgTextCodec extends CodecImpl<
   'pg/text@1',
@@ -58,7 +59,13 @@ class PgTextCodec extends CodecImpl<
   }
 }
 
-class PgTextDescriptor extends CodecDescriptorImpl<void> {
+class PgTextDescriptor extends PostgresCodecDescriptor<void> {
+  protected override nativeType(): string {
+    return 'text';
+  }
+  protected override jsonProjection(expression: ProjectionExpr): ProjectionExpr {
+    return expression;
+  }
   override readonly codecId = 'pg/text@1' as const;
   override readonly traits = ['equality', 'order', 'textual'] as const;
   override readonly targetTypes = ['text'] as const;
@@ -100,7 +107,13 @@ class VectorCodec<N extends number> extends CodecImpl<
   }
 }
 
-class PgVectorDescriptor extends CodecDescriptorImpl<{ readonly length: number }> {
+class PgVectorDescriptor extends PostgresCodecDescriptor<{ readonly length: number }> {
+  protected override nativeType(): string {
+    return 'vector';
+  }
+  protected override jsonProjection(expression: ProjectionExpr): ProjectionExpr {
+    return expression;
+  }
   override readonly codecId = 'pg/vector@1' as const;
   override readonly traits = ['equality'] as const;
   override readonly targetTypes = ['vector'] as const;
@@ -155,7 +168,13 @@ class ArktypeJsonCodecClass<TInferred> extends CodecImpl<
   }
 }
 
-class ArktypeJsonDescriptor extends CodecDescriptorImpl<ArktypeJsonTypeParams> {
+class ArktypeJsonDescriptor extends PostgresCodecDescriptor<ArktypeJsonTypeParams> {
+  protected override nativeType(): string {
+    return 'jsonb';
+  }
+  protected override jsonProjection(expression: ProjectionExpr): ProjectionExpr {
+    return expression;
+  }
   override readonly codecId = 'arktype/json@1' as const;
   override readonly traits = ['equality'] as const;
   override readonly targetTypes = ['jsonb'] as const;
@@ -348,26 +367,52 @@ The framework exports two helper-shape constraints:
 
 Both are exported from `@prisma-next/framework-components/codec`.
 
-## Aliases
+## Reusing generic SQL descriptors in PostgreSQL
 
-Aliasing a codec under a new id (e.g. Postgres's `pgCharDescriptor` aliasing the SQL-base `sqlCharDescriptor`) is a **descriptor-level** operation, not an instance-level one. There is no `aliasCodec` helper: aliases are expressed as plain class inheritance from the base descriptor with the alias's metadata overridden.
+A reusable SQL-family descriptor remains target-neutral. Bind it to PostgreSQL with `postgresCodec(...)`; do not subclass the generic descriptor, because the PostgreSQL registry requires the target discriminant and target methods.
 
 ```ts
-// SQL base — relational-core/src/ast/sql-codecs.ts
-class SqlCharDescriptor extends CodecDescriptorImpl<LengthParams> { /* … */ }
-export const sqlCharDescriptor = new SqlCharDescriptor();
+import { sqlCharDescriptor } from '@prisma-next/sql-relational-core/ast';
+import { postgresCodec } from '@prisma-next/target-postgres/codec-descriptor';
 
-// Postgres alias — target-postgres/src/core/codecs.ts
-class PgCharDescriptor extends SqlCharDescriptor {
-  override readonly codecId = 'pg/char@1';
-  override readonly targetTypes = ['char'] as const;
-}
-export const pgCharDescriptor = new PgCharDescriptor();
+const postgresSqlCharDescriptor = postgresCodec(sqlCharDescriptor, {
+  nativeType: () => 'character',
+  jsonProjection: (expression) => expression,
+});
 ```
 
-Inherited overrides do the heavy lifting: the alias inherits `paramsSchema`, `traits`, and `factory` from the base. Because `CodecImpl.id` proxies through `this.descriptor.codecId`, instances produced by `pgCharDescriptor.factory(params)(ctx)` automatically report the alias's id without prototype-stripping (the legacy `{ ...base, id }` spread pattern lost the prototype on class-instance bases — descriptor-class inheritance never spreads, so the bug is structurally avoided).
+The adapter preserves the generic codec id, params schema, traits, factory, output renderer, target types, and metadata while adding PostgreSQL native-type and projection behavior.
 
-See [packages/3-targets/3-targets/postgres/src/core/codecs.ts](../../packages/3-targets/3-targets/postgres/src/core/codecs.ts) (`pgCharDescriptor`, `pgVarcharDescriptor`) for the canonical pattern.
+When PostgreSQL owns a distinct codec id, define a `PostgresCodecDescriptor` subclass and delegate only the reusable SQL behavior explicitly:
+
+```ts
+class PgCharDescriptor extends PostgresCodecDescriptor<LengthParams> {
+  protected override nativeType(): string {
+    return 'character';
+  }
+
+  protected override jsonProjection(expression: ProjectionExpr): ProjectionExpr {
+    return expression;
+  }
+
+  override readonly codecId = 'pg/char@1' as const;
+  override readonly targetTypes = ['character'] as const;
+  override readonly traits = sqlCharDescriptor.traits;
+  override readonly paramsSchema = sqlCharDescriptor.paramsSchema;
+
+  override renderOutputType(params: LengthParams): string | undefined {
+    return sqlCharDescriptor.renderOutputType(params);
+  }
+
+  override factory(_params: LengthParams): (ctx: CodecInstanceContext) => SqlCharCodec {
+    return () => new SqlCharCodec(this);
+  }
+}
+```
+
+This keeps target ownership explicit: adaptation is for a reusable descriptor with its existing id; target-owned subclassing is for a PostgreSQL codec with PostgreSQL identity or behavior. In both cases the result satisfies the PostgreSQL descriptor protocol and can participate in `definePostgresCodecs(...)`.
+
+See [packages/3-targets/3-targets/postgres/src/core/codecs.ts](../../packages/3-targets/3-targets/postgres/src/core/codecs.ts) (`postgresSqlCharDescriptor`, `PgCharDescriptor`) for both patterns.
 
 ## Heterogeneous storage at the runtime layer
 
@@ -391,14 +436,14 @@ Per-codec helpers don't pass through the registry — they're imported directly 
 
 The class hierarchy isn't load-bearing for variance preservation (per-codec helpers' direct calls do that work). It's load-bearing for **structure**:
 
-1. **Codec instance ↔ descriptor reference is structural.** The abstract `CodecImpl` constructor takes a `descriptor: AnyCodecDescriptor`; concrete codec subclasses pass it via `super(descriptor)`. `codec.id` proxies through this reference. Aliases work for free: an alias descriptor produces a codec whose `descriptor` points to the alias, so `codec.id` reports the alias's `codecId` automatically.
-2. **Subclass-based authoring is uniform across the codec spectrum.** Non-parameterized, parameterized, schema-typed, alias — all four shapes are expressed as `class X extends CodecDescriptorImpl<...>` with overrides on the abstract members. The variance behavior is identical across all four: the per-codec helper handles literal preservation via direct calls; the descriptor class declares the shape.
+1. **Codec instance ↔ descriptor reference is structural.** The abstract `CodecImpl` constructor takes a `descriptor: AnyCodecDescriptor`; concrete codec subclasses pass it via `super(descriptor)`. `codec.id` proxies through this reference, so a target-owned descriptor can reuse a generic codec class while preserving the target-owned codec id without object spreads or prototype loss.
+2. **Subclass-based authoring is uniform within each ownership boundary.** Target-neutral descriptors extend `CodecDescriptorImpl<...>`; PostgreSQL- and SQLite-bound descriptors extend their target-owned bases. Generic descriptors cross into a target through explicit adapters such as `postgresCodec(...)`. The variance behavior remains the same: the per-codec helper handles literal preservation via direct calls, while the descriptor class or adapter declares the target shape.
 
 ## Reference implementations in the repo
 
 - **Non-parameterized base codecs** (text, int, float, bool, etc.): `packages/2-sql/4-lanes/relational-core/src/ast/sql-codecs.ts`.
-- **Postgres adapter codecs and aliases**: `packages/3-targets/3-targets/postgres/src/core/codecs.ts`.
-- **SQLite adapter codecs**: `packages/3-targets/3-targets/sqlite/src/core/codecs.ts`.
+- **PostgreSQL target codecs and generic descriptor adapters**: `packages/3-targets/3-targets/postgres/src/core/codecs.ts`.
+- **SQLite target codecs and generic descriptor adapters**: `packages/3-targets/3-targets/sqlite/src/core/codecs.ts`.
 - **Parameterized codec with literal preservation** (pgvector): `packages/3-extensions/pgvector/src/core/codecs.ts`.
 - **Parameterized codec with typed schema** (arktype-json): `packages/3-extensions/arktype-json/src/core/arktype-json-codec.ts`.
 
