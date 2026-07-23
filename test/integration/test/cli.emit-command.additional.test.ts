@@ -340,6 +340,89 @@ model Post {
     }
   });
 
+  for (const configName of ['prisma-next.config.mongo.ts', 'prisma-next.config.mongo-define.ts']) {
+    it(`emits a Mongo contract for a bare-member enum schema via ${configName}`, {
+      timeout: timeouts.typeScriptCompilation,
+    }, async () => {
+      const command = createContractEmitCommand();
+      const testSetup = setupIntegrationTestDirectoryFromFixtures(fixtureSubdir, configName);
+
+      try {
+        writeFileSync(
+          join(testSetup.testDir, 'contract.prisma'),
+          `enum WhatsAppMessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+model WhatsAppMessages {
+  id        ObjectId @id @map("_id")
+  direction WhatsAppMessageDirection
+}
+`,
+          'utf-8',
+        );
+
+        const originalCwd = process.cwd();
+        try {
+          process.chdir(testSetup.testDir);
+          const exitCode = await executeCommand(command, [
+            '--config',
+            'prisma-next.config.ts',
+            '--json',
+          ]);
+          expect(exitCode).toBe(0);
+        } finally {
+          process.chdir(originalCwd);
+        }
+
+        const contractJson = JSON.parse(
+          readFileSync(join(testSetup.outputDir, 'contract.json'), 'utf-8'),
+        );
+        expect(contractJson).toMatchObject({
+          targetFamily: 'mongo',
+          target: 'mongo',
+          domain: {
+            namespaces: {
+              __unbound__: {
+                enum: {
+                  WhatsAppMessageDirection: {
+                    codecId: 'mongo/string@1',
+                    members: [
+                      { name: 'INBOUND', value: 'INBOUND' },
+                      { name: 'OUTBOUND', value: 'OUTBOUND' },
+                    ],
+                  },
+                },
+                models: {
+                  WhatsAppMessages: expect.objectContaining({
+                    fields: expect.objectContaining({
+                      direction: {
+                        type: { kind: 'scalar', codecId: 'mongo/string@1' },
+                        nullable: false,
+                        valueSet: {
+                          plane: 'domain',
+                          entityKind: 'enum',
+                          namespaceId: '__unbound__',
+                          entityName: 'WhatsAppMessageDirection',
+                        },
+                      },
+                    }),
+                  }),
+                },
+              },
+            },
+          },
+        });
+        expect(
+          contractJson.storage.namespaces.__unbound__.entries.valueSet.WhatsAppMessageDirection,
+        ).toEqual({ kind: 'valueSet', values: ['INBOUND', 'OUTBOUND'] });
+      } finally {
+        testSetup.cleanup();
+      }
+    });
+  }
+
   it('emits contract.json and contract.d.ts with Mongo contract.ts config', {
     timeout: timeouts.typeScriptCompilation,
   }, async () => {

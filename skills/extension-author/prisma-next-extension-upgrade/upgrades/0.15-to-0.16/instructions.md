@@ -217,3 +217,14 @@ Incidental substrate diff only.
 <!--
 TML-2979 (MTI variant predicates in count writes): `changes: []`. The `packages/3-extensions/sql-orm-client` diff fixes internal query planning and adds regression coverage; it changes no public API, contract shape, emitted artefact, extension-authoring surface, adapter API, or downstream source translation. Incidental substrate diff only.
 -->
+
+<!--
+Mongo PSL enum inference defaults (PR #934): the Mongo PSL interpreter now derives
+its default enum-inference codec ids from the target's PSL `String`/`Int` scalar type
+descriptors when `enumInferenceCodecs` is not passed, so bare-member enums resolve on
+every config surface. The only `packages/3-extensions/` touch is `mongo`'s
+`defineConfig` dropping its now-redundant explicit `enumInferenceCodecs` wiring — the
+derived default is the identical codec-id pair, and the `mongoContract` option remains
+available as an override. No extension-author API changed; behaviour is identical.
+No extension-author action required. Incidental substrate diff only.
+-->

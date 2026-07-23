@@ -88,8 +88,21 @@ export interface InterpretPslDocumentToMongoContractInput {
   readonly codecLookup?: CodecLookup;
   readonly seedDiagnostics?: readonly ContractSourceDiagnostic[];
   readonly authoringContributions?: AuthoringContributions;
-  /** The target's default codec ids for an `enum` block that omits `@@type`. */
+  /**
+   * The target's default codec ids for an `enum` block that omits `@@type`. When omitted,
+   * they default to the target's PSL `String`/`Int` scalar type descriptors, so classic
+   * bare-member enums resolve without any explicit wiring.
+   */
   readonly enumInferenceCodecs?: { readonly text: string; readonly int: string };
+}
+
+function deriveEnumInferenceCodecs(
+  scalarTypeDescriptors: ReadonlyMap<string, string>,
+): { readonly text: string; readonly int: string } | undefined {
+  const text = scalarTypeDescriptors.get('String');
+  const int = scalarTypeDescriptors.get('Int');
+  if (text === undefined || int === undefined) return undefined;
+  return { text, int };
 }
 
 /**
@@ -971,6 +984,9 @@ export function interpretPslDocumentToMongoContract(
     .filter((b) => b.keyword === 'enum')
     .map((b) => b.block);
 
+  const enumInferenceCodecs =
+    input.enumInferenceCodecs ?? deriveEnumInferenceCodecs(scalarTypeDescriptors);
+
   const builtEnums = processEnumDeclarations({
     enumBlocks: topLevelEnumBlocks,
     sourceId,
@@ -978,7 +994,7 @@ export function interpretPslDocumentToMongoContract(
     entityContext: {
       family: 'mongo',
       target: 'mongo',
-      ...ifDefined('enumInferenceCodecs', input.enumInferenceCodecs),
+      ...ifDefined('enumInferenceCodecs', enumInferenceCodecs),
       ...ifDefined('codecLookup', codecLookup),
       sourceId,
       diagnostics: {
