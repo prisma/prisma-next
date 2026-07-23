@@ -26,9 +26,12 @@ import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { TestSqlContractSerializer as SqlContractSerializer } from '../../../../2-sql/9-family/test/test-sql-contract-serializer';
 import { createPostgresAdapter } from '../src/core/adapter';
-import { assemblePostgresCodecDescriptorRegistry } from '../src/core/codec-lookup';
+import { assemblePostgresCodecRegistry } from '../src/core/codec-lookup';
 import type { PostgresContract } from '../src/core/types';
-import postgresAdapterControlDescriptor from '../src/exports/control';
+import postgresAdapterControlDescriptor, {
+  createPostgresCodecRegistryWithBuiltins,
+  PostgresControlAdapter,
+} from '../src/exports/control';
 import postgresRuntimeAdapterDescriptor from '../src/exports/runtime';
 import {
   createComposedPostgresAdapter,
@@ -100,6 +103,33 @@ function postgresDescriptor(
   });
 }
 
+function transformingPostgresDescriptor(
+  codecId: string,
+  nativeType: string,
+  onMaterialize?: () => void,
+): AnyPostgresCodecDescriptor {
+  const codec = defineTestCodec({
+    typeId: codecId,
+    encode: (value: string): string => `encoded:${value}`,
+    decode: (wire: string): string => wire,
+  });
+  const descriptor: AnyCodecDescriptor = {
+    codecId,
+    traits: ['equality'],
+    targetTypes: [nativeType],
+    paramsSchema: voidParamsSchema,
+    isParameterized: false,
+    factory: () => () => {
+      onMaterialize?.();
+      return codec;
+    },
+  };
+  return postgresCodec(descriptor, {
+    nativeType: () => nativeType,
+    jsonProjection: (expression: ProjectionExpr) => expression,
+  });
+}
+
 function runtimeExtension(
   id: string,
   descriptors: readonly AnyCodecDescriptor[],
@@ -161,12 +191,12 @@ describe('PostgreSQL adapter codec registry composition', () => {
       controlExtension('postgis', [postgis]),
     ];
 
-    const runtimeRegistry = assemblePostgresCodecDescriptorRegistry([
+    const runtimeRegistry = assemblePostgresCodecRegistry([
       postgresRuntimeTargetDescriptor,
       postgresRuntimeAdapterDescriptor,
       ...runtimeExtensions,
     ]);
-    const controlRegistry = assemblePostgresCodecDescriptorRegistry([
+    const controlRegistry = assemblePostgresCodecRegistry([
       postgresTargetControlDescriptor,
       postgresAdapterControlDescriptor,
       ...controlExtensions,
@@ -234,6 +264,33 @@ describe('PostgreSQL adapter codec registry composition', () => {
     const ast = selectWithParam('embedding', 'pg/vector@1', [0.1, 0.2]);
 
     expect(() => adapter.lower(ast, { contract })).toThrow(/codecId "pg\/vector@1"/);
+  });
+
+  it('derives direct runtime materialization and native-type rendering from one descriptor contribution', () => {
+    let materializations = 0;
+    const descriptor = transformingPostgresDescriptor('app/direct-runtime@1', 'citext', () => {
+      materializations += 1;
+    });
+    const adapter = createPostgresAdapter({ codecDescriptors: [descriptor] });
+    const ast = selectWithParam('document', descriptor.codecId, 'Ada');
+
+    expect(materializations).toBe(1);
+    expect(adapter.lower(ast, { contract })).toEqual({
+      sql: 'SELECT "records"."id" AS "id" FROM "records" WHERE "records"."document" = $1::citext',
+      params: [{ kind: 'literal', value: 'Ada' }],
+    });
+  });
+
+  it('derives direct control materialization and native-type rendering from one descriptor contribution', async () => {
+    const descriptor = transformingPostgresDescriptor('app/direct-control@1', 'citext');
+    const codecRegistry = createPostgresCodecRegistryWithBuiltins([descriptor]);
+    const adapter = new PostgresControlAdapter(codecRegistry);
+    const ast = selectWithParam('document', descriptor.codecId, 'Ada');
+
+    await expect(adapter.lowerToExecuteRequest(ast, { contract })).resolves.toEqual({
+      sql: 'SELECT "records"."id" AS "id" FROM "records" WHERE "records"."document" = $1::citext',
+      params: ['encoded:Ada'],
+    });
   });
 
   it('rejects raw, wrong-target, and malformed contributions before lowering on both planes', () => {

@@ -6,7 +6,7 @@ import {
   quoteIdentifier,
   SqlEscapeError,
 } from '@prisma-next/target-postgres/sql-utils';
-import { assemblePostgresCodecDescriptorRegistry } from '../core/codec-lookup';
+import { assemblePostgresCodecRegistry } from '../core/codec-lookup';
 import { PostgresControlAdapter } from '../core/control-adapter';
 import {
   createPostgresDefaultFunctionRegistry,
@@ -28,8 +28,8 @@ const postgresAdapterDescriptor: SqlControlAdapterDescriptor<'postgres'> = {
       ...(stack.adapter === undefined ? [] : [stack.adapter]),
       ...stack.extensions,
     ];
-    const codecDescriptorRegistry = assemblePostgresCodecDescriptorRegistry(components);
-    return new PostgresControlAdapter(stack.codecLookup, codecDescriptorRegistry);
+    const codecRegistry = assemblePostgresCodecRegistry(components);
+    return new PostgresControlAdapter(codecRegistry);
   },
 };
 
@@ -37,6 +37,9 @@ export default postgresAdapterDescriptor;
 
 export { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 export { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
-export { createPostgresBuiltinCodecLookup } from '../core/codec-lookup';
+export {
+  createPostgresBuiltinCodecLookup,
+  createPostgresCodecRegistryWithBuiltins,
+} from '../core/codec-lookup';
 export { PostgresControlAdapter } from '../core/control-adapter';
 export { escapeLiteral, qualifyName, quoteIdentifier, SqlEscapeError };

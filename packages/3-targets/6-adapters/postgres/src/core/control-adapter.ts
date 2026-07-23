@@ -10,7 +10,7 @@ import {
 } from '@prisma-next/errors/execution';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
-import type { CodecLookup, CodecRegistry } from '@prisma-next/framework-components/codec';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { APP_SPACE_ID, type SchemaNodeRef } from '@prisma-next/framework-components/control';
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { ledgerOriginFromStored } from '@prisma-next/migration-tools/ledger-origin';
@@ -41,8 +41,6 @@ import type {
   SqlUniqueIRInput,
 } from '@prisma-next/sql-schema-ir/types';
 import { RelationalSchemaNodeKind } from '@prisma-next/sql-schema-ir/types';
-import type { PostgresCodecDescriptorRegistry } from '@prisma-next/target-postgres/codec-descriptor';
-import { postgresCodecDescriptorRegistry } from '@prisma-next/target-postgres/codecs';
 import {
   buildControlTableBootstrapQueries,
   buildSignMarkerBootstrapQueries,
@@ -90,7 +88,7 @@ import {
   NOW,
 } from './marker-ledger';
 import { renderLoweredSql } from './sql-renderer';
-import type { PostgresContract } from './types';
+import type { PostgresCodecRegistry, PostgresContract } from './types';
 
 const POSTGRES_MARKER_TABLE = 'prisma_contract.marker';
 const POSTGRES_LEDGER_TABLE = 'prisma_contract.ledger';
@@ -113,16 +111,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   readonly familyId = 'sql' as const;
   readonly targetId = 'postgres' as const;
 
-  private readonly codecRegistry: CodecRegistry;
-  private readonly codecDescriptorRegistry: PostgresCodecDescriptorRegistry;
-
-  constructor(
-    codecRegistry: CodecRegistry,
-    codecDescriptorRegistry: PostgresCodecDescriptorRegistry = postgresCodecDescriptorRegistry,
-  ) {
-    this.codecRegistry = codecRegistry;
-    this.codecDescriptorRegistry = codecDescriptorRegistry;
-  }
+  constructor(private readonly codecRegistry: PostgresCodecRegistry) {}
 
   /**
    * Target-specific normalizer for raw Postgres default expressions.
@@ -164,7 +153,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       blindCast<PostgresContract, 'caller must supply a matching PostgresContract'>(
         context.contract,
       ),
-      this.codecDescriptorRegistry,
+      this.codecRegistry,
     );
   }
 
@@ -188,7 +177,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     const contract = blindCast<PostgresContract, 'Caller must supply matching contract'>(
       context?.contract,
     );
-    const lowered = renderLoweredSql(ast, contract, this.codecDescriptorRegistry);
+    const lowered = renderLoweredSql(ast, contract, this.codecRegistry);
     const codecRegistry = blindCast<
       ContractCodecRegistry,
       'framework CodecRegistry: its descriptors materialise SQL codecs; the framework Codec type erases to BaseCodec at this boundary'
