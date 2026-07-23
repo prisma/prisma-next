@@ -167,11 +167,9 @@ export function isSqliteCodecDescriptor(value: unknown): value is AnySqliteCodec
     Array.isArray(value.targetTypes) &&
     value.targetTypes.every((targetType) => typeof targetType === 'string') &&
     'paramsSchema' in value &&
-    typeof value.paramsSchema === 'object' &&
-    value.paramsSchema !== null &&
+    isObjectLike(value.paramsSchema) &&
     '~standard' in value.paramsSchema &&
-    typeof value.paramsSchema['~standard'] === 'object' &&
-    value.paramsSchema['~standard'] !== null &&
+    isObjectLike(value.paramsSchema['~standard']) &&
     'validate' in value.paramsSchema['~standard'] &&
     typeof value.paramsSchema['~standard'].validate === 'function' &&
     'isParameterized' in value &&
@@ -181,6 +179,10 @@ export function isSqliteCodecDescriptor(value: unknown): value is AnySqliteCodec
     'projectJson' in value &&
     typeof value.projectJson === 'function'
   );
+}
+
+function isObjectLike(value: unknown): value is object {
+  return (typeof value === 'object' && value !== null) || typeof value === 'function';
 }
 
 export interface SqliteCodecDescriptorRegistry {
