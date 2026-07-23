@@ -15,7 +15,7 @@ Six things must be true on release day. Everything on this page belongs to one o
 5. **[The code must move into prisma/prisma](#5-the-code-must-move-into-prismaprisma)** — *starting · Alexey.* Repository merge, publishing pipeline, and years of open v7 issues.
 6. **[The rough edges users hit on day one must be gone](#6-the-rough-edges-users-hit-on-day-one-must-be-gone)** — *not started · everyone.* Small fixes that would be embarrassing under announcement-day attention.
 
-Two decisions gate work and have dates: the minimum supported Postgres version (July 22 — it blocks final scoreboard verdicts), and the polymorphism stable-or-experimental call (July 24, decided by whether its bug stream has flattened). A third is already made and delivered: error codes standardize on dotted namespace codes (like `ORM.DECODE_FAILED`), and the consolidation has landed. July 24 is also the day the scoreboard verdicts freeze and scope stops moving. There is no other internal schedule: we work these sections as fast as they'll go and ship when they're done.
+Two dated decisions still bound the work. One is now overdue: the minimum supported Postgres version, whose July 22 target has passed and still blocks final scoreboard verdicts until it is set. One is imminent: the polymorphism stable-or-experimental call (July 24, decided by whether its bug stream has flattened). A third is already made and delivered: error codes standardize on dotted namespace codes (like `ORM.DECODE_FAILED`), and the consolidation has landed. July 24 is also the day the scoreboard verdicts freeze and scope stops moving. There is no other internal schedule: we work these sections as fast as they'll go and ship when they're done.
 
 ---
 
@@ -129,7 +129,7 @@ Prisma 8 identifies contracts and migrations by content hash, and today every ha
 
 <details><summary>✅ <b>Store each contract snapshot once instead of copying it into every migration</b> · landed</summary>
 
-Every migration folder used to carry full copies of the data contract it goes from and to — so a project with N migrations stored roughly 2N copies of N+1 distinct documents. They now live in a single `migrations/snapshots/` folder, one file per distinct contract, named by its content hash ([TML-3059](https://linear.app/prisma-company/issue/TML-3059)); ref-paired snapshots fold into the same store ([TML-3072](https://linear.app/prisma-company/issue/TML-3072)). A migration's identity hash deliberately doesn't cover the snapshots, so no existing migration was invalidated, and a one-shot migrator converts existing projects' committed migration trees.
+Every migration folder used to carry full copies of the data contract it goes from and to — so a project with N migrations stored roughly 2N copies of N+1 distinct documents. They now live in a single `migrations/snapshots/` folder, one snapshot entry per distinct contract, addressed by its content hash ([TML-3059](https://linear.app/prisma-company/issue/TML-3059)); ref-paired snapshots fold into the same store ([TML-3072](https://linear.app/prisma-company/issue/TML-3072)). A migration's identity hash deliberately doesn't cover the snapshots, so no existing migration was invalidated, and a one-shot migrator converts existing projects' committed migration trees.
 </details>
 
 <details><summary>⬜ <b>Sweep out the old `prisma-next` name everywhere it's baked in</b></summary>

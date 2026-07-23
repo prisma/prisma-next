@@ -273,7 +273,7 @@
         <span class="pill open">Open</span>
       </li>
     </ol>
-    <p class="soft" style="margin-top: 16px;">Two decisions gate work and have dates: the minimum supported Postgres version (<strong>July 22</strong> — it blocks final scoreboard verdicts), and the polymorphism stable-or-experimental call (<strong>July 24</strong>, decided by whether its bug stream has flattened). A third is already made and delivered: error codes standardize on dotted namespace codes (like <code>ORM.DECODE_FAILED</code>), and the consolidation has landed. July 24 is also the day the scoreboard verdicts freeze and scope stops moving. There is no other internal schedule: we work these sections as fast as they'll go and ship when they're done.</p>
+    <p class="soft" style="margin-top: 16px;">Two dated decisions still bound the work. One is now overdue: the minimum supported Postgres version, whose <strong>July 22</strong> target has passed and still blocks final scoreboard verdicts until it is set. One is imminent: the polymorphism stable-or-experimental call (<strong>July 24</strong>, decided by whether its bug stream has flattened). A third is already made and delivered: error codes standardize on dotted namespace codes (like <code>ORM.DECODE_FAILED</code>), and the consolidation has landed. July 24 is also the day the scoreboard verdicts freeze and scope stops moving. There is no other internal schedule: we work these sections as fast as they'll go and ship when they're done.</p>
   </section>
 
   <section class="req" id="req1">
@@ -415,7 +415,7 @@
     <details class="task">
       <summary><svg class="chev" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="t">Store each contract snapshot once instead of copying it into every migration</span><span class="pill done">Landed</span></summary>
       <div class="body">
-        <p>Every migration folder used to carry full copies of the data contract it goes from and to — so a project with N migrations stored roughly 2N copies of N+1 distinct documents. They now live in a single <code>migrations/snapshots/</code> folder, one file per distinct contract, named by its content hash (<a href="https://linear.app/prisma-company/issue/TML-3059">TML-3059</a>); ref-paired snapshots fold into the same store (<a href="https://linear.app/prisma-company/issue/TML-3072">TML-3072</a>). A migration's identity hash deliberately doesn't cover the snapshots, so no existing migration was invalidated, and a one-shot migrator converts existing projects' committed migration trees.</p>
+        <p>Every migration folder used to carry full copies of the data contract it goes from and to — so a project with N migrations stored roughly 2N copies of N+1 distinct documents. They now live in a single <code>migrations/snapshots/</code> folder, one snapshot entry per distinct contract, addressed by its content hash (<a href="https://linear.app/prisma-company/issue/TML-3059">TML-3059</a>); ref-paired snapshots fold into the same store (<a href="https://linear.app/prisma-company/issue/TML-3072">TML-3072</a>). A migration's identity hash deliberately doesn't cover the snapshots, so no existing migration was invalidated, and a one-shot migrator converts existing projects' committed migration trees.</p>
       </div>
     </details>
 
