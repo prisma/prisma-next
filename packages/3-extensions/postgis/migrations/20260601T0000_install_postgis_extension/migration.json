@@ -1,7 +1,7 @@
 {
   "from": null,
-  "to": "sha256:eae593f92640a599b88d4901b70c572442661a4f0f7460ea1b6295da661d8653",
+  "to": "sha256:7e98a4d9437e6be2f2fa7fca02fbc01c245586997a937f97cab60788612512e5",
   "providedInvariants": ["postgis:install-postgis-v1"],
   "createdAt": "2026-06-01T00:00:00.000Z",
-  "migrationHash": "sha256:74185f29bc4213391ac446bab8b0be0a72c8de95d37fd58a0b8da5e73322f71f"
+  "migrationHash": "sha256:12d5952a675e694743e97e3f9166f83c3211540f319f0110d0fd1cf2ac1013a5"
 }

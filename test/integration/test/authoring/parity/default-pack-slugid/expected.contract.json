@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "profileHash": "sha256:3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
   "roots": {
     "user": {
       "model": "User",
@@ -63,10 +63,10 @@
         "id": "public"
       }
     },
-    "storageHash": "sha256:69ba22f8e5cae4917380a76136df9fadffd6f89cf1ee547d70dfda2b7671f8dd"
+    "storageHash": "sha256:3fd60476cde0e91df6a931914cff24b07fb117339cc4730225df06e334705894"
   },
   "execution": {
-    "executionHash": "sha256:f72e81af4cc505547c88a6cfaaa6b4fbf4f8889162bd426facf8a8eebefc573f",
+    "executionHash": "sha256:9003fee28dff9ce001f42eabde5a62810bf25e7d29e2e8854a4fcb66268039d8",
     "mutations": {
       "defaults": [
         {

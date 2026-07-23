@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "mongo",
   "target": "mongo",
-  "profileHash": "sha256:cca47cfb902adf4e15c2f277dd98af4aff64a3a2c010b49ace1c897de1cc4510",
+  "profileHash": "sha256:251b3ce23f6c9f561892e7c1af9d2cc941a13d64ba1aa7226b90036b09568cc3",
   "roots": {
     "tasks": {
       "model": "Task",
@@ -276,10 +276,10 @@
         "kind": "mongo-database"
       }
     },
-    "storageHash": "sha256:792a87f0544054087d0a43db8c14e94f52ee1aaf4a5a97c4c98d8355420ece19"
+    "storageHash": "sha256:570ba689a61d07585f3e31609fe8eda758d82b4df90937daff6c946276a5b9ac"
   },
   "capabilities": {},
-  "extensionPacks": {},
+  "extensions": {},
   "meta": {},
   "_generated": {
     "warning": "⚠️  GENERATED FILE - DO NOT EDIT",

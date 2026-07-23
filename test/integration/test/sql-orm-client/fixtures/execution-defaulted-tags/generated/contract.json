@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "profileHash": "sha256:3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
   "roots": {
     "tags": {
       "model": "Tag",
@@ -285,10 +285,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:3e4db7816116cb986091cf746c2494dddf91cd072786822c3959da201dd432b9"
+    "storageHash": "sha256:9602bd606b8ac453bcfe47ef2f669eb348b13d0008b62ba6e310d07b74005e32"
   },
   "execution": {
-    "executionHash": "sha256:06b81e884e803a620a2798659231de4288c310083aa49896b5a3dc582d73a40d",
+    "executionHash": "sha256:8cfb2065082037619a1d198fe14b83d1701f18a8897b04de451157e7561972aa",
     "mutations": {
       "defaults": [
         {
@@ -333,7 +333,7 @@
       "scalarList": true
     }
   },
-  "extensionPacks": {},
+  "extensions": {},
   "meta": {},
   "_generated": {
     "warning": "⚠️  GENERATED FILE - DO NOT EDIT",

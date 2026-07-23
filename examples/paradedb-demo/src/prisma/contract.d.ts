@@ -31,10 +31,10 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:fd7c3cfe9ecb591ac1f6c77f5da571d1313e7d5ccc1c93770336ebcdae840655'>;
+  StorageHashBase<'sha256:d4ed464dc0417ae8bf0804cc91de00350770239e3b8d71003b6cc8fec3419485'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
+  ProfileHashBase<'sha256:3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -206,7 +206,7 @@ type ContractBase = Omit<
       readonly scalarList: true;
     };
   };
-  readonly extensionPacks: {
+  readonly extensions: {
     readonly paradedb: {
       readonly capabilities: { readonly postgres: { readonly 'paradedb/bm25': true } };
       readonly familyId: 'sql';

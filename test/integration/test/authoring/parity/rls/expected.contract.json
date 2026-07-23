@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "profileHash": "sha256:3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
   "roots": {
     "audit_log": {
       "model": "AuditLog",
@@ -236,7 +236,7 @@
         "id": "public"
       }
     },
-    "storageHash": "sha256:baa5da17b0dde0c3c9063c4d3c11b1dbd4f73873fb2733b9bb73a2751070c13f"
+    "storageHash": "sha256:608a5e404fc512d14e214476ef46ed21de0628e20f7f53487faa246ed154d7af"
   },
   "capabilities": {
     "postgres": {

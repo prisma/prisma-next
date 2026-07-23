@@ -36,11 +36,11 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:d64442fe8210ea01567a1ffe02af5d3b0bb5af0fba4173b1dd7ba48bf145b1fd'>;
+  StorageHashBase<'sha256:cecd9cfc7e5a5102f2f73a02f9e58aac2643d5249308de9bed711b45f5d83fbe'>;
 export type ExecutionHash =
-  ExecutionHashBase<'sha256:055d44fe135482983abba0b4d9fab946a7e9587034dbb6c241317ef6021452ff'>;
+  ExecutionHashBase<'sha256:5629682c0d69cfa236e08de82a20c1a4fdcf1163a78ac2f17ffaf993caf4f8f4'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
+  ProfileHashBase<'sha256:3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
 export type CodecTypes = PgTypes & ArktypeJsonTypes & PgVectorTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -1097,7 +1097,7 @@ type ContractBase = Omit<
       readonly scalarList: true;
     };
   };
-  readonly extensionPacks: {
+  readonly extensions: {
     readonly 'arktype-json': {
       readonly capabilities: {};
       readonly familyId: 'sql';

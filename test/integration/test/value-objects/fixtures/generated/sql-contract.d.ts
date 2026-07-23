@@ -30,10 +30,10 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:42bb55b36779510808a1d0fa1d97deace3348341de7dbca7a5a5ee8a4c021aba'>;
+  StorageHashBase<'sha256:36c2557fc1c8e38328d6515c94c66a20ca4843d34209dd1a4b68ea914b050355'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb'>;
+  ProfileHashBase<'sha256:3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
 export type CodecTypes = PgTypes;
 export type LaneCodecTypes = CodecTypes;
@@ -52,77 +52,96 @@ export type AddressInput = {
   readonly zip: CodecTypes['pg/text@1']['input'];
 };
 export type FieldOutputTypes = {
-  readonly Shop: {
-    readonly id: CodecTypes['pg/int4@1']['output'];
-    readonly name: CodecTypes['pg/text@1']['output'];
-    readonly location: AddressOutput;
-    readonly notes: AddressOutput | null;
+  readonly public: {
+    readonly Shop: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+      readonly location: AddressOutput;
+      readonly notes: AddressOutput | null;
+    };
   };
 };
 export type FieldInputTypes = {
-  readonly Shop: {
-    readonly id: CodecTypes['pg/int4@1']['input'];
-    readonly name: CodecTypes['pg/text@1']['input'];
-    readonly location: AddressInput;
-    readonly notes: AddressInput | null;
+  readonly public: {
+    readonly Shop: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+      readonly location: AddressInput;
+      readonly notes: AddressInput | null;
+    };
+  };
+};
+export type StorageColumnTypes = {
+  readonly public: {
+    readonly shop: {
+      readonly id: CodecTypes['pg/int4@1']['output'];
+      readonly location: CodecTypes['pg/jsonb@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+      readonly notes: CodecTypes['pg/jsonb@1']['output'] | null;
+    };
+  };
+};
+export type StorageColumnInputTypes = {
+  readonly public: {
+    readonly shop: {
+      readonly id: CodecTypes['pg/int4@1']['input'];
+      readonly location: CodecTypes['pg/jsonb@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+      readonly notes: CodecTypes['pg/jsonb@1']['input'] | null;
+    };
   };
 };
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   QueryOperationTypes,
   FieldOutputTypes,
-  FieldInputTypes
+  FieldInputTypes,
+  StorageColumnTypes,
+  StorageColumnInputTypes
 >;
 
 type ContractBase = Omit<
-  ContractType<
-    {
-      readonly namespaces: {
-        readonly __unbound__: {
-          readonly id: '__unbound__';
-          readonly kind: 'postgres-unbound-schema';
-          readonly entries: { readonly table: {}; readonly type: Record<string, never> };
-        };
-        readonly public: {
-          readonly id: 'public';
-          readonly kind: 'postgres-schema';
-          readonly entries: {
-            readonly table: {
-              readonly shop: {
-                columns: {
-                  readonly id: {
-                    readonly nativeType: 'int4';
-                    readonly codecId: 'pg/int4@1';
-                    readonly nullable: false;
-                  };
-                  readonly name: {
-                    readonly nativeType: 'text';
-                    readonly codecId: 'pg/text@1';
-                    readonly nullable: false;
-                  };
-                  readonly location: {
-                    readonly nativeType: 'jsonb';
-                    readonly codecId: 'pg/jsonb@1';
-                    readonly nullable: false;
-                  };
-                  readonly notes: {
-                    readonly nativeType: 'jsonb';
-                    readonly codecId: 'pg/jsonb@1';
-                    readonly nullable: true;
-                  };
+  ContractType<{
+    readonly namespaces: {
+      readonly public: {
+        readonly id: 'public';
+        readonly kind: 'postgres-schema';
+        readonly entries: {
+          readonly table: {
+            readonly shop: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
                 };
-                primaryKey: { readonly columns: readonly ['id'] };
-                uniques: readonly [];
-                indexes: readonly [];
-                foreignKeys: readonly [];
+                readonly name: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly location: {
+                  readonly nativeType: 'jsonb';
+                  readonly codecId: 'pg/jsonb@1';
+                  readonly nullable: false;
+                };
+                readonly notes: {
+                  readonly nativeType: 'jsonb';
+                  readonly codecId: 'pg/jsonb@1';
+                  readonly nullable: true;
+                };
               };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [];
+              indexes: readonly [];
+              foreignKeys: readonly [];
             };
-            readonly type: Record<string, never>;
           };
         };
       };
-      readonly storageHash: StorageHash;
-    }>,
+    };
+    readonly storageHash: StorageHash;
+  }>,
   'roots' | 'domain'
 > & {
   readonly target: 'postgres';
@@ -201,9 +220,10 @@ type ContractBase = Omit<
       readonly enums: true;
       readonly lateral: true;
       readonly returning: true;
+      readonly scalarList: true;
     };
   };
-  readonly extensionPacks: {};
+  readonly extensions: {};
   readonly meta: {};
   readonly valueObjects: {
     readonly Address: {
@@ -225,7 +245,6 @@ type ContractBase = Omit<
   };
   readonly profileHash: ProfileHash;
 };
-
 
 export type Contract = ContractWithTypeMaps<ContractBase, TypeMaps>;
 
