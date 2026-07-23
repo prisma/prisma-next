@@ -1,4 +1,4 @@
 {
-  "hash": "sha256:b0d547223488b4a8cea642a0bb2cc8e8f6cd9b2a6e490f23832865146ac51468",
+  "hash": "b0d547223488b4a8cea642a0bb2cc8e8f6cd9b2a6e490f23832865146ac51468",
   "invariants": ["audit:create-audit_event-v1"]
 }

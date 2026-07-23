@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "mongo",
   "target": "mongo",
-  "profileHash": "sha256:cca47cfb902adf4e15c2f277dd98af4aff64a3a2c010b49ace1c897de1cc4510",
+  "profileHash": "cca47cfb902adf4e15c2f277dd98af4aff64a3a2c010b49ace1c897de1cc4510",
   "roots": {
     "posts": {
       "model": "Post",
@@ -440,7 +440,7 @@
         "kind": "mongo-database"
       }
     },
-    "storageHash": "sha256:79b46070809bf632b3742219ce1dd8924daf6350b2f478c4732962cf96288b6e"
+    "storageHash": "79b46070809bf632b3742219ce1dd8924daf6350b2f478c4732962cf96288b6e"
   },
   "capabilities": {},
   "extensionPacks": {},

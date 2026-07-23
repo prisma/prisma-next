@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "profileHash": "9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "comment": {
       "model": "Comment",
@@ -1096,10 +1096,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:d64442fe8210ea01567a1ffe02af5d3b0bb5af0fba4173b1dd7ba48bf145b1fd"
+    "storageHash": "d64442fe8210ea01567a1ffe02af5d3b0bb5af0fba4173b1dd7ba48bf145b1fd"
   },
   "execution": {
-    "executionHash": "sha256:055d44fe135482983abba0b4d9fab946a7e9587034dbb6c241317ef6021452ff",
+    "executionHash": "055d44fe135482983abba0b4d9fab946a7e9587034dbb6c241317ef6021452ff",
     "mutations": {
       "defaults": [
         {

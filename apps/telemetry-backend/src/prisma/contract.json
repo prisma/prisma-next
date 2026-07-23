@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "profileHash": "9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "telemetry_event": {
       "model": "TelemetryEvent",
@@ -290,7 +290,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:be92c3521871ea0d863f15c8889093bd38747d60e97bd1dca404da27d0b13bc7"
+    "storageHash": "be92c3521871ea0d863f15c8889093bd38747d60e97bd1dca404da27d0b13bc7"
   },
   "capabilities": {
     "postgres": {

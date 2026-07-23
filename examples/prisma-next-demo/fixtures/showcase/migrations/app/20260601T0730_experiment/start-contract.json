@@ -21,7 +21,7 @@
     }
   },
   "execution": {
-    "executionHash": "sha256:07bf8bd20b4ab4505cc0a5908a26eb3426e28c15e4876cf38ab0918b9820c405",
+    "executionHash": "07bf8bd20b4ab4505cc0a5908a26eb3426e28c15e4876cf38ab0918b9820c405",
     "mutations": {
       "defaults": [
         {
@@ -49,7 +49,7 @@
   },
   "extensionPacks": {},
   "meta": {},
-  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "profileHash": "1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
   "roots": {
     "account": {
       "model": "account",
@@ -154,7 +154,7 @@
         }
       }
     },
-    "storageHash": "sha256:34dd5176d953c101467355b72fd2adf3e49c97bf13d8198dcc0dafec4d6341ce"
+    "storageHash": "34dd5176d953c101467355b72fd2adf3e49c97bf13d8198dcc0dafec4d6341ce"
   },
   "target": "postgres",
   "targetFamily": "sql",

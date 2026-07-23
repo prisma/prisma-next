@@ -17,10 +17,10 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:a58dadc7b7eec01c91b82c7bc6479789b531866f54ed834429d78d975cc13537'>;
+  StorageHashBase<'a58dadc7b7eec01c91b82c7bc6479789b531866f54ed834429d78d975cc13537'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:cca47cfb902adf4e15c2f277dd98af4aff64a3a2c010b49ace1c897de1cc4510'>;
+  ProfileHashBase<'cca47cfb902adf4e15c2f277dd98af4aff64a3a2c010b49ace1c897de1cc4510'>;
 
 export type CodecTypes = MongoCodecTypes;
 

@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "mongo",
   "target": "mongo",
-  "profileHash": "sha256:cca47cfb902adf4e15c2f277dd98af4aff64a3a2c010b49ace1c897de1cc4510",
+  "profileHash": "cca47cfb902adf4e15c2f277dd98af4aff64a3a2c010b49ace1c897de1cc4510",
   "roots": {
     "carts": {
       "model": "Cart",
@@ -1394,7 +1394,7 @@
         "kind": "mongo-database"
       }
     },
-    "storageHash": "sha256:8ee1e7ce30ed334572583d826d9c41388c46f7db82ae2352c3a3fccf1de7cbab"
+    "storageHash": "8ee1e7ce30ed334572583d826d9c41388c46f7db82ae2352c3a3fccf1de7cbab"
   },
   "capabilities": {},
   "extensionPacks": {},

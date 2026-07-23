@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "profileHash": "9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {
     "app_user": {
       "model": "User",
@@ -81,7 +81,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:854ba864ade8eab53829a4a4ecf7173eb6bebe7d359963e42d60da55e7c5747e"
+    "storageHash": "854ba864ade8eab53829a4a4ecf7173eb6bebe7d359963e42d60da55e7c5747e"
   },
   "capabilities": {
     "postgres": {

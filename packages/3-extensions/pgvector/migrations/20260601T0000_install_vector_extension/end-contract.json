@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "profileHash": "9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
   "roots": {},
   "domain": {
     "namespaces": {
@@ -21,7 +21,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:c7bb9818eb8d86182fff73219e9c27c4f42ff7918bdcabf003324a7c6c814e20",
+    "storageHash": "c7bb9818eb8d86182fff73219e9c27c4f42ff7918bdcabf003324a7c6c814e20",
     "types": {
       "vector": {
         "codecId": "pg/vector@1",
@@ -43,7 +43,8 @@
       "defaultInInsert": true,
       "enums": true,
       "lateral": true,
-      "returning": true
+      "returning": true,
+      "scalarList": true
     }
   },
   "extensionPacks": {},
