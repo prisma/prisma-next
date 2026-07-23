@@ -3,8 +3,8 @@
   "schemaVersion": "1",
   "target": "postgres",
   "targetFamily": "sql",
-  "storageHash": "sha256:test-core",
-  "profileHash": "sha256:test-profile",
+  "storageHash": "test-core",
+  "profileHash": "test-profile",
   "storage": {
     "tables": {
       "user": {

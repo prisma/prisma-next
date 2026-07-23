@@ -131,7 +131,7 @@ withTempDir(({ createTempDir }) => {
             expect(drift.exitCode).not.toBe(0);
             const err = parseJsonOutput<MigrateErrorJson>(drift);
             expect(err.meta?.code).toBe('MIGRATION.MARKER_MISMATCH');
-            expect(err.meta?.markerHash).toMatch(/^sha256:/);
+            expect(err.meta?.markerHash).toMatch(/^[a-f0-9]{64}$/);
             expect(err.meta?.reachableHashes).toEqual([]);
           });
         });

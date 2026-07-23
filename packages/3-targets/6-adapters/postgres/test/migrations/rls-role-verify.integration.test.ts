@@ -69,9 +69,9 @@ function buildContract(input: {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash(`sha256:${input.hashSeed}`),
+    profileHash: profileHash(`${input.hashSeed}`),
     storage: new SqlStorage({
-      storageHash: coreHash(`sha256:${input.hashSeed}`),
+      storageHash: coreHash(`${input.hashSeed}`),
       namespaces: { [UNBOUND_NAMESPACE_ID]: schema },
     }),
     roots: {},

@@ -129,7 +129,7 @@ describe('capability contribution at authoring time', () => {
     });
     expect(bare.profileHash).toEqual(decorated.profileHash);
     expect(bare.profileHash).toEqual(
-      'sha256:3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2',
+      '3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2',
     );
   });
 });

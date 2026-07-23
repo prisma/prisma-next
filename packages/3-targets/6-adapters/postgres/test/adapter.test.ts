@@ -6,15 +6,23 @@ import {
   AndExpr,
   type AnyQueryAst,
   BinaryExpr,
+  CaseExpr,
+  CastExpr,
+  CodecJsonValueProjection,
   ColumnRef,
   DefaultValueExpr,
   DeleteAst,
   ExistsExpr,
+  FunctionCallExpr,
+  FunctionSource,
   InsertAst,
   InsertOnConflict,
+  JsonArrayAggExpr,
+  JsonDocumentProjection,
   JsonObjectExpr,
   ListExpression,
   LiteralExpr,
+  NativeJsonValueProjection,
   NullCheckExpr,
   OperationExpr,
   OrderByItem,
@@ -39,13 +47,13 @@ import type { PostgresContract } from '../src/core/types';
 const contract = new SqlContractSerializer().deserializeContract({
   target: 'postgres',
   targetFamily: 'sql',
-  profileHash: 'sha256:test-profile',
+  profileHash: 'test-profile',
   roots: {},
   capabilities: {},
   extensions: {},
   meta: {},
   storage: {
-    storageHash: 'sha256:test-core',
+    storageHash: 'test-core',
     namespaces: {
       __unbound__: {
         id: '__unbound__',
@@ -99,8 +107,11 @@ describe('Postgres adapter', () => {
         ProjectionItem.of(
           'payload',
           JsonObjectExpr.fromEntries([
-            JsonObjectExpr.entry('email', ColumnRef.of('user', 'email')),
-            JsonObjectExpr.entry('count', AggregateExpr.count()),
+            JsonObjectExpr.entry(
+              'email',
+              new NativeJsonValueProjection(ColumnRef.of('user', 'email')),
+            ),
+            JsonObjectExpr.entry('count', new NativeJsonValueProjection(AggregateExpr.count())),
           ]),
         ),
         ProjectionItem.of('firstPostId', SubqueryExpr.of(subquery)),
@@ -115,6 +126,106 @@ describe('Postgres adapter', () => {
       '(SELECT "post"."id" AS "id" FROM "post" WHERE "post"."userId" = "user"."id") AS "firstPostId"',
     );
     expect(lowered.sql).toContain(`WHERE "user"."email" = 'a@example.com'`);
+  });
+
+  it.each([
+    {
+      name: 'codec',
+      projection: new CodecJsonValueProjection(ColumnRef.of('user', 'email'), {
+        codecId: 'pg/text@1',
+      }),
+    },
+    {
+      name: 'native',
+      projection: new NativeJsonValueProjection(ColumnRef.of('user', 'email')),
+    },
+    {
+      name: 'document',
+      projection: new JsonDocumentProjection(ColumnRef.of('user', 'email')),
+    },
+  ])('renders $name JSON value projections as structural pass-throughs', ({ projection }) => {
+    const ast = SelectAst.from(TableSource.named('user')).withProjection([
+      ProjectionItem.of(
+        'object',
+        JsonObjectExpr.fromEntries([JsonObjectExpr.entry('value', projection)]),
+      ),
+      ProjectionItem.of('array', JsonArrayAggExpr.of(projection)),
+    ]);
+
+    const lowered = adapter.lower(ast, { contract, params: [] });
+
+    expect(lowered.sql).toBe(
+      `SELECT json_build_object('value', "user"."email") AS "object", json_agg("user"."email") AS "array" FROM "user"`,
+    );
+  });
+
+  it('renders nested scalar projection expressions with exact precedence', () => {
+    const decision = CaseExpr.of(
+      [
+        {
+          condition: BinaryExpr.eq(
+            FunctionCallExpr.of('lower', [ColumnRef.of('user', 'email')]),
+            ParamRef.of('a@example.com', { codec: { codecId: 'pg/text@1' } }),
+          ),
+          value: CastExpr.as(
+            FunctionCallExpr.of('concat', [
+              ColumnRef.of('user', 'email'),
+              ParamRef.of('!', { codec: { codecId: 'pg/text@1' } }),
+            ]),
+            'text',
+          ),
+        },
+        {
+          condition: NullCheckExpr.isNull(ColumnRef.of('user', 'profile')),
+          value: FunctionCallExpr.of('coalesce', [
+            ColumnRef.of('user', 'email'),
+            LiteralExpr.of('missing'),
+          ]),
+        },
+      ],
+      CastExpr.as(ParamRef.of('fallback', { codec: { codecId: 'pg/text@1' } }), 'text'),
+    );
+    const ast = SelectAst.from(TableSource.named('user')).withProjection([
+      ProjectionItem.of('zero', FunctionCallExpr.of('random', [])),
+      ProjectionItem.of('decision', NullCheckExpr.isNotNull(decision)),
+    ]);
+
+    const lowered = adapter.lower(ast, { contract, params: [] });
+
+    expect(lowered.sql).toBe(
+      `SELECT random() AS "zero", CASE WHEN lower("user"."email") = $1 THEN CAST(concat("user"."email", $2) AS text) WHEN "user"."profile" IS NULL THEN coalesce("user"."email", 'missing') ELSE CAST($3 AS text) END IS NOT NULL AS "decision" FROM "user"`,
+    );
+  });
+
+  it.each([
+    {
+      name: 'function call',
+      expression: FunctionCallExpr.of('lower', [ColumnRef.of('user', 'email')]),
+      sql: 'lower("user"."email")',
+    },
+    {
+      name: 'cast',
+      expression: CastExpr.as(ColumnRef.of('user', 'email'), 'text'),
+      sql: 'CAST("user"."email" AS text)',
+    },
+    {
+      name: 'searched CASE',
+      expression: CaseExpr.of([
+        {
+          condition: BinaryExpr.eq(ColumnRef.of('user', 'id'), LiteralExpr.of(1)),
+          value: LiteralExpr.of('found'),
+        },
+      ]),
+      sql: `CASE WHEN "user"."id" = 1 THEN 'found' END`,
+    },
+  ])('treats $name expressions as atomic under null checks', ({ expression, sql }) => {
+    const ast = SelectAst.from(TableSource.named('user')).withProjection([
+      ProjectionItem.of('value', NullCheckExpr.isNotNull(expression)),
+    ]);
+
+    expect(adapter.lower(ast, { contract, params: [] }).sql).toBe(
+      `SELECT ${sql} IS NOT NULL AS "value" FROM "user"`,
+    );
   });
 
   it('lowers insert, update, and delete statements with returning clauses', () => {
@@ -312,6 +423,69 @@ describe('Postgres adapter', () => {
     expect(sql).toContain('FROM "user" AS "u"');
   });
 
+  it.each([
+    {
+      name: 'without arguments or alias',
+      source: FunctionSource.of('rows', []),
+      sql: 'SELECT 1 AS "value" FROM rows()',
+    },
+    {
+      name: 'with arguments and alias',
+      source: FunctionSource.of('rows', [LiteralExpr.of(1), LiteralExpr.of(2)], { alias: 'r' }),
+      sql: 'SELECT 1 AS "value" FROM rows(1, 2) AS "r"',
+    },
+    {
+      name: 'with ordinality',
+      source: FunctionSource.of('rows', []).withOrdinality(),
+      sql: 'SELECT 1 AS "value" FROM rows() WITH ORDINALITY',
+    },
+    {
+      name: 'with returned-column aliases',
+      source: FunctionSource.of('rows', [], {
+        alias: 'r',
+        columnAliases: ['value', 'position'],
+      }),
+      sql: 'SELECT 1 AS "value" FROM rows() AS "r"("value", "position")',
+    },
+  ])('renders function sources $name', ({ source, sql }) => {
+    const ast = SelectAst.from(source).withProjection([
+      ProjectionItem.of('value', LiteralExpr.of(1)),
+    ]);
+
+    expect(adapter.lower(ast, { contract, params: [] }).sql).toBe(sql);
+  });
+
+  it('renders rewritten parameterized function sources with ordinality and column aliases', () => {
+    const originalArg = ParamRef.of([1, 2], {
+      name: 'input',
+      codec: { codecId: 'pg/int4@1', many: true },
+    });
+    const replacementArg = ParamRef.of([3, 4], {
+      name: 'rewrittenInput',
+      codec: { codecId: 'pg/int4@1', many: true },
+    });
+    const source = FunctionSource.of('unnest', [originalArg], {
+      alias: 'u',
+      columnAliases: ['element', 'ord'],
+    })
+      .withOrdinality()
+      .rewrite({ paramRef: () => replacementArg });
+
+    expect(source).toBeInstanceOf(FunctionSource);
+    if (!(source instanceof FunctionSource)) {
+      throw new Error('Expected FunctionSource');
+    }
+    expect(source.args).toEqual([replacementArg]);
+
+    const ast = SelectAst.from(source).withProjection([
+      ProjectionItem.of('element', ColumnRef.of('u', 'element')),
+    ]);
+
+    expect(adapter.lower(ast, { contract, params: [] }).sql).toBe(
+      'SELECT "u"."element" AS "element" FROM unnest($1::integer[]) WITH ORDINALITY AS "u"("element", "ord")',
+    );
+  });
+
   it('renders empty OR as FALSE', () => {
     const ast = SelectAst.from(TableSource.named('user'))
       .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
@@ -495,8 +669,8 @@ describe('Postgres adapter', () => {
 
   it('readMarker parses a present marker row into a ContractMarkerRecord', async () => {
     const markerRow = {
-      core_hash: 'sha256:test-core',
-      profile_hash: 'sha256:test-profile',
+      core_hash: 'test-core',
+      profile_hash: 'test-profile',
       contract_json: { storage: {}, target: 'postgres' },
       canonical_version: 1,
       updated_at: new Date('2026-04-30T00:00:00Z'),
@@ -525,8 +699,8 @@ describe('Postgres adapter', () => {
 
     expect(result.kind).toBe('present');
     if (result.kind !== 'present') return;
-    expect(result.record.storageHash).toBe('sha256:test-core');
-    expect(result.record.profileHash).toBe('sha256:test-profile');
+    expect(result.record.storageHash).toBe('test-core');
+    expect(result.record.profileHash).toBe('test-profile');
     expect(result.record.appTag).toBe('app');
     expect(result.record.invariants).toEqual(['inv-1']);
   });
@@ -555,7 +729,7 @@ describe('Postgres adapter', () => {
     const publicContract = {
       ...contract,
       storage: new SqlStorage({
-        storageHash: 'sha256:test-core-public' as StorageHashBase<'sha256:test-core-public'>,
+        storageHash: 'test-core-public' as StorageHashBase<'test-core-public'>,
         namespaces: {
           public: new PostgresSchema({
             id: 'public',

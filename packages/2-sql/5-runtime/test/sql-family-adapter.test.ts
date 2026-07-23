@@ -13,11 +13,11 @@ import { stubAst } from './utils';
 const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
   target: 'postgres',
-  profileHash: profileHash('sha256:test-hash'),
+  profileHash: profileHash('test-hash'),
   domain: applicationDomainOf({ models: {} }),
   roots: {},
   storage: new SqlStorage({
-    storageHash: coreHash('sha256:test-hash'),
+    storageHash: coreHash('test-hash'),
     namespaces: {
       __unbound__: createTestSqlNamespace({ id: '__unbound__', entries: { table: {} } }),
     },
@@ -64,7 +64,7 @@ describe('SqlFamilyAdapter', () => {
     const plan: SqlExecutionPlan = {
       meta: {
         target: 'postgres',
-        storageHash: 'sha256:test-hash',
+        storageHash: 'test-hash',
         lane: 'sql',
       },
       sql: 'SELECT 1',
@@ -81,7 +81,7 @@ describe('SqlFamilyAdapter', () => {
     const plan: SqlExecutionPlan = {
       meta: {
         target: 'mysql', // Wrong target
-        storageHash: 'sha256:test-hash',
+        storageHash: 'test-hash',
         lane: 'sql',
       },
       sql: 'SELECT 1',
@@ -99,7 +99,7 @@ describe('SqlFamilyAdapter', () => {
     const plan: SqlExecutionPlan = {
       meta: {
         target: 'postgres',
-        storageHash: 'sha256:different-hash', // Wrong hash
+        storageHash: 'different-hash', // Wrong hash
         lane: 'sql',
       },
       sql: 'SELECT 1',

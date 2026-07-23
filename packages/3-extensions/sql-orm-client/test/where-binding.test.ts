@@ -2,16 +2,20 @@ import {
   AggregateExpr,
   AndExpr,
   BinaryExpr,
+  CaseExpr,
+  CastExpr,
   ColumnRef,
   DerivedTableSource,
   EqColJoinOn,
   ExistsExpr,
+  FunctionCallExpr,
   IdentifierRef,
   JoinAst,
   JsonArrayAggExpr,
   JsonObjectExpr,
   ListExpression,
   LiteralExpr,
+  NativeJsonValueProjection,
   NotExpr,
   NullCheckExpr,
   OperationExpr,
@@ -314,26 +318,82 @@ describe('bindWhereExpr', () => {
 
     it('binds inner expressions of JsonObjectExpr', () => {
       const expr = JsonObjectExpr.fromEntries([
-        JsonObjectExpr.entry('sub', SubqueryExpr.of(subqueryWithLiteral())),
+        JsonObjectExpr.entry(
+          'sub',
+          new NativeJsonValueProjection(SubqueryExpr.of(subqueryWithLiteral())),
+        ),
       ]);
       const bound = bindWhereExpr(contract, expr);
 
       expect(bound.kind).toBe('json-object');
       const json = bound as JsonObjectExpr;
-      const innerQuery = (json.entries[0]!.value as SubqueryExpr).query as SelectAst;
+      const projection = json.entries[0]?.value;
+      expect(projection).toBeInstanceOf(NativeJsonValueProjection);
+      const nativeProjection = projection as NativeJsonValueProjection;
+      const innerQuery = (nativeProjection.value as SubqueryExpr).query as SelectAst;
       const innerWhere = innerQuery.where as BinaryExpr;
       expect(innerWhere.right.kind).toBe('param-ref');
     });
 
     it('binds inner expression of JsonArrayAggExpr', () => {
-      const expr = JsonArrayAggExpr.of(SubqueryExpr.of(subqueryWithLiteral()));
+      const expr = JsonArrayAggExpr.of(
+        new NativeJsonValueProjection(SubqueryExpr.of(subqueryWithLiteral())),
+      );
       const bound = bindWhereExpr(contract, expr);
 
       expect(bound.kind).toBe('json-array-agg');
       const agg = bound as JsonArrayAggExpr;
-      const innerQuery = (agg.expr as SubqueryExpr).query as SelectAst;
+      expect(agg.expr).toBeInstanceOf(NativeJsonValueProjection);
+      const innerQuery = (agg.expr.value as SubqueryExpr).query as SelectAst;
       const innerWhere = innerQuery.where as BinaryExpr;
       expect(innerWhere.right.kind).toBe('param-ref');
+    });
+
+    it('preserves nested scalar projection expressions while binding inner subqueries', () => {
+      const expr = CaseExpr.of(
+        [
+          {
+            condition: BinaryExpr.eq(
+              FunctionCallExpr.of('length', [ColumnRef.of('users', 'email')]),
+              LiteralExpr.of(1),
+            ),
+            value: CastExpr.as(
+              FunctionCallExpr.of('coalesce', [
+                SubqueryExpr.of(subqueryWithLiteral()),
+                LiteralExpr.of('fallback'),
+              ]),
+              'text',
+            ),
+          },
+        ],
+        CastExpr.as(LiteralExpr.of('missing'), 'text'),
+      );
+
+      const bound = bindWhereExpr(contract, expr);
+
+      expect(bound).toBeInstanceOf(CaseExpr);
+      const caseExpr = bound as CaseExpr;
+      const condition = caseExpr.branches[0]?.condition;
+      expect(condition).toBeInstanceOf(BinaryExpr);
+      const binaryCondition = condition as BinaryExpr;
+      expect(binaryCondition.left).toBeInstanceOf(FunctionCallExpr);
+      const value = caseExpr.branches[0]?.value;
+      expect(value).toBeInstanceOf(CastExpr);
+      const castValue = value as CastExpr;
+      expect(castValue.expr).toBeInstanceOf(FunctionCallExpr);
+      const functionCall = castValue.expr as FunctionCallExpr;
+      const nestedValue = functionCall.args[0];
+      expect(nestedValue).toBeInstanceOf(SubqueryExpr);
+      const nestedSubquery = nestedValue as SubqueryExpr;
+      const innerWhere = nestedSubquery.query.where;
+      expect(innerWhere).toBeInstanceOf(BinaryExpr);
+      const binaryWhere = innerWhere as BinaryExpr;
+      expect(binaryWhere.right).toMatchObject({
+        kind: 'param-ref',
+        value: 100,
+        codec: { codecId: 'pg/int4@1' },
+      });
+      expect(caseExpr.elseExpr).toBeInstanceOf(CastExpr);
     });
 
     it('binds inner expressions of top-level ListExpression', () => {

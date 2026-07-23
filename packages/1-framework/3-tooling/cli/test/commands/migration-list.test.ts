@@ -41,19 +41,19 @@ import { createTerminalUI } from '../../src/utils/terminal-ui';
  * via `result.failure.toEnvelope()` — no command-builder needed.
  */
 
-const HASH_4cb4256 = `sha256:4cb4256${'0'.repeat(57)}`;
-const HASH_55bada2 = `sha256:55bada2${'0'.repeat(57)}`;
-const HASH_2f45cc7 = `sha256:2f45cc7${'0'.repeat(57)}`;
-const HASH_804e018 = `sha256:804e018${'0'.repeat(57)}`;
-const HASH_BRANCH_X = `sha256:${'a'.repeat(64)}`;
-const HASH_BRANCH_Y = `sha256:${'b'.repeat(64)}`;
-const HASH_FAN_BASE = `sha256:${'c'.repeat(64)}`;
-const HASH_FAN_A = `sha256:${'d'.repeat(64)}`;
-const HASH_FAN_B = `sha256:${'e'.repeat(64)}`;
-const HASH_FAN_C = `sha256:${'f'.repeat(64)}`;
-const HASH_POSTGIS = `sha256:9aabbcc${'0'.repeat(57)}`;
-const HASH_SHARED = `sha256:shared0${'0'.repeat(57)}`;
-const HASH_LINEAR_TIP = `sha256:lintip0${'0'.repeat(57)}`;
+const HASH_4cb4256 = `4cb4256${'0'.repeat(57)}`;
+const HASH_55bada2 = `55bada2${'0'.repeat(57)}`;
+const HASH_2f45cc7 = `2f45cc7${'0'.repeat(57)}`;
+const HASH_804e018 = `804e018${'0'.repeat(57)}`;
+const HASH_BRANCH_X = `${'a'.repeat(64)}`;
+const HASH_BRANCH_Y = `${'b'.repeat(64)}`;
+const HASH_FAN_BASE = `${'c'.repeat(64)}`;
+const HASH_FAN_A = `${'d'.repeat(64)}`;
+const HASH_FAN_B = `${'e'.repeat(64)}`;
+const HASH_FAN_C = `${'f'.repeat(64)}`;
+const HASH_POSTGIS = `9aabbcc${'0'.repeat(57)}`;
+const HASH_SHARED = `shared0${'0'.repeat(57)}`;
+const HASH_LINEAR_TIP = `lintip0${'0'.repeat(57)}`;
 
 const ADDITIVE_OP: MigrationPlanOperation = {
   id: 'table.users',
@@ -737,7 +737,7 @@ describe('runMigrationList — JSON output shape', () => {
     expect(oldest.name).toBe('20260422T0720_initial');
 
     // Full sha256 hash preserved in JSON (no abbreviation).
-    expect(latest.hash).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(latest.hash).toMatch(/^[0-9a-f]{64}$/);
     expect(latest.fromContract).toBe(HASH_4cb4256);
     expect(latest.toContract).toBe(HASH_55bada2);
 

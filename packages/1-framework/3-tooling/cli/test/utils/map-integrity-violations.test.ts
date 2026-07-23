@@ -21,8 +21,8 @@ describe('mapIntegrityViolations', () => {
         kind: 'hashMismatch',
         spaceId: 'app',
         dirName: '20260101T0000_init',
-        stored: 'sha256:old',
-        computed: 'sha256:new',
+        stored: 'old',
+        computed: 'new',
       },
     ]);
     expect(error?.meta?.['violations']).toEqual([
@@ -30,8 +30,8 @@ describe('mapIntegrityViolations', () => {
         kind: 'hashMismatch',
         spaceId: 'app',
         dirName: '20260101T0000_init',
-        stored: 'sha256:old',
-        computed: 'sha256:new',
+        stored: 'old',
+        computed: 'new',
       },
     ]);
   });

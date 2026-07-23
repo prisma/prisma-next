@@ -28,8 +28,8 @@ All references use a common, structured addressing scheme, not free-form strings
 ```json
 {
   "target": "postgres",
-  "coreHash": "sha256:…",
-  "profileHash": "sha256:…",
+  "coreHash": "…",
+  "profileHash": "…",
   "tables": { /* core storage */ },
   "capabilities": { /* adapter and pack surfaced features */ },
   "extensions": {

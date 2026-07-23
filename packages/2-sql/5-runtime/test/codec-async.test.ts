@@ -35,7 +35,7 @@ interface ProjectionSpec {
   readonly column?: { table: string; column: string };
 }
 
-const TEST_HASH = coreHash('sha256:test');
+const TEST_HASH = coreHash('test');
 
 function paramRefFromSpec(spec: ParamSpec): ParamRef {
   const options: { name?: string; codec?: { codecId: string } } = {};

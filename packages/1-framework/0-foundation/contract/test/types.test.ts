@@ -6,8 +6,8 @@ describe('PlanMeta', () => {
     const meta: PlanMeta = {
       target: 'postgres',
       targetFamily: 'sql',
-      storageHash: 'sha256:test',
-      profileHash: 'sha256:profile',
+      storageHash: 'test',
+      profileHash: 'profile',
       lane: 'orm-client',
       annotations: { intent: 'read' },
     };

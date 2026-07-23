@@ -11,13 +11,13 @@ Source code, comments, test names, identifier strings, and hash fixtures must **
 - Task IDs (`T1.1`, `D7`, `M3.2`), test-case IDs (`TC-1`, `TC18`), AC/FR/NFR IDs (`AC1`, `FR2`, `NFR5`), phase/round/checkpoint IDs (`P3 R2`, `CKPT-2`, `M2 review`)
 - Prose attributions to the plan ("out of scope per the spec", "sub-spec § 4", "deferred per project plan")
 - `projects/<x>/...` paths anywhere in source (incl. JSDoc `@link`s and string literals)
-- Hash fixtures named after IDs (`'sha256:tc12-ext-contract'`)
+- Hash fixtures named after IDs (`'tc12-ext-contract'`)
 
 **Allowed (durable):** Linear ticket IDs (`TML-2408`), ADR numbers (`ADR 211`), PR numbers (`PR #494`), permanent doc paths (`docs/...`), durable source paths (`packages/...`, `test/...`, `examples/...`).
 
 ## How to comply
 
-Describe the constraint or behaviour itself, not its plan row. Say "the runner skips ops with already-satisfied postchecks", not "see T3.4's postcheck-skip rule". Test names pin the property (`it('runs both spaces in caller order')`), not the coverage-table row. JSDoc cross-refs point at durable artefacts, never into `projects/`. Name fixtures/constants after their role (`'sha256:mongo-ext-contract'`), not the introducing test-case ID.
+Describe the constraint or behaviour itself, not its plan row. Say "the runner skips ops with already-satisfied postchecks", not "see T3.4's postcheck-skip rule". Test names pin the property (`it('runs both spaces in caller order')`), not the coverage-table row. JSDoc cross-refs point at durable artefacts, never into `projects/`. Name fixtures/constants after their role (`'mongo-ext-contract'`), not the introducing test-case ID.
 
 Before committing, scan your `+` diff for token-shaped IDs:
 

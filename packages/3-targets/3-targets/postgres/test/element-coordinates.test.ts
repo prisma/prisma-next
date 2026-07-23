@@ -24,7 +24,7 @@ describe('elementCoordinates with PostgresSchema', () => {
     expect(schema.kind).toBe('schema');
 
     const storage = new SqlStorage({
-      storageHash: coreHash('sha256:element-coordinates-test'),
+      storageHash: coreHash('element-coordinates-test'),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
         public: schema,
@@ -44,7 +44,7 @@ describe('elementCoordinates with PostgresSchema', () => {
 describe('coordinate-resolution acceptance — every elementCoordinates tuple resolves', () => {
   it('every coordinate from a postgres storage resolves through entityAt', () => {
     const storage = new SqlStorage({
-      storageHash: coreHash('sha256:coord-resolution-postgres'),
+      storageHash: coreHash('coord-resolution-postgres'),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
         public: new PostgresSchema({

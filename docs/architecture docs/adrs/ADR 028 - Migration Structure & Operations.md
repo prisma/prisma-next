@@ -87,23 +87,23 @@ migrations/
 {
   "version": 1,
   "nodes": [
-    { "coreHash": "sha256:000...zero" },
-    { "coreHash": "sha256:abc...123" },
-    { "coreHash": "sha256:def...456" }
+    { "coreHash": "000...zero" },
+    { "coreHash": "abc...123" },
+    { "coreHash": "def...456" }
   ],
   "edges": [
     {
-      "edgeId": "sha256:edgexxx",
-      "from": "sha256:000...zero",
-      "to": "sha256:abc...123",
+      "edgeId": "edgexxx",
+      "from": "000...zero",
+      "to": "abc...123",
       "path": "migrations/2025-01-15T1022_add_users",
       "kind": "regular",
       "labels": ["main"]
     },
     {
-      "edgeId": "sha256:edgeyyy",
-      "from": "sha256:abc...123",
-      "to": "sha256:def...456",
+      "edgeId": "edgeyyy",
+      "from": "abc...123",
+      "to": "def...456",
       "path": "migrations/2025-02-03T0905_add_posts",
       "kind": "regular",
       "labels": ["main"]
@@ -121,9 +121,9 @@ migrations/
 ### migration.json header schema (v1)
 ```json
 {
-  "from": "sha256:000...zero",
-  "to": "sha256:abc...123",
-  "edgeId": "sha256:edgexxx",
+  "from": "000...zero",
+  "to": "abc...123",
+  "edgeId": "edgexxx",
   "kind": "regular",
   "fromContract": { /* complete source contract JSON */ },
   "toContract": { /* complete destination contract JSON */ },

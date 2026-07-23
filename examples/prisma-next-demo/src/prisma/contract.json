@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
+  "profileHash": "3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
   "roots": {
     "post": {
       "model": "Post",
@@ -1089,7 +1089,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:6174be7a847a05e291afa27baf77c68cde5bcd2280326a28479b98bc778ec11d",
+    "storageHash": "6174be7a847a05e291afa27baf77c68cde5bcd2280326a28479b98bc778ec11d",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",
@@ -1107,7 +1107,7 @@
     }
   },
   "execution": {
-    "executionHash": "sha256:e592be8e097b3e2b4958da0b3ed54265d1bfa0523295fa03e03af2364cccbd08",
+    "executionHash": "e592be8e097b3e2b4958da0b3ed54265d1bfa0523295fa03e03af2364cccbd08",
     "mutations": {
       "defaults": [
         {

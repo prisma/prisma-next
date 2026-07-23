@@ -56,9 +56,9 @@ function ledgerEntry(
 ): LedgerEntryRecord {
   return {
     space: 'app',
-    migrationHash: 'sha256:mig',
+    migrationHash: 'mig',
     from: null,
-    to: 'sha256:dest',
+    to: 'dest',
     appliedAt: new Date('2026-06-01T08:00:00.000Z'),
     operationCount: 3,
     ...overrides,
@@ -136,19 +136,19 @@ describe('executeMigrationLogCommand', () => {
       ledgerEntry({
         migrationName: '20260303_add',
         from: null,
-        to: 'sha256:a',
+        to: 'a',
         appliedAt: new Date('2026-06-01T08:00:00.000Z'),
       }),
       ledgerEntry({
         migrationName: '20260303_add',
-        from: 'sha256:a',
-        to: 'sha256:b',
+        from: 'a',
+        to: 'b',
         appliedAt: new Date('2026-06-02T08:00:00.000Z'),
       }),
       ledgerEntry({
         migrationName: '20260303_add',
-        from: 'sha256:b',
-        to: 'sha256:a',
+        from: 'b',
+        to: 'a',
         appliedAt: new Date('2026-06-03T08:00:00.000Z'),
       }),
     ]);

@@ -17,7 +17,7 @@ describe('emitter + postgres adapter descriptor', () => {
       roots: {},
       domain: applicationDomainOf({ models: {} }),
       storage: {
-        storageHash: 'storage:sha256:test' as never,
+        storageHash: 'storage:test' as never,
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
             id: UNBOUND_NAMESPACE_ID,
@@ -27,7 +27,7 @@ describe('emitter + postgres adapter descriptor', () => {
       },
       capabilities: {},
       extensions: {},
-      profileHash: 'profile:sha256:test' as never,
+      profileHash: 'profile:test' as never,
       meta: {},
     };
     const queryOperationTypeImports = extractQueryOperationTypeImports([postgresAdapter]);

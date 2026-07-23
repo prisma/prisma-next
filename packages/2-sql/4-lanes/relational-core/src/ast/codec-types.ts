@@ -1,3 +1,4 @@
+import type { JsonValue } from '@prisma-next/contract/types';
 import type {
   Codec as BaseCodec,
   CodecCallContext,
@@ -6,6 +7,7 @@ import type {
   CodecRef,
   CodecTrait,
 } from '@prisma-next/framework-components/codec';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 export type {
   CodecCallContext,
@@ -13,6 +15,41 @@ export type {
   CodecRef,
   CodecTrait,
 } from '@prisma-next/framework-components/codec';
+
+function isJsonArray(value: JsonValue): value is readonly JsonValue[] {
+  return Array.isArray(value);
+}
+
+function freezeJsonValue(value: JsonValue): void {
+  if (value === null || typeof value !== 'object') {
+    return;
+  }
+
+  if (isJsonArray(value)) {
+    for (const item of value) {
+      freezeJsonValue(item);
+    }
+  } else {
+    for (const item of Object.values(value)) {
+      freezeJsonValue(item);
+    }
+  }
+
+  Object.freeze(value);
+}
+
+export function frozenCodecRef(codec: CodecRef): CodecRef {
+  const typeParams = codec.typeParams === undefined ? undefined : structuredClone(codec.typeParams);
+  if (typeParams !== undefined) {
+    freezeJsonValue(typeParams);
+  }
+
+  return Object.freeze({
+    codecId: codec.codecId,
+    ...ifDefined('typeParams', typeParams),
+    ...ifDefined('many', codec.many),
+  });
+}
 
 /**
  * SQL-family addressing of a single column. The decode site populates a `SqlColumnRef` whenever it can resolve the cell to a single underlying `(table, column)` (the typical case for projected columns from a single-table source); cells the runtime cannot resolve (aggregate aliases, include aggregate fields, computed projections without a simple ref) get `column = undefined`.

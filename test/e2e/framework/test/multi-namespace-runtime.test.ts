@@ -65,9 +65,9 @@ function buildMultiNamespaceRuntimeContract(): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:multi-ns-runtime-e2e'),
+    profileHash: profileHash('multi-ns-runtime-e2e'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:multi-ns-runtime-e2e'),
+      storageHash: coreHash('multi-ns-runtime-e2e'),
       namespaces: {
         auth: new PostgresSchema({
           id: 'auth',

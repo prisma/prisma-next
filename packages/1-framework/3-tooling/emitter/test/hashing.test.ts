@@ -25,7 +25,7 @@ describe('hashing', () => {
       storage: emptyNamespacedStorage(),
       ...SQL_HOOKS,
     });
-    expect(hash).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(hash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it('computes profile hash', () => {
@@ -34,7 +34,7 @@ describe('hashing', () => {
       target: 'postgres',
       capabilities: { postgres: { jsonAgg: true } },
     });
-    expect(hash).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(hash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it('produces stable hashes for identical input', () => {

@@ -55,7 +55,7 @@ A preflight bundle must include the following pack artifacts:
     }
   ],
   "derivedFrom": {
-    "coreHash": "sha256:...",
+    "coreHash": "...",
     "generator": "prisma-next@1.0.0",
     "capabilityKeysUsed": [
       "ext.pgvector.metric.cosine",

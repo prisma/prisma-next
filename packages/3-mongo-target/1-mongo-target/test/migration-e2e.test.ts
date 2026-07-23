@@ -132,7 +132,7 @@ describe('migration file E2E', () => {
       `import { createIndex, createCollection } from '${factoryExport}';`,
       '',
       'class M extends Migration {',
-      "  describe() { return { from: 'sha256:00', to: 'sha256:01' }; }",
+      "  describe() { return { from: '00', to: '01' }; }",
       '  get operations() {',
       '    return [',
       '      createCollection("users", {',
@@ -189,7 +189,7 @@ describe('migration file E2E', () => {
       `import { validatedCollection } from '${factoryExport}';`,
       '',
       'class M extends Migration {',
-      "  describe() { return { from: 'sha256:00', to: 'sha256:01' }; }",
+      "  describe() { return { from: '00', to: '01' }; }",
       '  get operations() {',
       '    return validatedCollection(',
       '      "users",',
@@ -227,8 +227,8 @@ describe('migration file E2E', () => {
 
   describe('renderCallsToTypeScript round-trip', () => {
     const defaultMeta = {
-      from: `sha256:${'0'.repeat(64)}`,
-      to: `sha256:${'1'.repeat(64)}`,
+      from: '0'.repeat(64),
+      to: '1'.repeat(64),
       snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
     } as const;
 
@@ -314,8 +314,8 @@ describe('migration file E2E', () => {
       const calls = [new DropCollectionCall('legacy')];
 
       const meta = {
-        from: `sha256:${'a'.repeat(64)}`,
-        to: `sha256:${'b'.repeat(64)}`,
+        from: 'a'.repeat(64),
+        to: 'b'.repeat(64),
         snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
       } as const;
       const tsSource = renderCallsToTypeScript(calls, meta);
@@ -348,7 +348,7 @@ describe('migration file E2E', () => {
       `import { createCollection, dataTransform } from '${factoryExport}';`,
       '',
       'class M extends Migration {',
-      "  describe() { return { from: 'sha256:00', to: 'sha256:01' }; }",
+      "  describe() { return { from: '00', to: '01' }; }",
       '  get operations() {',
       '    return [',
       '      createCollection("users"),',
@@ -361,7 +361,7 @@ describe('migration file E2E', () => {
       '            filter: { status: { $exists: false } },',
       '            update: { $set: { status: "active" } },',
       '          },',
-      '          meta: { target: "mongo", storageHash: "sha256:x", lane: "mongo-raw" },',
+      '          meta: { target: "mongo", storageHash: "x", lane: "mongo-raw" },',
       '        }),',
       '      }),',
       '    ];',
@@ -401,7 +401,7 @@ describe('migration file E2E', () => {
         `import { dataTransform } from '${factoryExport}';`,
         '',
         'class M extends Migration {',
-        "  describe() { return { from: 'sha256:00', to: 'sha256:01' }; }",
+        "  describe() { return { from: '00', to: '01' }; }",
         '  get operations() {',
         '    return [',
         '      dataTransform("backfill-with-check", {',
@@ -413,7 +413,7 @@ describe('migration file E2E', () => {
         '              collection: "users",',
         '              pipeline: [{ $match: { status: { $exists: false } } }, { $limit: 1 }],',
         '            },',
-        '            meta: { target: "mongo", storageHash: "sha256:x", lane: "mongo-raw" },',
+        '            meta: { target: "mongo", storageHash: "x", lane: "mongo-raw" },',
         '          }),',
         '        },',
         '        run: () => ({',
@@ -424,7 +424,7 @@ describe('migration file E2E', () => {
         '            filter: { status: { $exists: false } },',
         '            update: { $set: { status: "active" } },',
         '          },',
-        '          meta: { target: "mongo", storageHash: "sha256:x", lane: "mongo-raw" },',
+        '          meta: { target: "mongo", storageHash: "x", lane: "mongo-raw" },',
         '        }),',
         '      }),',
         '    ];',
@@ -494,8 +494,8 @@ describe('migration file E2E', () => {
       ];
 
       const directRunMeta = {
-        from: `sha256:${'0'.repeat(64)}`,
-        to: `sha256:${'1'.repeat(64)}`,
+        from: '0'.repeat(64),
+        to: '1'.repeat(64),
         snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
       } as const;
       const migrationSource = renderCallsToTypeScript(calls, directRunMeta)
@@ -542,7 +542,7 @@ describe('migration file E2E', () => {
         `import { createIndex, dropIndex, createCollection, dropCollection, setValidation } from '${factoryExport}';`,
         '',
         'class M extends Migration {',
-        "  describe() { return { from: 'sha256:00', to: 'sha256:01' }; }",
+        "  describe() { return { from: '00', to: '01' }; }",
         '  get operations() {',
         '    return [',
         '      createCollection("users"),',

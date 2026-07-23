@@ -99,7 +99,7 @@ describe('createMongoFamilyInstance descriptor self-consistency', () => {
   it('rejects an extension with a stale headRef.hash', () => {
     const extension = buildExtension({
       id: 'stale-fixture',
-      headRefHash: 'sha256:stale-fixture-hash',
+      headRefHash: 'stale-fixture-hash',
     });
     let captured: MigrationToolsError | undefined;
     try {
@@ -125,7 +125,7 @@ describe('createMongoFamilyInstance descriptor self-consistency', () => {
 
   it('checks every contractSpace-bearing extension', () => {
     const ok = buildExtension({ id: 'ok', headRefHash: FIXTURE_HEAD_HASH });
-    const bad = buildExtension({ id: 'second-bad', headRefHash: 'sha256:wrong' });
+    const bad = buildExtension({ id: 'second-bad', headRefHash: 'wrong' });
     let captured: MigrationToolsError | undefined;
     try {
       createMongoFamilyInstance(makeStack([ok, bad]));

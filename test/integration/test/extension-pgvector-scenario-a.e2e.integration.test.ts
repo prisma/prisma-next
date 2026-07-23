@@ -108,8 +108,8 @@ const pgvectorHeadRef = getPgvectorContractSpace().headRef;
 const pgvectorBaselineMigration = getPgvectorBaselineMigration();
 const PGVECTOR_STORAGE_HASH = pgvectorContract.storage.storageHash;
 
-const APP_CONTRACT_HASH = coreHash('sha256:pgvector-e2e-app-v1');
-const APP_PROFILE_HASH = profileHash('sha256:pgvector-e2e-app-profile-v1');
+const APP_CONTRACT_HASH = coreHash('pgvector-e2e-app-v1');
+const APP_PROFILE_HASH = profileHash('pgvector-e2e-app-profile-v1');
 const APP_TABLE = 'Doc';
 const APP_FIELD = 'embedding';
 const VECTOR_LENGTH = 3;

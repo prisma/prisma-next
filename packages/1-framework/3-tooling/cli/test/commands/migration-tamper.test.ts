@@ -46,8 +46,8 @@ vi.mock('@prisma-next/config-loader', () => ({
 }));
 
 const PACKAGE_DIR_NAME = '00001_tamper_test';
-const FROM_HASH = 'sha256:from';
-const TO_HASH = 'sha256:to';
+const FROM_HASH = 'from';
+const TO_HASH = 'to';
 const SCHEMA_VERSION = '1.0.0';
 const TARGET = 'mock';
 const TARGET_FAMILY = 'mock';
@@ -429,8 +429,8 @@ describe('migration tamper detection (tolerant model, per-command class)', () =>
     it(
       'proceeds when cross-space layout drift is the only integrity fault',
       async () => {
-        const ORPHAN_HASH = `sha256:${'c'.repeat(64)}`;
-        const DEST_HASH = `sha256:${'d'.repeat(64)}`;
+        const ORPHAN_HASH = 'c'.repeat(64);
+        const DEST_HASH = 'd'.repeat(64);
         const cwd = await mkdtemp(join(tmpdir(), 'cli-migration-new-orphan-'));
         tempDirs.push(cwd);
 

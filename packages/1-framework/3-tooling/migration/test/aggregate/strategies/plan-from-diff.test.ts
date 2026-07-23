@@ -41,7 +41,7 @@ function makeStubPlan(targetId: string): MigrationPlanWithAuthoringSurface {
   return {
     targetId,
     origin: null,
-    destination: { storageHash: 'sha256:synth' },
+    destination: { storageHash: 'synth' },
     operations: [{ id: 'synth.op', label: 'Synthesised op', operationClass: 'additive' }],
     renderTypeScript: () => 'export {};',
   };
@@ -109,9 +109,9 @@ describe('planFromDiff', () => {
     expect(outcome.result.migrationEdges).toEqual([
       {
         dirName: '',
-        migrationHash: 'sha256:synth',
+        migrationHash: 'synth',
         from: '',
-        to: 'sha256:synth',
+        to: 'synth',
         operationCount: 1,
         destinationContractJson: appSpace.contract(),
       },

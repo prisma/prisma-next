@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "mongo",
   "target": "mongo",
-  "profileHash": "sha256:vo-test-profile-hash",
+  "profileHash": "vo-test-profile-hash",
   "roots": {
     "shop": {
       "model": "Shop",
@@ -23,7 +23,7 @@
         }
       }
     },
-    "storageHash": "sha256:vo-test-storage-hash"
+    "storageHash": "vo-test-storage-hash"
   },
   "capabilities": {},
   "extensions": {},

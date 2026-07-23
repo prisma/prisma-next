@@ -33,8 +33,8 @@ vi.mock('@prisma-next/config-loader', () => ({
 
 const TARGET = 'postgres';
 const TARGET_FAMILY = 'sql';
-const HASH_A = `sha256:aaaaaaa${'0'.repeat(57)}`;
-const HASH_B = `sha256:bbbbbbb${'0'.repeat(57)}`;
+const HASH_A = `aaaaaaa${'0'.repeat(57)}`;
+const HASH_B = `bbbbbbb${'0'.repeat(57)}`;
 
 const ADDITIVE_OP: MigrationPlanOperation = {
   id: 'table.users',

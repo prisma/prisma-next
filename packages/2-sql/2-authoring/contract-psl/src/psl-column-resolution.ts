@@ -554,7 +554,7 @@ export function resolveFieldTypeDescriptor(input: {
   readonly field: FieldSymbol;
   readonly enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly namedTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
-  readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
+  readonly scalarColumnDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly authoringContributions: AuthoringContributions | undefined;
   readonly composedExtensions: ReadonlySet<string>;
   readonly familyId: string;
@@ -689,7 +689,7 @@ export function resolveFieldTypeDescriptor(input: {
     input.field,
     input.enumTypeDescriptors,
     input.namedTypeDescriptors,
-    input.scalarTypeDescriptors,
+    input.scalarColumnDescriptors,
   );
   if (!descriptor) {
     return { ok: false, alreadyReported: false };
@@ -982,7 +982,7 @@ export function resolveColumnDescriptor(
   field: FieldSymbol,
   enumTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
   namedTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
-  scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>,
+  scalarColumnDescriptors: ReadonlyMap<string, ColumnDescriptor>,
 ): ColumnDescriptor | undefined {
   if (namedTypeDescriptors.has(field.typeName)) {
     return namedTypeDescriptors.get(field.typeName);
@@ -990,5 +990,5 @@ export function resolveColumnDescriptor(
   if (enumTypeDescriptors.has(field.typeName)) {
     return enumTypeDescriptors.get(field.typeName);
   }
-  return scalarTypeDescriptors.get(field.typeName);
+  return scalarColumnDescriptors.get(field.typeName);
 }

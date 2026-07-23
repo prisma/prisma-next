@@ -123,7 +123,7 @@ export async function readContractSnapshotJson(
 /**
  * Tolerant read: a missing store entry (ENOENT), an unparseable
  * `contract.json`, the JSON literal `null`, or a `storageHash` that isn't a
- * well-formed `sha256:<64hex>` value all resolve to `undefined` rather than
+ * well-formed 64-hex value all resolve to `undefined` rather than
  * throwing — parity with the catch-all tolerance of the pre-store
  * `readEndContractJson` (`io.ts`), which never validated the hash it was
  * keyed by either. Any other fs error (e.g. `EACCES` on a present-but-

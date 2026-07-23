@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { emitContractSpaceArtifacts } from '../src/emit-contract-space-artifacts';
 import { gatherDiskContractSpaceState } from '../src/gather-disk-contract-space-state';
 
-const CIPHER_HASH = `sha256:${'c'.repeat(64)}`;
-const PGVECTOR_HASH = `sha256:${'d'.repeat(64)}`;
+const CIPHER_HASH = 'c'.repeat(64);
+const PGVECTOR_HASH = 'd'.repeat(64);
 
 function makeContract(storageHash: string): unknown {
   return { storage: { storageHash } };

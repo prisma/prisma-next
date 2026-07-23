@@ -75,9 +75,25 @@ function parseCliArgs(argv) {
 function escapeTableCell(value) {
   return String(value ?? '')
     .replace(/\r?\n/g, ' ')
+    .replace(/\\/g, '\\\\')
     .replace(/\|/g, '\\|')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function formatCodeSpan(value) {
+  const text = String(value ?? '')
+    .replace(/\r?\n/g, ' ')
+    .replace(/\|/g, '\\|')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const longestBacktickRun = (text.match(/`+/g) ?? []).reduce(
+    (max, run) => Math.max(max, run.length),
+    0,
+  );
+  const fence = '`'.repeat(longestBacktickRun + 1);
+  const pad = text.startsWith('`') || text.endsWith('`') ? ' ' : '';
+  return `${fence}${pad}${text}${pad}${fence}`;
 }
 
 function formatLines(startLine, endLine) {
@@ -111,13 +127,13 @@ function formatAuthorLogin(author) {
 export function renderReviewStateMarkdown(payload, { sourcePath }) {
   assertReviewStateV1(payload);
 
-  const source = sourcePath ? escapeTableCell(sourcePath) : 'review-state.json';
+  const source = formatCodeSpan(sourcePath || 'review-state.json');
   const lines = [];
 
   lines.push('# Review State');
   lines.push('');
   lines.push(`PR: ${escapeTableCell(payload.pr.url)}`);
-  lines.push(`Source: \`${source}\``);
+  lines.push(`Source: ${source}`);
   lines.push(`FetchedAt: ${escapeTableCell(payload.fetchedAt)}`);
   lines.push(`SourceBranch: ${escapeTableCell(payload.sourceBranch)}`);
   lines.push('');

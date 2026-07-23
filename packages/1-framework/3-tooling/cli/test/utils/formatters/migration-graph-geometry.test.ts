@@ -28,7 +28,7 @@ function makeEdge(from: string, to: string, dirName: string, i: number): Migrati
   return {
     from,
     to,
-    migrationHash: `sha256:geo${String(i).padStart(3, '0')}-${dirName.slice(0, 20)}`,
+    migrationHash: `geo${String(i).padStart(3, '0')}-${dirName.slice(0, 20)}`,
     dirName,
     createdAt: '2026-06-06T00:00:00.000Z',
     invariants: [],

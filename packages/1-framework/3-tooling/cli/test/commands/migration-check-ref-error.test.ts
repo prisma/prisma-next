@@ -19,7 +19,7 @@ vi.mock('@prisma-next/config-loader', () => ({
 
 const TARGET = 'mock';
 const TARGET_FAMILY = 'mock';
-const HASH = `sha256:${'a'.repeat(64)}`;
+const HASH = `${'a'.repeat(64)}`;
 
 const ADDITIVE_OPS: readonly MigrationPlanOperation[] = [
   { id: 'table.users', label: 'Create table users', operationClass: 'additive' },

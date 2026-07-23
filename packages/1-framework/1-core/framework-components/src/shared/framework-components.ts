@@ -58,11 +58,6 @@ export interface ComponentMetadata {
   readonly authoring?: AuthoringContributions;
 
   /**
-   * Scalar type name to codec ID mapping contributed by this component. Assembled by `createControlStack` with duplicate detection.
-   */
-  readonly scalarTypeDescriptors?: ReadonlyMap<string, string>;
-
-  /**
    * Mutation default function handlers and generator descriptors contributed by this component. Assembled by `createControlStack` with duplicate detection.
    */
   readonly controlMutationDefaults?: ControlMutationDefaults;

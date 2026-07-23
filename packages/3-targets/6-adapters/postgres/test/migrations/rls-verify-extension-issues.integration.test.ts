@@ -79,9 +79,9 @@ function buildContractWithPolicy(): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:rls-verify-test'),
+    profileHash: profileHash('rls-verify-test'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:rls-verify-test'),
+      storageHash: coreHash('rls-verify-test'),
       namespaces: { [UNBOUND_NAMESPACE_ID]: schema },
     }),
     roots: {},
@@ -198,9 +198,9 @@ describe.sequential('RLS verify extension issues', () => {
     const noPolicyContract: Contract<SqlStorage> = {
       target: 'postgres',
       targetFamily: 'sql',
-      profileHash: profileHash('sha256:rls-verify-no-policy'),
+      profileHash: profileHash('rls-verify-no-policy'),
       storage: new SqlStorage({
-        storageHash: coreHash('sha256:rls-verify-no-policy'),
+        storageHash: coreHash('rls-verify-no-policy'),
         namespaces: { [UNBOUND_NAMESPACE_ID]: noPolicySchema },
       }),
       roots: {},
@@ -251,9 +251,9 @@ describe.sequential('RLS verify extension issues', () => {
     const noPolicyContract: Contract<SqlStorage> = {
       target: 'postgres',
       targetFamily: 'sql',
-      profileHash: profileHash('sha256:rls-verify-no-policy-2'),
+      profileHash: profileHash('rls-verify-no-policy-2'),
       storage: new SqlStorage({
-        storageHash: coreHash('sha256:rls-verify-no-policy-2'),
+        storageHash: coreHash('rls-verify-no-policy-2'),
         namespaces: { [UNBOUND_NAMESPACE_ID]: noPolicySchema },
       }),
       roots: {},

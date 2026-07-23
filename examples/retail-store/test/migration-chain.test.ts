@@ -69,7 +69,7 @@ function loadMigration(dirName: string): {
   const metadata = JSON.parse(readFileSync(resolve(dir, 'migration.json'), 'utf8')) as {
     to: string;
   };
-  const snapshotHex = metadata.to.replace(/^sha256:/, '');
+  const snapshotHex = metadata.to;
   const snapshotPath = resolve(
     import.meta.dirname,
     '../migrations/snapshots',

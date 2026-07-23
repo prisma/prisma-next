@@ -16,7 +16,7 @@ import { _unstable_createMongoAdapterWithCodecs } from '../src/mongo-adapter';
 
 const baseMeta = {
   target: 'mongo' as const,
-  storageHash: 'sha256:test',
+  storageHash: 'test',
   lane: 'mongo' as const,
   paramDescriptors: [],
 };

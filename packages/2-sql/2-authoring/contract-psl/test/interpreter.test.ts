@@ -33,7 +33,7 @@ describe('interpretPslDocumentToSqlContract', () => {
     input: Omit<
       InterpretPslDocumentToSqlContractInput,
       | 'target'
-      | 'scalarTypeDescriptors'
+      | 'scalarColumnDescriptors'
       | 'composedExtensionContracts'
       | 'createNamespace'
       | 'capabilities'
@@ -42,7 +42,7 @@ describe('interpretPslDocumentToSqlContract', () => {
   ) =>
     interpretPslDocumentToSqlContractInternal({
       target: postgresTarget,
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
       authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
@@ -62,7 +62,7 @@ describe('interpretPslDocumentToSqlContract', () => {
     const result = interpretPslDocumentToSqlContractInternal({
       ...document,
       target: postgresTarget,
-      scalarTypeDescriptors: new Map([
+      scalarColumnDescriptors: new Map([
         ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
         ['String', { codecId: 'custom/text@1', nativeType: 'custom_text' }],
       ]),
@@ -132,7 +132,7 @@ describe('interpretPslDocumentToSqlContract', () => {
     const result = interpretPslDocumentToSqlContractInternal({
       ...document,
       target: targetWithCapabilities,
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
       authoringContributions: { entityTypes: testEnumEntityContributions, type: {}, field: {} },
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
@@ -159,7 +159,7 @@ describe('interpretPslDocumentToSqlContract', () => {
     const result = interpretPslDocumentToSqlContractInternal({
       ...document,
       target: postgresTarget,
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       capabilities: { sql: { scalarList: true } },
       controlMutationDefaults: {

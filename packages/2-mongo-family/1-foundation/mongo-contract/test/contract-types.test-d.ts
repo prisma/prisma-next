@@ -25,7 +25,7 @@ type ContractWithEnum = MongoContractWithTypeMaps<
   {
     readonly target: 'mongo';
     readonly targetFamily: 'mongo';
-    readonly profileHash: ProfileHashBase<'sha256:enum-test'>;
+    readonly profileHash: ProfileHashBase<'enum-test'>;
     readonly capabilities: Record<string, never>;
     readonly extensions: Record<string, never>;
     readonly meta: Record<string, never>;
@@ -100,7 +100,7 @@ type ContractWithEnum = MongoContractWithTypeMaps<
           readonly entries: { readonly collection: Record<string, never> };
         };
       };
-      readonly storageHash: StorageHashBase<'sha256:enum-test-storage'>;
+      readonly storageHash: StorageHashBase<'enum-test-storage'>;
     };
   },
   MongoTypeMaps<
@@ -176,7 +176,7 @@ type ContractWithVO = MongoContractWithTypeMaps<
   {
     readonly target: 'mongo';
     readonly targetFamily: 'mongo';
-    readonly profileHash: ProfileHashBase<'sha256:test'>;
+    readonly profileHash: ProfileHashBase<'test'>;
     readonly capabilities: Record<string, never>;
     readonly extensions: Record<string, never>;
     readonly meta: Record<string, never>;
@@ -238,7 +238,7 @@ type ContractWithVO = MongoContractWithTypeMaps<
           readonly entries: { readonly collection: { readonly users: MongoCollection } };
         };
       };
-      readonly storageHash: StorageHashBase<'sha256:test-storage'>;
+      readonly storageHash: StorageHashBase<'test-storage'>;
     };
   },
   MongoTypeMaps<
@@ -304,7 +304,7 @@ test('ExtractMongoFieldOutputTypes extracts fieldOutputTypes from contract', () 
     {
       readonly target: 'mongo';
       readonly targetFamily: 'mongo';
-      readonly profileHash: ProfileHashBase<'sha256:test'>;
+      readonly profileHash: ProfileHashBase<'test'>;
       readonly capabilities: Record<string, never>;
       readonly extensions: Record<string, never>;
       readonly meta: Record<string, never>;
@@ -317,7 +317,7 @@ test('ExtractMongoFieldOutputTypes extracts fieldOutputTypes from contract', () 
           string,
           { readonly id: string; readonly entries: { readonly collection: Record<string, never> } }
         >;
-        readonly storageHash: StorageHashBase<'sha256:s'>;
+        readonly storageHash: StorageHashBase<'s'>;
       };
     },
     TM
@@ -331,7 +331,7 @@ test('ExtractMongoFieldInputTypes extracts fieldInputTypes from contract', () =>
     {
       readonly target: 'mongo';
       readonly targetFamily: 'mongo';
-      readonly profileHash: ProfileHashBase<'sha256:test'>;
+      readonly profileHash: ProfileHashBase<'test'>;
       readonly capabilities: Record<string, never>;
       readonly extensions: Record<string, never>;
       readonly meta: Record<string, never>;
@@ -344,7 +344,7 @@ test('ExtractMongoFieldInputTypes extracts fieldInputTypes from contract', () =>
           string,
           { readonly id: string; readonly entries: { readonly collection: Record<string, never> } }
         >;
-        readonly storageHash: StorageHashBase<'sha256:s'>;
+        readonly storageHash: StorageHashBase<'s'>;
       };
     },
     TM
@@ -363,7 +363,7 @@ type MinimalContractWithFieldTypes<TFieldTypes extends Record<string, Record<str
     {
       readonly target: 'mongo';
       readonly targetFamily: 'mongo';
-      readonly profileHash: ProfileHashBase<'sha256:test'>;
+      readonly profileHash: ProfileHashBase<'test'>;
       readonly capabilities: Record<string, never>;
       readonly extensions: Record<string, never>;
       readonly meta: Record<string, never>;
@@ -376,7 +376,7 @@ type MinimalContractWithFieldTypes<TFieldTypes extends Record<string, Record<str
           string,
           { readonly id: string; readonly entries: { readonly collection: Record<string, never> } }
         >;
-        readonly storageHash: StorageHashBase<'sha256:s'>;
+        readonly storageHash: StorageHashBase<'s'>;
       };
     },
     MongoTypeMaps<TestCodecTypes, TFieldTypes, TFieldTypes>
@@ -476,7 +476,7 @@ type BigContract = MongoContractWithTypeMaps<
   {
     readonly target: 'mongo';
     readonly targetFamily: 'mongo';
-    readonly profileHash: ProfileHashBase<'sha256:stress'>;
+    readonly profileHash: ProfileHashBase<'stress'>;
     readonly capabilities: Record<string, never>;
     readonly extensions: Record<string, never>;
     readonly meta: Record<string, never>;
@@ -537,7 +537,7 @@ type BigContract = MongoContractWithTypeMaps<
           readonly entries: { readonly collection: Record<string, never> };
         };
       };
-      readonly storageHash: StorageHashBase<'sha256:stress-storage'>;
+      readonly storageHash: StorageHashBase<'stress-storage'>;
     };
   },
   MongoTypeMaps<
@@ -644,7 +644,7 @@ type ContractNoMap = MongoContractWithTypeMaps<
   {
     readonly target: 'mongo';
     readonly targetFamily: 'mongo';
-    readonly profileHash: ProfileHashBase<'sha256:no-map'>;
+    readonly profileHash: ProfileHashBase<'no-map'>;
     readonly capabilities: Record<string, never>;
     readonly extensions: Record<string, never>;
     readonly meta: Record<string, never>;
@@ -680,7 +680,7 @@ type ContractNoMap = MongoContractWithTypeMaps<
           readonly entries: { readonly collection: Record<string, never> };
         };
       };
-      readonly storageHash: StorageHashBase<'sha256:no-map-storage'>;
+      readonly storageHash: StorageHashBase<'no-map-storage'>;
     };
   },
   MongoTypeMaps<

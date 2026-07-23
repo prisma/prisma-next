@@ -140,8 +140,8 @@ async function writeContractFixtures(
 
 const SNAPSHOTS_IMPORT_PATH = './snapshots';
 const META = {
-  from: `sha256:${'0'.repeat(64)}`,
-  to: `sha256:${'1'.repeat(64)}`,
+  from: '0'.repeat(64),
+  to: '1'.repeat(64),
 } as const;
 
 describe('TypeScriptRenderablePostgresMigration round-trip', () => {

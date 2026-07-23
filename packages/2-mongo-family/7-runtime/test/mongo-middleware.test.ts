@@ -61,7 +61,7 @@ function makeContext(adapter: MongoAdapter): MongoExecutionContext {
 const baseMeta: PlanMeta = {
   target: 'mongo',
   targetFamily: 'mongo',
-  storageHash: 'sha256:test',
+  storageHash: 'test',
   lane: 'orm',
 };
 

@@ -29,8 +29,8 @@ vi.mock('../../src/control-api/client', () => ({
   })),
 }));
 
-const HASH_A = `sha256:${'a'.repeat(64)}`;
-const HASH_B = `sha256:${'b'.repeat(64)}`;
+const HASH_A = `${'a'.repeat(64)}`;
+const HASH_B = `${'b'.repeat(64)}`;
 const ADDITIVE_OP: MigrationPlanOperation = {
   id: 'table.users',
   label: 'Create users',

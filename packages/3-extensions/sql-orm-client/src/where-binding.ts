@@ -60,6 +60,15 @@ function bindWhereExprNode(
     windowFunc(expr) {
       return bindExpression(contract, expr);
     },
+    functionCall(expr) {
+      return bindExpression(contract, expr);
+    },
+    cast(expr) {
+      return bindExpression(contract, expr);
+    },
+    case(expr) {
+      return bindExpression(contract, expr);
+    },
     jsonObject(expr) {
       return bindExpression(contract, expr);
     },
@@ -80,7 +89,7 @@ function bindWhereExprNode(
     },
     binary(expr) {
       const left = bindExpression(contract, expr.left);
-      const bindingColumn = left.kind === 'column-ref' ? (left as ColumnRef) : undefined;
+      const bindingColumn = left.kind === 'column-ref' ? left : undefined;
 
       return new BinaryExpr(
         expr.op,
@@ -204,8 +213,7 @@ function bindFromSource(contract: Contract<SqlStorage>, source: AnyFromSource): 
     return source;
   }
   if (source.kind === 'derived-table-source') {
-    const derived = source as DerivedTableSource;
-    return DerivedTableSource.as(derived.alias, bindSelectAst(contract, derived.query));
+    return DerivedTableSource.as(source.alias, bindSelectAst(contract, source.query));
   }
 
   return source;

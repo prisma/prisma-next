@@ -80,7 +80,7 @@ describe('migration plan — core flow', () => {
       packageDir,
       {
         from: null,
-        to: 'sha256:test-hash',
+        to: 'test-hash',
         providedInvariants: [],
         createdAt: new Date().toISOString(),
       },
@@ -90,7 +90,7 @@ describe('migration plan — core flow', () => {
     const pkg = await readMigrationPackage(packageDir, { migrationsDir });
 
     expect(pkg.metadata.from).toBeNull();
-    expect(pkg.metadata.to).toBe('sha256:test-hash');
+    expect(pkg.metadata.to).toBe('test-hash');
     expect(pkg.metadata.migrationHash).toBe(metadata.migrationHash);
     expect(pkg.ops).toHaveLength(1);
     expect(pkg.ops[0]!.id).toBe('table.user');
@@ -107,22 +107,22 @@ describe('migration plan — core flow', () => {
       packageDir,
       {
         from: null,
-        to: 'sha256:same-hash',
+        to: 'same-hash',
         providedInvariants: [],
         createdAt: new Date().toISOString(),
       },
       [],
     );
 
-    // Read migrations and find leaf — leaf should be 'sha256:same-hash'
+    // Read migrations and find leaf — leaf should be 'same-hash'
     const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
     const graph = reconstructGraph(packages);
     const leaf = findLeaf(graph);
 
-    expect(leaf).toBe('sha256:same-hash');
+    expect(leaf).toBe('same-hash');
 
     // If toStorageHash === leaf, it's a no-op
-    const toStorageHash = 'sha256:same-hash';
+    const toStorageHash = 'same-hash';
     expect(leaf).toBe(toStorageHash);
   });
 
@@ -141,7 +141,7 @@ describe('migration plan — core flow', () => {
         path1,
         {
           from: null,
-          to: 'sha256:hash-a',
+          to: 'hash-a',
           providedInvariants: [],
           createdAt: new Date().toISOString(),
         },
@@ -155,8 +155,8 @@ describe('migration plan — core flow', () => {
       await writeTestPackage(
         path2,
         {
-          from: 'sha256:hash-a',
-          to: 'sha256:hash-b',
+          from: 'hash-a',
+          to: 'hash-b',
           providedInvariants: [],
           createdAt: new Date().toISOString(),
         },
@@ -169,11 +169,11 @@ describe('migration plan — core flow', () => {
 
       const graph = reconstructGraph(packages);
       const leaf = findLeaf(graph);
-      expect(leaf).toBe('sha256:hash-b');
+      expect(leaf).toBe('hash-b');
 
       // Verify chain: first migration's `to` === second migration's `from`
-      const pkg1 = packages.find((p) => p.metadata.to === 'sha256:hash-a')!;
-      const pkg2 = packages.find((p) => p.metadata.to === 'sha256:hash-b')!;
+      const pkg1 = packages.find((p) => p.metadata.to === 'hash-a')!;
+      const pkg2 = packages.find((p) => p.metadata.to === 'hash-b')!;
       expect(pkg1.metadata.to).toBe(pkg2.metadata.from);
     },
     timeouts.databaseOperation,
@@ -206,7 +206,7 @@ describe('--from hash lookup', () => {
       packageDir,
       {
         from: null,
-        to: 'sha256:known-hash',
+        to: 'known-hash',
         providedInvariants: [],
         createdAt: new Date().toISOString(),
       },
@@ -214,11 +214,11 @@ describe('--from hash lookup', () => {
     );
 
     const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
-    const found = packages.find((p) => p.metadata.to === 'sha256:nonexistent');
+    const found = packages.find((p) => p.metadata.to === 'nonexistent');
     expect(found).toBeUndefined();
   });
 
-  it('resolves prefix without sha256: scheme', async () => {
+  it('resolves prefix without  scheme', async () => {
     const tempDir = await createTempDir('prefix-no-scheme');
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
@@ -229,7 +229,7 @@ describe('--from hash lookup', () => {
       packageDir,
       {
         from: null,
-        to: 'sha256:abcdef1234567890',
+        to: 'abcdef1234567890',
         providedInvariants: [],
         createdAt: new Date().toISOString(),
       },
@@ -240,11 +240,11 @@ describe('--from hash lookup', () => {
     const result = resolveBundleByPrefix(packages, 'abcdef');
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.metadata.to).toBe('sha256:abcdef1234567890');
+      expect(result.value.metadata.to).toBe('abcdef1234567890');
     }
   });
 
-  it('resolves prefix with sha256: scheme', async () => {
+  it('resolves prefix with  scheme', async () => {
     const tempDir = await createTempDir('prefix-with-scheme');
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
@@ -255,7 +255,7 @@ describe('--from hash lookup', () => {
       packageDir,
       {
         from: null,
-        to: 'sha256:abcdef1234567890',
+        to: 'abcdef1234567890',
         providedInvariants: [],
         createdAt: new Date().toISOString(),
       },
@@ -263,10 +263,10 @@ describe('--from hash lookup', () => {
     );
 
     const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
-    const result = resolveBundleByPrefix(packages, 'sha256:abcdef');
+    const result = resolveBundleByPrefix(packages, 'abcdef');
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.metadata.to).toBe('sha256:abcdef1234567890');
+      expect(result.value.metadata.to).toBe('abcdef1234567890');
     }
   });
 
@@ -283,7 +283,7 @@ describe('--from hash lookup', () => {
         join(migrationsDir, dir1),
         {
           from: null,
-          to: 'sha256:abc111',
+          to: 'abc111',
           providedInvariants: [],
           createdAt: new Date().toISOString(),
         },
@@ -294,8 +294,8 @@ describe('--from hash lookup', () => {
       await writeTestPackage(
         join(migrationsDir, dir2),
         {
-          from: 'sha256:abc111',
-          to: 'sha256:abc222',
+          from: 'abc111',
+          to: 'abc222',
           providedInvariants: [],
           createdAt: new Date().toISOString(),
         },
@@ -303,7 +303,7 @@ describe('--from hash lookup', () => {
       );
 
       const { packages } = await readMigrationsDir(migrationsDir, { migrationsDir });
-      const result = resolveBundleByPrefix(packages, 'sha256:abc');
+      const result = resolveBundleByPrefix(packages, 'abc');
       expect(result.ok).toBe(false);
       if (!result.ok) {
         expect(result.failure).toEqual({ reason: 'ambiguous', count: 2 });

@@ -108,7 +108,7 @@ middleware.ts             Auth middleware (redirects to /login)
 
 ## Framework Gaps
 
-- **Float scalar type**: Not in default Mongo PSL scalar descriptors; added via custom `scalarTypeDescriptors` in config
+
 - **ObjectId in filters**: `MongoFieldFilter.eq` with ObjectId values requires wrapping in `MongoParamRef` (see `src/data/object-id-filter.ts`)
 - **Schema migrations**: Migration artifacts are committed under `migrations/`; run `pnpm migration:apply` to apply. The planner handles indexes and collection validators but not all schema-level operations.
 - **Typed `$push`/`$pull`**: ORM doesn't expose array update operators; use `mongoRaw` with untyped commands

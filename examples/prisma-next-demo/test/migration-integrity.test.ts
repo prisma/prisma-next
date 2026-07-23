@@ -80,8 +80,7 @@ describe('demo migration integrity — guard verification', () => {
       await cp(MIGRATIONS_DIR, tmpMigrationsDir, { recursive: true });
 
       // Inject a no-op migration: from === to.
-      const selfEdgeHash =
-        'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+      const selfEdgeHash = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
       const baseMetadata = {
         from: selfEdgeHash,
         to: selfEdgeHash,

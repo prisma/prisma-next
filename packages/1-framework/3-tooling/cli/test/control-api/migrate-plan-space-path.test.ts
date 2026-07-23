@@ -6,7 +6,7 @@ import { createSqlContract } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { planSpacePath } from '../../src/control-api/operations/migrate';
 
-const HEAD_HASH = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const HEAD_HASH = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
 function makeContract(control: 'external' | 'managed'): Contract {
   const base = createSqlContract({
@@ -71,7 +71,7 @@ describe('planSpacePath — empty-graph spaces', () => {
       targetHash: HEAD_HASH,
       refInvariants: undefined,
       liveMarker: {
-        storageHash: 'sha256:0ld0000000000000000000000000000000000000000000000000000000000000',
+        storageHash: '01d0000000000000000000000000000000000000000000000000000000000000',
         invariants: [],
       },
     });

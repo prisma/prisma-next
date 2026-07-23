@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import type { ContractConfig, ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import { applySpecifierDefaultControlPolicy } from '@prisma-next/contract/apply-specifier-default-control-policy';
 import type { ControlPolicy } from '@prisma-next/contract/types';
-import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import { collectScalarTypeConstructors } from '@prisma-next/framework-components/authoring';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import { buildSymbolTable, rangeToPslSpan } from '@prisma-next/psl-parser';
 import type { PslInterpretCapable } from '@prisma-next/psl-parser/interpret';
@@ -62,28 +62,13 @@ function mapParseDiagnostics(
   }));
 }
 
-function buildColumnDescriptorMap(
-  scalarTypeDescriptors: ReadonlyMap<string, string>,
-  codecLookup: CodecLookup,
-): ReadonlyMap<string, ColumnDescriptor> {
-  const result = new Map<string, ColumnDescriptor>();
-  for (const [typeName, codecId] of scalarTypeDescriptors) {
-    const nativeType = codecLookup.targetTypesFor(codecId)?.[0];
-    if (nativeType === undefined) continue;
-    result.set(typeName, { codecId, nativeType });
-  }
-  return result;
-}
-
 export function prismaContract(schemaPath: string, options: PrismaContractOptions): ContractConfig {
   const source: PslInterpretCapable = {
     format: 'psl',
     inputs: [schemaPath],
     interpret(input, context) {
-      const scalarTypeDescriptors = buildColumnDescriptorMap(
-        context.scalarTypeDescriptors,
-        context.codecLookup,
-      );
+      const scalarColumnDescriptors: ReadonlyMap<string, ColumnDescriptor> =
+        collectScalarTypeConstructors(context.authoringContributions.type);
       return interpretPslDocumentToSqlContract({
         symbolTable: input.symbolTable,
         sourceFile: input.sourceFile,
@@ -91,7 +76,7 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
         seedDiagnostics: [],
         target: options.target,
         authoringContributions: context.authoringContributions,
-        scalarTypeDescriptors,
+        scalarColumnDescriptors,
         ...ifDefined(
           'composedExtensions',
           context.composedExtensions.length > 0 ? [...context.composedExtensions] : undefined,
@@ -137,7 +122,6 @@ export function prismaContract(schemaPath: string, options: PrismaContractOption
       const { table: symbolTable, diagnostics: symbolTableDiagnostics } = buildSymbolTable({
         document,
         sourceFile,
-        scalarTypes: [...context.scalarTypeDescriptors.keys()],
         pslBlockDescriptors: context.authoringContributions.pslBlockDescriptors,
       });
 

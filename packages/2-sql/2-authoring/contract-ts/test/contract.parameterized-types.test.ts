@@ -16,7 +16,7 @@ type TestContract = Contract<SqlStorage>;
 describe('SqlContractSerializer parameterized type fields', () => {
   const baseContractInput = validSqlContractJson({
     storage: storageWithNamespacedTables({
-      storageHash: 'sha256:test',
+      storageHash: 'test',
       tables: {
         User: {
           columns: {
@@ -36,7 +36,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
       const input = {
         ...baseContractInput,
         storage: storageWithNamespacedTables({
-          storageHash: 'sha256:test',
+          storageHash: 'test',
           tables: {
             Embedding: {
               columns: {
@@ -66,7 +66,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
       const input = {
         ...baseContractInput,
         storage: storageWithNamespacedTables({
-          storageHash: 'sha256:test',
+          storageHash: 'test',
           tables: {
             User: {
               columns: {
@@ -99,7 +99,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
       const input = {
         ...baseContractInput,
         storage: storageWithNamespacedTables({
-          storageHash: 'sha256:test',
+          storageHash: 'test',
           tables: {
             User: {
               columns: {
@@ -126,7 +126,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
       const input = {
         ...baseContractInput,
         storage: storageWithNamespacedTables({
-          storageHash: 'sha256:test',
+          storageHash: 'test',
           tables: {
             User: {
               columns: {
@@ -153,7 +153,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
       const input = {
         ...baseContractInput,
         storage: storageWithNamespacedTables({
-          storageHash: 'sha256:test',
+          storageHash: 'test',
           tables: {
             Embedding: {
               columns: {
@@ -194,7 +194,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
       const input = {
         ...baseContractInput,
         storage: storageWithNamespacedTables({
-          storageHash: 'sha256:test',
+          storageHash: 'test',
           tables: {
             Embedding: {
               columns: {
@@ -232,7 +232,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
       const input = {
         ...baseContractInput,
         storage: storageWithNamespacedTables({
-          storageHash: 'sha256:test',
+          storageHash: 'test',
           tables: {
             User: {
               columns: {
@@ -259,7 +259,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
       const input = {
         ...baseContractInput,
         storage: storageWithNamespacedTables({
-          storageHash: 'sha256:test',
+          storageHash: 'test',
           tables: {
             Embedding: {
               columns: {
@@ -295,7 +295,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
       const input = {
         ...baseContractInput,
         storage: storageWithNamespacedTables({
-          storageHash: 'sha256:test',
+          storageHash: 'test',
           tables: {
             Embedding: {
               columns: {
@@ -470,7 +470,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
       const input = {
         ...baseContractInput,
         storage: storageWithNamespacedTables({
-          storageHash: 'sha256:test',
+          storageHash: 'test',
           tables: {
             User: {
               columns: {
@@ -506,7 +506,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
       const input = {
         ...baseContractInput,
         storage: storageWithNamespacedTables({
-          storageHash: 'sha256:test',
+          storageHash: 'test',
           tables: {
             User: {
               columns: {
@@ -542,7 +542,7 @@ describe('SqlContractSerializer parameterized type fields', () => {
       const input = {
         ...baseContractInput,
         storage: storageWithNamespacedTables({
-          storageHash: 'sha256:test',
+          storageHash: 'test',
           tables: {
             User: {
               columns: {

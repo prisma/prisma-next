@@ -111,8 +111,7 @@ interface MigrationStatusCommandResult {
 }
 
 function shortDisplayHash(hash: string): string {
-  const stripped = hash.startsWith('sha256:') ? hash.slice(7) : hash;
-  return stripped.slice(0, 12);
+  return hash.slice(0, 12);
 }
 
 function resolveTarget(contractHash: string, activeRefHash: string | undefined): string {
@@ -660,10 +659,10 @@ export function createMigrationStatusCommand(): Command {
   setCommandExamples(command, [
     'prisma-next migration status --db $DATABASE_URL',
     'prisma-next migration status --to production --db $DATABASE_URL',
-    'prisma-next migration status --from sha256:abc --to production',
-    'prisma-next migration status --from sha256:abc --to production --json',
-    'prisma-next migration status --ascii --from sha256:abc --to production',
-    'prisma-next migration status --legend --from sha256:abc --to production',
+    'prisma-next migration status --from abc123 --to production',
+    'prisma-next migration status --from abc123 --to production --json',
+    'prisma-next migration status --ascii --from abc123 --to production',
+    'prisma-next migration status --legend --from abc123 --to production',
   ]);
   setCommandSeeAlso(command, [
     { verb: 'migration log', oneLiner: 'Show executed migration history' },

@@ -46,7 +46,7 @@ const postgresTarget = {
   defaultNamespaceId: 'public',
 };
 
-const scalarTypeDescriptors = new Map<string, { codecId: string; nativeType: string }>([
+const scalarColumnDescriptors = new Map<string, { codecId: string; nativeType: string }>([
   ['String', { codecId: 'pg/text@1', nativeType: 'text' }],
   ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
 ]);
@@ -56,7 +56,6 @@ function parsePsl(source: string) {
   return buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...scalarTypeDescriptors.keys()],
     pslBlockDescriptors: assembled.pslBlockDescriptors,
   });
 }
@@ -66,7 +65,6 @@ function interpret(source: string) {
   const { table: symbolTable } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...scalarTypeDescriptors.keys()],
     pslBlockDescriptors: assembled.pslBlockDescriptors,
   });
   return interpretPslDocumentToSqlContract({
@@ -75,7 +73,7 @@ function interpret(source: string) {
     sourceId: 'schema.prisma',
     capabilities: {},
     target: postgresTarget,
-    scalarTypeDescriptors,
+    scalarColumnDescriptors,
     authoringContributions: assembled,
     composedExtensionContracts: new Map(),
     createNamespace: postgresCreateNamespace,
@@ -425,7 +423,6 @@ describe('native_enum coexists with a PSL enum block in the same namespace', () 
     const { table: symbolTable } = buildSymbolTable({
       document,
       sourceFile,
-      scalarTypes: [...scalarTypeDescriptors.keys()],
       pslBlockDescriptors: combinedAssembled.pslBlockDescriptors,
     });
     return interpretPslDocumentToSqlContract({
@@ -434,7 +431,7 @@ describe('native_enum coexists with a PSL enum block in the same namespace', () 
       sourceId: 'schema.prisma',
       capabilities: {},
       target: postgresTarget,
-      scalarTypeDescriptors,
+      scalarColumnDescriptors,
       authoringContributions: combinedAssembled,
       composedExtensionContracts: new Map(),
       createNamespace: postgresCreateNamespace,

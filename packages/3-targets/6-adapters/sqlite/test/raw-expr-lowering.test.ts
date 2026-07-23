@@ -16,13 +16,13 @@ import type { SqliteContract } from '../src/core/types';
 const contract = new SqlContractSerializer().deserializeContract({
   target: 'sqlite',
   targetFamily: 'sql',
-  profileHash: 'sha256:raw-expr-test',
+  profileHash: 'raw-expr-test',
   roots: {},
   capabilities: {},
   extensions: {},
   meta: {},
   storage: {
-    storageHash: 'sha256:raw-expr-core',
+    storageHash: 'raw-expr-core',
     namespaces: {
       __unbound__: {
         id: '__unbound__',

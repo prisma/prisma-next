@@ -135,21 +135,21 @@ types {
 }
 
 model Cafe {
-  id       String      @id @default(uuid())
+  id       Char(36)    @id @default(uuid())
   name     String
   location WgsGeometry
   @@map("cafe")
 }
 
 model Route {
-  id   String      @id @default(uuid())
+  id   Char(36)    @id @default(uuid())
   name String
   path WgsGeometry
   @@map("route")
 }
 
 model Neighborhood {
-  id       String      @id @default(uuid())
+  id       Char(36)    @id @default(uuid())
   name     String
   boundary WgsGeometry
   @@map("neighborhood")

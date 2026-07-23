@@ -83,12 +83,13 @@ Want to ship your own? The **[Authoring Prisma Next Extensions](https://pris.ly/
 
 ## Supported databases
 
-Prisma Next ships first-class support for:
+Prisma 8 carries **PostgreSQL to general availability** — and that is all at this stage:
 
-- **PostgreSQL** — the primary target and on track for GA
-- **MongoDB** — proves the framework works beyond SQL
+- **PostgreSQL** — the primary target; general availability at Prisma 8
+- **MongoDB** — early access; proves the framework works beyond SQL
+- **SQLite** — a proof of concept today
 
-SQLite is the next SQL target on deck, with MySQL to follow. See the [roadmap](./ROADMAP.md) for the full sequencing.
+MySQL follows later. See the [roadmap](./ROADMAP.md) for what must happen before the 8.0.0-rc.1 release.
 
 ## Contributing
 

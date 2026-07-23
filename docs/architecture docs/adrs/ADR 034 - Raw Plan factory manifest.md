@@ -92,7 +92,7 @@ Define an optional sidecar JSON manifest that lanes may emit when they generate 
       "lane": "typed-sql",
       "origin": { "sqlPath": "prisma/sql/getUsersWithPosts.sql", "lineRange": [1, 20] },
       "targetProfile": "postgres@15",
-      "contract": { "coreHash": "sha256:abc…", "profileHash": "sha256:def…" },
+      "contract": { "coreHash": "abc…", "profileHash": "def…" },
       "plan": {
         "annotations": { "intent": "read", "isMutation": false, "hasWhere": true, "hasLimit": false },
         "refs": { "tables": ["User", "Post"], "columns": ["User.id", "User.name", "Post.id"] }
@@ -110,7 +110,7 @@ Define an optional sidecar JSON manifest that lanes may emit when they generate 
       },
       "fingerprints": {
         "sqlFingerprint": "xxh3:5dd7e…",
-        "factoryHash": "sha256:91bf…"
+        "factoryHash": "91bf…"
       },
       "tooling": {
         "generator": "typed-sql@0.2.1",

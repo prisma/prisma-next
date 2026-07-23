@@ -12,8 +12,8 @@ import {
 import { MigrationToolsError } from '../src/errors';
 
 const HASH_HEX = 'a'.repeat(64);
-const STORAGE_HASH = `sha256:${HASH_HEX}`;
-const OTHER_HASH = `sha256:${'b'.repeat(64)}`;
+const STORAGE_HASH = HASH_HEX;
+const OTHER_HASH = 'b'.repeat(64);
 
 function contractFixture(storageHash: string) {
   return { storage: { storageHash }, target: 'postgres' };
@@ -42,7 +42,7 @@ describe('writeContractSnapshot', () => {
     const json = await readFile(join(result.dir, 'contract.json'), 'utf-8');
     // Canonicalized: object keys sorted lexicographically at every level.
     expect(json).toBe(
-      '{"storage":{"storageHash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"target":"postgres"}\n',
+      '{"storage":{"storageHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"target":"postgres"}\n',
     );
 
     const dts = await readFile(join(result.dir, 'contract.d.ts'), 'utf-8');
@@ -214,8 +214,8 @@ describe('readContractSnapshotJsonTolerant', () => {
     expect(json).toBeUndefined();
   });
 
-  it('returns undefined when storageHash is not a well-formed sha256:<64hex> value', async () => {
-    const json = await readContractSnapshotJsonTolerant(migrationsDir, 'sha256:short-placeholder');
+  it('returns undefined when storageHash is not a well-formed 64-hex value', async () => {
+    const json = await readContractSnapshotJsonTolerant(migrationsDir, 'short-placeholder');
 
     expect(json).toBeUndefined();
   });

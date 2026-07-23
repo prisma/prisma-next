@@ -76,7 +76,7 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn', () => {
     types?: Record<string, SqlStorageTypeEntry>;
   }): SqlStorage {
     return new SqlStorage({
-      storageHash: 'sha256:test' as SqlStorage['storageHash'],
+      storageHash: 'test' as SqlStorage['storageHash'],
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -255,7 +255,7 @@ describe('buildCodecDescriptorRegistry — codecRefForColumn namespace coordinat
   // coordinate it is handed rather than scanning and first-matching.
   function twoNamespaceStorage(): SqlStorage {
     return new SqlStorage({
-      storageHash: 'sha256:test' as SqlStorage['storageHash'],
+      storageHash: 'test' as SqlStorage['storageHash'],
       namespaces: {
         public: createTestSqlNamespace({
           id: 'public',

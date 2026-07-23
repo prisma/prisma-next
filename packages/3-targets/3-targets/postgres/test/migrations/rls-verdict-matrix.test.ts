@@ -77,9 +77,9 @@ function buildContract(options: {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:rls-verdict-matrix-test'),
+    profileHash: profileHash('rls-verdict-matrix-test'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:rls-verdict-matrix-test'),
+      storageHash: coreHash('rls-verdict-matrix-test'),
       namespaces: { public: schema },
     }),
     roots: {},

@@ -521,7 +521,7 @@ const contract: Contract = {
   storage: { tables: {} } as Contract['storage'],
   capabilities: {},
   extensions: {},
-  profileHash: 'sha256:stub' as Contract['profileHash'],
+  profileHash: 'stub' as Contract['profileHash'],
   meta: {},
 };
 ```

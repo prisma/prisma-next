@@ -64,7 +64,7 @@ describe('PostgresMigration view getters', () => {
   it('endContract throws when no endContractJson is provided', () => {
     class NoContract extends PostgresMigration<Contract, Contract> {
       override describe() {
-        return { from: null, to: 'sha256:x' };
+        return { from: null, to: 'x' };
       }
       override get operations() {
         return [];

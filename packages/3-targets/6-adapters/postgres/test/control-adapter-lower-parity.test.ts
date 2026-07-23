@@ -25,13 +25,13 @@ import {
 const contract = new SqlContractSerializer().deserializeContract({
   target: 'postgres',
   targetFamily: 'sql',
-  profileHash: 'sha256:test-profile',
+  profileHash: 'test-profile',
   roots: {},
   capabilities: {},
   extensions: {},
   meta: {},
   storage: {
-    storageHash: 'sha256:test-core',
+    storageHash: 'test-core',
     namespaces: {
       __unbound__: {
         id: '__unbound__',

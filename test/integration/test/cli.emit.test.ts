@@ -107,7 +107,7 @@ describe('emit command functionality', () => {
         sqlEmission,
       );
 
-      expect(result.storageHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+      expect(result.storageHash).toMatch(/^[a-f0-9]{64}$/);
     },
     timeouts.typeScriptCompilation,
   );

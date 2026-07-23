@@ -1,5 +1,6 @@
 import type { Contract, JsonValue } from '@prisma-next/contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import type { CapabilityMatrix } from '../shared/capabilities';
 import { mergeCapabilityMatrices } from '../shared/capabilities';
 import type { Codec } from '../shared/codec';
@@ -15,6 +16,9 @@ import type {
 } from '../shared/framework-authoring';
 import {
   assertNoCrossRegistryCollisions,
+  assertResolvableTypeConstructorTemplates,
+  collectContributedDescriptorPaths,
+  collectScalarTypeConstructors,
   mergeAuthoringNamespaces,
 } from '../shared/framework-authoring';
 import type { ComponentMetadata } from '../shared/framework-components';
@@ -43,6 +47,8 @@ export interface AssembledAuthoringContributions {
   readonly entityTypes: AuthoringEntityTypeNamespace;
   readonly pslBlockDescriptors: AuthoringPslBlockDescriptorNamespace;
   readonly modelAttributes: AuthoringModelAttributeDescriptorNamespace;
+  /** The single {@link AuthoringContributions.valueObjectStorageType} declared across the composed components, validated at assembly against the merged `type` namespace. */
+  readonly valueObjectStorageType?: string;
 }
 
 export interface ControlStack<
@@ -62,7 +68,8 @@ export interface ControlStack<
   readonly extensionIds: ReadonlyArray<string>;
   readonly codecLookup: CodecRegistry;
   readonly authoringContributions: AssembledAuthoringContributions;
-  readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
+  /** Names of the top-level zero-arg type constructors in the assembled authoring namespace — the base scalars of the composed stack. */
+  readonly scalarTypes: ReadonlyArray<string>;
   readonly controlMutationDefaults: ControlMutationDefaults;
   readonly capabilities: CapabilityMatrix;
 }
@@ -94,7 +101,7 @@ export function assertUniqueCodecOwner(options: {
 }): void {
   const existingOwner = options.owners.get(options.codecId);
   if (existingOwner !== undefined) {
-    throw new Error(
+    throw new InternalError(
       `Duplicate ${options.entityLabel} for codecId "${options.codecId}". ` +
         `Descriptor "${options.descriptorId}" conflicts with "${existingOwner}". ` +
         `Each codecId can only have one ${options.entityOwnershipLabel}.`,
@@ -158,7 +165,7 @@ export function extractComponentIds(
 }
 
 export function assembleAuthoringContributions(
-  descriptors: ReadonlyArray<{ readonly authoring?: AuthoringContributions }>,
+  descriptors: ReadonlyArray<{ readonly id?: string; readonly authoring?: AuthoringContributions }>,
 ): AssembledAuthoringContributions {
   const field = {} as Record<string, unknown>;
   const type = {} as Record<string, unknown>;
@@ -166,14 +173,57 @@ export function assembleAuthoringContributions(
   const pslBlockDescriptors: Record<string, unknown> = {};
   const modelAttributes: Record<string, unknown> = {};
 
+  const pathOwners = new Map<string, string>();
+  const claimContributedPaths = (
+    namespace: Record<string, unknown>,
+    descriptorKind: string,
+    label: string,
+    descriptorId: string,
+  ): void => {
+    for (const path of collectContributedDescriptorPaths(namespace, descriptorKind)) {
+      const key = `${label}:${path}`;
+      const existingOwner = pathOwners.get(key);
+      if (existingOwner !== undefined) {
+        throw new InternalError(
+          `Duplicate authoring ${label} helper "${path}". ` +
+            `Descriptor "${descriptorId}" conflicts with "${existingOwner}".`,
+        );
+      }
+      pathOwners.set(key, descriptorId);
+    }
+  };
+
+  let valueObjectStorageDeclaration:
+    | { readonly name: string; readonly ownerId: string }
+    | undefined;
+
   for (const descriptor of descriptors) {
+    const descriptorId = descriptor.id ?? '<unknown>';
+    const declaredValueObjectStorageType = descriptor.authoring?.valueObjectStorageType;
+    if (declaredValueObjectStorageType !== undefined) {
+      if (valueObjectStorageDeclaration !== undefined) {
+        throw new InternalError(
+          'Duplicate authoring valueObjectStorageType declaration. ' +
+            `Descriptor "${descriptorId}" conflicts with "${valueObjectStorageDeclaration.ownerId}". ` +
+            'Exactly one composed component may declare the value-object storage type.',
+        );
+      }
+      valueObjectStorageDeclaration = {
+        name: declaredValueObjectStorageType,
+        ownerId: descriptorId,
+      };
+    }
     if (descriptor.authoring?.field) {
+      claimContributedPaths(descriptor.authoring.field, 'fieldPreset', 'field', descriptorId);
       mergeAuthoringNamespaces(field, descriptor.authoring.field, [], 'fieldPreset', 'field');
     }
     if (descriptor.authoring?.type) {
+      claimContributedPaths(descriptor.authoring.type, 'typeConstructor', 'type', descriptorId);
+      assertResolvableTypeConstructorTemplates(descriptor.authoring.type, descriptorId);
       mergeAuthoringNamespaces(type, descriptor.authoring.type, [], 'typeConstructor', 'type');
     }
     if (descriptor.authoring?.entityTypes) {
+      claimContributedPaths(descriptor.authoring.entityTypes, 'entity', 'entity', descriptorId);
       mergeAuthoringNamespaces(
         entityTypes,
         descriptor.authoring.entityTypes,
@@ -183,6 +233,12 @@ export function assembleAuthoringContributions(
       );
     }
     if (descriptor.authoring?.pslBlockDescriptors) {
+      claimContributedPaths(
+        descriptor.authoring.pslBlockDescriptors,
+        'pslBlock',
+        'pslBlock',
+        descriptorId,
+      );
       mergeAuthoringNamespaces(
         pslBlockDescriptors,
         descriptor.authoring.pslBlockDescriptors,
@@ -221,41 +277,26 @@ export function assembleAuthoringContributions(
     modelAttributeNamespace,
   );
 
+  if (
+    valueObjectStorageDeclaration !== undefined &&
+    !collectScalarTypeConstructors(typeNamespace).has(valueObjectStorageDeclaration.name)
+  ) {
+    throw new InternalError(
+      `Invalid authoring valueObjectStorageType "${valueObjectStorageDeclaration.name}" declared by descriptor "${valueObjectStorageDeclaration.ownerId}". ` +
+        'The name must be a top-level bare-eligible type constructor in the assembled authoring namespace.',
+    );
+  }
+
   return {
     field: fieldNamespace,
     type: typeNamespace,
     entityTypes: entityTypeNamespace,
     pslBlockDescriptors: pslBlockDescriptorNamespace,
     modelAttributes: modelAttributeNamespace,
+    ...(valueObjectStorageDeclaration !== undefined
+      ? { valueObjectStorageType: valueObjectStorageDeclaration.name }
+      : {}),
   };
-}
-
-export function assembleScalarTypeDescriptors(
-  descriptors: ReadonlyArray<
-    Pick<ComponentMetadata, 'scalarTypeDescriptors'> & { readonly id?: string }
-  >,
-): ReadonlyMap<string, string> {
-  const result = new Map<string, string>();
-  const owners = new Map<string, string>();
-
-  for (const descriptor of descriptors) {
-    const descriptorMap = descriptor.scalarTypeDescriptors;
-    if (!descriptorMap) continue;
-    const descriptorId = descriptor.id ?? '<unknown>';
-    for (const [typeName, codecId] of descriptorMap) {
-      const existingOwner = owners.get(typeName);
-      if (existingOwner !== undefined) {
-        throw new Error(
-          `Duplicate scalar type descriptor "${typeName}". ` +
-            `Descriptor "${descriptorId}" conflicts with "${existingOwner}".`,
-        );
-      }
-      result.set(typeName, codecId);
-      owners.set(typeName, descriptorId);
-    }
-  }
-
-  return result;
 }
 
 export function assembleControlMutationDefaults(
@@ -276,7 +317,7 @@ export function assembleControlMutationDefaults(
     for (const generatorDescriptor of contributions.generatorDescriptors) {
       const existingOwner = generatorOwners.get(generatorDescriptor.id);
       if (existingOwner !== undefined) {
-        throw new Error(
+        throw new InternalError(
           `Duplicate mutation default generator id "${generatorDescriptor.id}". ` +
             `Descriptor "${descriptorId}" conflicts with "${existingOwner}".`,
         );
@@ -288,7 +329,7 @@ export function assembleControlMutationDefaults(
     for (const [functionName, handler] of contributions.defaultFunctionRegistry) {
       const existingOwner = functionOwners.get(functionName);
       if (existingOwner !== undefined) {
-        throw new Error(
+        throw new InternalError(
           `Duplicate mutation default function "${functionName}". ` +
             `Descriptor "${descriptorId}" conflicts with "${existingOwner}".`,
         );
@@ -408,14 +449,14 @@ export function extractCodecLookup(
 }
 
 export function validateScalarTypeCodecIds(
-  scalarTypeDescriptors: ReadonlyMap<string, string>,
+  typeNamespace: AuthoringTypeNamespace,
   codecLookup: CodecLookup,
 ): string[] {
   const errors: string[] = [];
-  for (const [typeName, codecId] of scalarTypeDescriptors) {
-    if (!codecLookup.get(codecId)) {
+  for (const [typeName, output] of collectScalarTypeConstructors(typeNamespace)) {
+    if (!codecLookup.get(output.codecId)) {
       errors.push(
-        `Scalar type "${typeName}" references codec "${codecId}" which is not registered by any component.`,
+        `Scalar type "${typeName}" references codec "${output.codecId}" which is not registered by any component.`,
       );
     }
   }
@@ -481,7 +522,7 @@ export function buildExtensionLoadOrder(
   for (const ext of extensions) {
     for (const depId of readDeclaredDependencyIds(ext)) {
       if (!idSet.has(depId)) {
-        throw new Error(
+        throw new InternalError(
           `Extension "${ext.id}" declares a dependency on "${depId}", but "${depId}" is not in the provided extension set. Add the missing space to extensions.`,
         );
       }
@@ -516,7 +557,7 @@ export function buildExtensionLoadOrder(
       .map((e) => e.id)
       .filter((id) => !result.includes(id))
       .sort();
-    throw new Error(
+    throw new InternalError(
       `Extension dependency cycle detected. Cycle members: ${cycleMembers.map((id) => `"${id}"`).join(', ')}.`,
     );
   }
@@ -538,7 +579,7 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
   const allDescriptors = [family, target, ...(adapter ? [adapter] : []), ...orderedExtensions];
 
   const codecLookup = extractCodecLookup(allDescriptors);
-  const scalarTypeDescriptors = assembleScalarTypeDescriptors(allDescriptors);
+  const authoringContributions = assembleAuthoringContributions(allDescriptors);
 
   return {
     family,
@@ -552,8 +593,8 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     queryOperationTypeImports: extractQueryOperationTypeImports(allDescriptors),
     extensionIds: extractComponentIds(family, target, adapter, orderedExtensions),
     codecLookup,
-    authoringContributions: assembleAuthoringContributions(allDescriptors),
-    scalarTypeDescriptors,
+    authoringContributions,
+    scalarTypes: [...collectScalarTypeConstructors(authoringContributions.type).keys()],
     controlMutationDefaults: assembleControlMutationDefaults(allDescriptors),
     capabilities: mergeCapabilityMatrices({}, [
       target,

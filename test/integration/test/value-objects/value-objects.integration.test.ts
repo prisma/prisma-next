@@ -61,7 +61,8 @@ const postgresScalarTypeDescriptors = new Map([
   ['String', { codecId: 'pg/text@1', nativeType: 'text' }],
   ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
   ['Boolean', { codecId: 'pg/bool@1', nativeType: 'bool' }],
-  ['Json', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
+  ['Json', { codecId: 'pg/json@1', nativeType: 'json' }],
+  ['Jsonb', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
 ]) as ReadonlyMap<string, { codecId: string; nativeType: string }>;
 
 function interpretMongoPsl(schema: string) {
@@ -77,23 +78,31 @@ function interpretMongoPsl(schema: string) {
   const { table } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...mongoScalarTypeDescriptors.keys()],
     pslBlockDescriptors: {},
   });
   return interpretPslDocumentToMongoContract({
     symbolTable: table,
     sourceFile,
     sourceId: 'test.prisma',
-    scalarTypeDescriptors: mongoScalarTypeDescriptors,
+    scalarTypeCodecIds: mongoScalarTypeDescriptors,
   });
 }
+
+const postgresScalarAuthoringTypes = Object.fromEntries(
+  [...postgresScalarTypeDescriptors].map(([name, { codecId, nativeType }]) => [
+    name,
+    {
+      kind: 'typeConstructor' as const,
+      output: { codecId, nativeType },
+    },
+  ]),
+);
 
 function interpretSqlPsl(schema: string) {
   const { document, sourceFile } = parse(schema);
   const { table } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...postgresScalarTypeDescriptors.keys()],
     pslBlockDescriptors: {},
   });
   return interpretPslDocumentToSqlContract({
@@ -101,7 +110,12 @@ function interpretSqlPsl(schema: string) {
     sourceFile,
     sourceId: 'test.prisma',
     target: postgresTarget,
-    scalarTypeDescriptors: postgresScalarTypeDescriptors,
+    scalarColumnDescriptors: postgresScalarTypeDescriptors,
+    // Mirrors the real postgres adapter declaration.
+    authoringContributions: {
+      type: postgresScalarAuthoringTypes,
+      valueObjectStorageType: 'Jsonb',
+    },
     composedExtensionContracts: new Map(),
     createNamespace: postgresCreateNamespace,
     capabilities: { sql: { scalarList: true } },

@@ -15,6 +15,7 @@ import {
   JsonArrayAggExpr,
   JsonObjectExpr,
   LiteralExpr,
+  NativeJsonValueProjection,
   OrderByItem,
   OrExpr,
   ProjectionItem,
@@ -396,7 +397,7 @@ function wrapWithRowNumberDedup(options: {
   return SelectAst.from(DerivedTableSource.as(rankedAlias, inner))
     .withProjection(
       base.projection.map((item) =>
-        ProjectionItem.of(item.alias, ColumnRef.of(rankedAlias, item.alias)),
+        ProjectionItem.of(item.alias, ColumnRef.of(rankedAlias, item.alias), item.codec),
       ),
     )
     .withWhere(BinaryExpr.eq(ColumnRef.of(rankedAlias, rnAlias), LiteralExpr.of(1)));
@@ -1041,7 +1042,7 @@ function buildDistinctNonLeafChildRowsSelect(options: {
   // outer SELECT so `aggregateOrderBy` (which still references `rowsAlias`)
   // can resolve them when the outer wrap materialises `(childRows) AS rowsAlias`.
   const outerHiddenOrderProjection = hiddenOrderProjection.map((proj) =>
-    ProjectionItem.of(proj.alias, ColumnRef.of(distinctAlias, proj.alias)),
+    ProjectionItem.of(proj.alias, ColumnRef.of(distinctAlias, proj.alias), proj.codec),
   );
 
   const childProjection: ReadonlyArray<ProjectionItem> = [
@@ -1130,7 +1131,7 @@ function buildIncludeChildScalarSelect(
   if (!needsInnerScoping) {
     const aggregateExpr = buildIncludeAggregateExpr(scalar, childTableRef);
     const jsonObjectExpr = JsonObjectExpr.fromEntries([
-      JsonObjectExpr.entry('value', aggregateExpr),
+      JsonObjectExpr.entry('value', new NativeJsonValueProjection(aggregateExpr)),
     ]);
     return SelectAst.from(
       tableSourceForContract(
@@ -1232,7 +1233,7 @@ function buildIncludeChildScalarSelect(
   // Outer aggregating SELECT over the shaped inner row set.
   const outerAggregateExpr = buildIncludeAggregateExpr(scalar, innerAlias);
   const outerJsonObjectExpr = JsonObjectExpr.fromEntries([
-    JsonObjectExpr.entry('value', outerAggregateExpr),
+    JsonObjectExpr.entry('value', new NativeJsonValueProjection(outerAggregateExpr)),
   ]);
 
   return SelectAst.from(DerivedTableSource.as(innerAlias, inner)).withProjection([
@@ -1315,7 +1316,10 @@ function buildIncludeChildCombineSelect(
 
   const jsonObjectExpr = JsonObjectExpr.fromEntries(
     compiledBranches.map((branch) =>
-      JsonObjectExpr.entry(branch.name, ColumnRef.of(branch.alias, include.relationName)),
+      JsonObjectExpr.entry(
+        branch.name,
+        new NativeJsonValueProjection(ColumnRef.of(branch.alias, include.relationName)),
+      ),
     ),
   );
 
@@ -1379,13 +1383,20 @@ function buildIncludeChildRowsAggregateSelect(
   );
   const jsonObjectExpr = JsonObjectExpr.fromEntries(
     childProjection.map((item) =>
-      JsonObjectExpr.entry(item.alias, ColumnRef.of(rowsAlias, item.alias)),
+      JsonObjectExpr.entry(
+        item.alias,
+        new NativeJsonValueProjection(ColumnRef.of(rowsAlias, item.alias)),
+      ),
     ),
   );
   return SelectAst.from(DerivedTableSource.as(rowsAlias, childRows)).withProjection([
     ProjectionItem.of(
       include.relationName,
-      JsonArrayAggExpr.of(jsonObjectExpr, 'emptyArray', aggregateOrderBy),
+      JsonArrayAggExpr.of(
+        new NativeJsonValueProjection(jsonObjectExpr),
+        'emptyArray',
+        aggregateOrderBy,
+      ),
     ),
   ]);
 }

@@ -127,9 +127,9 @@ function describedContractWithNativeEnum(input: {
   const contract: Contract<SqlStorage> = {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:contract'),
+      storageHash: coreHash('contract'),
       namespaces: {
         [input.namespaceId]: new PostgresSchema({
           id: input.namespaceId,
@@ -227,7 +227,6 @@ function interpret(source: string) {
   const { table: symbolTable } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...scalarTypeDescriptors.keys()],
     pslBlockDescriptors: assembled.pslBlockDescriptors,
   });
   return interpretPslDocumentToSqlContract({
@@ -236,7 +235,7 @@ function interpret(source: string) {
     sourceId: 'schema.prisma',
     capabilities: {},
     target: postgresTarget,
-    scalarTypeDescriptors,
+    scalarColumnDescriptors: scalarTypeDescriptors,
     authoringContributions: assembled,
     composedExtensionContracts: new Map(),
     createNamespace: postgresCreateNamespace,
@@ -589,5 +588,56 @@ describe('adopted output lowers through the production interpret chain', () => {
     const wrappedNs = wrappedResult.value.storage.namespaces['public'] as PostgresSchema;
     expect(Object.keys(wrappedNs.table)).toEqual(Object.keys(flatNs.table));
     expect(wrappedNs.table['user']?.columns).toEqual(flatNs.table['user']?.columns);
+  });
+});
+
+describe('mixed-case enum type names (Prisma-ORM-created types)', () => {
+  // Prisma ORM's migration engine names the type after the PSL enum —
+  // PascalCase, created quoted ("HoldType"). Postgres case-folds unquoted
+  // identifiers, so any consumer of the inferred contract that renders the
+  // type name unquoted resolves a nonexistent lowercase type (TML-3085).
+  // Lowercase-only fixtures cannot observe that class of bug.
+  const HOLD_TYPE: FlatNativeEnumEntry = {
+    typeName: 'HoldType',
+    values: ['active', 'released'],
+  };
+
+  function ordersNamespace(schemaName: string) {
+    return namespaceNode(
+      schemaName,
+      {
+        orders: table('orders', {
+          id: idColumn,
+          hold: { name: 'hold', nativeType: 'HoldType', nullable: false },
+        }),
+      },
+      [HOLD_TYPE],
+    );
+  }
+
+  it('preserves the PascalCase type name verbatim through infer and print', () => {
+    const output = inferAndPrint(tree({ public: ordersNamespace('public') }));
+
+    // The block name already equals the type name, so no @@map is emitted —
+    // the interpret test below proves the nativeType still round-trips.
+    expect(output).toContain('native_enum HoldType {');
+    expect(output).not.toContain('@@map("HoldType")');
+    expect(output).toContain('pg.enum(HoldType)');
+    expect(output).not.toContain('holdtype');
+    expect(output).not.toContain('Unsupported(');
+  });
+
+  it('interprets with the mixed-case typeName in typeParams — the input the cast-quoting policy keys on', () => {
+    const result = interpret(inferAndPrint(tree({ public: ordersNamespace('public') })));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const ns = result.value.storage.namespaces['public'] as PostgresSchema;
+    expect(ns.valueSet?.['HoldType']).toMatchObject({ values: ['active', 'released'] });
+    expect(ns.table['orders']?.columns['hold']).toMatchObject({
+      codecId: 'pg/enum@1',
+      nativeType: 'HoldType',
+      typeParams: { typeName: 'HoldType' },
+    });
   });
 });

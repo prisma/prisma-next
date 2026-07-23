@@ -109,11 +109,11 @@ describe('listContractSpaceDirectories', () => {
 
 describe('verifyContractSpaces', () => {
   const cipherstashHead: ContractSpaceHeadRecord = {
-    hash: 'sha256:0000000000000000000000000000000000000000000000000000000000000001',
+    hash: '0000000000000000000000000000000000000000000000000000000000000001',
     invariants: ['cipherstash:install-v1'],
   };
   const pgvectorHead: ContractSpaceHeadRecord = {
-    hash: 'sha256:0000000000000000000000000000000000000000000000000000000000000002',
+    hash: '0000000000000000000000000000000000000000000000000000000000000002',
     invariants: ['pgvector:install-v1'],
   };
 
@@ -192,7 +192,7 @@ describe('verifyContractSpaces', () => {
 
   it('rejects when marker hash does not match on-disk head hash for a loaded space (hashMismatch)', () => {
     const driftedMarker: SpaceMarkerRecord = {
-      hash: 'sha256:00000000000000000000000000000000000000000000000000000000000000ff',
+      hash: '00000000000000000000000000000000000000000000000000000000000000ff',
       invariants: cipherstashHead.invariants,
     };
     const result = verifyContractSpaces({
@@ -262,7 +262,7 @@ describe('verifyContractSpaces', () => {
 
   it('every violation includes a remediation hint', () => {
     const driftedMarker: SpaceMarkerRecord = {
-      hash: 'sha256:00000000000000000000000000000000000000000000000000000000000000ff',
+      hash: '00000000000000000000000000000000000000000000000000000000000000ff',
       invariants: [],
     };
     const result = verifyContractSpaces({
@@ -285,7 +285,7 @@ describe('verifyContractSpaces', () => {
 
   it("treats 'app' marker rows as expected (app is always loaded)", () => {
     const appMarker: SpaceMarkerRecord = {
-      hash: 'sha256:dead',
+      hash: 'dead',
       invariants: [],
     };
     const result = verifyContractSpaces({

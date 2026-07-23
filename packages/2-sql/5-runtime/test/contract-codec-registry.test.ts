@@ -135,11 +135,11 @@ function createTestContract(
   return {
     targetFamily: 'sql',
     target: 'postgres',
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     domain: applicationDomainOf({ models: {} }),
     roots: {},
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       namespaces: {
         __unbound__: createTestSqlNamespace({
           id: '__unbound__',

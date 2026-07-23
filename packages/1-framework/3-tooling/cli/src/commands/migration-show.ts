@@ -228,7 +228,7 @@ export function createMigrationShowCommand(): Command {
   );
   setCommandExamples(command, [
     'prisma-next migration show 20260101_100000_add_user',
-    'prisma-next migration show sha256:a1b2c3',
+    'prisma-next migration show a1b2c3',
     'prisma-next migration show 20260101_100000_add_user --json',
   ]);
   setCommandSeeAlso(command, [

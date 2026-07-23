@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { mongoEmission } from '../src/index';
 import { blogContract } from './fixtures/blog-contract';
 
-const testHashes = { storageHash: 'sha256:blog-test', profileHash: 'sha256:blog-profile' };
+const testHashes = { storageHash: 'blog-test', profileHash: 'blog-profile' };
 
 const mongoCodecImports: TypesImportSpec[] = [
   {

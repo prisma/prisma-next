@@ -83,7 +83,7 @@ describe('emitter integration', () => {
 
       const result = await emit(ir, options, mockSqlHook);
 
-      expect(result.storageHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+      expect(result.storageHash).toMatch(/^[a-f0-9]{64}$/);
       expect(result.contractDts).toContain('export type Contract');
       expect(result.contractDts).toContain('CodecTypes');
       expect(result.contractDts).toContain('LaneCodecTypes');
@@ -93,7 +93,7 @@ describe('emitter integration', () => {
         schemaVersion: '1',
         targetFamily: 'sql',
         target: 'postgres',
-        profileHash: expect.stringMatching(/^sha256:/),
+        profileHash: expect.stringMatching(/^[a-f0-9]{64}$/),
         roots: {},
         storage: {
           storageHash: result.storageHash,

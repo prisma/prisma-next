@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PostgresControlAdapter } from '../../src/core/control-adapter';
 import { encodeControlQueryParams } from '../../src/core/control-codecs';
 
-const CONTRACT_HASH = 'sha256:contract-abc';
+const CONTRACT_HASH = 'contract-abc';
 
 const lowerToExecuteRequestMock = vi.fn();
 
@@ -26,7 +26,7 @@ function makeAdapter(): SqlControlAdapter<'postgres'> {
 function makeContract(storageHash: string = CONTRACT_HASH): Contract<SqlStorage> {
   return {
     storage: { storageHash, tables: {}, extensions: {}, schemas: [], types: {} },
-    profile: { profileHash: 'sha256:profile', lanes: {} },
+    profile: { profileHash: 'profile', lanes: {} },
   } as unknown as Contract<SqlStorage>;
 }
 
@@ -149,7 +149,7 @@ describe('dataTransform factory', () => {
       await dataTransform(
         makeContract(),
         'mismatched',
-        { run: () => makePlan('sha256:someone-elses-contract') },
+        { run: () => makePlan('someone-elses-contract') },
         makeAdapter(),
       );
       expect.fail('expected dataTransform to throw');
@@ -160,7 +160,7 @@ describe('dataTransform factory', () => {
       expect(e.meta).toMatchObject({
         dataTransformName: 'mismatched',
         expected: CONTRACT_HASH,
-        actual: 'sha256:someone-elses-contract',
+        actual: 'someone-elses-contract',
       });
     }
   });

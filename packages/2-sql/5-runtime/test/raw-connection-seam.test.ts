@@ -33,11 +33,11 @@ import { descriptorsFromCodecs, stubAst } from './utils';
 const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
   target: 'postgres',
-  profileHash: profileHash('sha256:queryable-seam-test'),
+  profileHash: profileHash('queryable-seam-test'),
   domain: applicationDomainOf({ models: {} }),
   roots: {},
   storage: new SqlStorage({
-    storageHash: coreHash('sha256:queryable-seam-test'),
+    storageHash: coreHash('queryable-seam-test'),
     namespaces: {
       __unbound__: createTestSqlNamespace({ id: '__unbound__', entries: { table: {} } }),
     },

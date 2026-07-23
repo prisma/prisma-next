@@ -12,7 +12,7 @@ vi.mock('@prisma-next/config-loader', () => ({
   loadConfig: mocks.loadConfig,
 }));
 
-const HASH_A = `sha256:${'a'.repeat(64)}`;
+const HASH_A = `${'a'.repeat(64)}`;
 
 describe('migration-ref MigrationToolsError envelope mapping', () => {
   let tempDir: string;

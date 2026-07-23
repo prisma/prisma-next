@@ -23,9 +23,9 @@ import {
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
-const HASH_A = `sha256:${'a'.repeat(64)}`;
-const HASH_B = `sha256:${'b'.repeat(64)}`;
-const HASH_C = `sha256:${'c'.repeat(64)}`;
+const HASH_A = `${'a'.repeat(64)}`;
+const HASH_B = `${'b'.repeat(64)}`;
+const HASH_C = `${'c'.repeat(64)}`;
 
 const ENTRY_A: RefEntry = { hash: HASH_A, invariants: [] };
 const ENTRY_B: RefEntry = { hash: HASH_B, invariants: [] };

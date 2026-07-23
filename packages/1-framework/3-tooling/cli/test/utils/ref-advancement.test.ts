@@ -11,8 +11,8 @@ import {
   executeRefAdvancement,
 } from '../../src/utils/ref-advancement';
 
-const HASH_A = `sha256:${'a'.repeat(64)}`;
-const PROFILE_HASH = `sha256:${'c'.repeat(64)}`;
+const HASH_A = `${'a'.repeat(64)}`;
+const PROFILE_HASH = `${'c'.repeat(64)}`;
 
 function sampleContractIR(storageHash: string = HASH_A): ContractIR {
   return {
@@ -117,7 +117,7 @@ describe('executeRefAdvancement', () => {
   });
 
   it('propagates a hash mismatch between the argument and the contract IR from the store write', async () => {
-    const HASH_B = `sha256:${'b'.repeat(64)}`;
+    const HASH_B = 'b'.repeat(64);
     await expect(
       executeRefAdvancement(refsDir, migrationsDir, 'db', HASH_A, sampleContractIR(HASH_B)),
     ).rejects.toSatisfy((error) => {

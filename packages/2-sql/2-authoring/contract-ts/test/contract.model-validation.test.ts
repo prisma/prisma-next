@@ -10,7 +10,7 @@ import { storageWithNamespacedTables } from './storage-with-namespaced-tables';
 describe('SqlContractSerializer model validation', () => {
   const baseContract = validSqlContractJson({
     storage: storageWithNamespacedTables({
-      storageHash: 'sha256:test',
+      storageHash: 'test',
       tables: {
         User: {
           columns: {
@@ -67,7 +67,7 @@ describe('SqlContractSerializer model validation', () => {
       },
       {
         storage: storageWithNamespacedTables({
-          storageHash: 'sha256:test',
+          storageHash: 'test',
           tables: {
             User: {
               columns: {
@@ -158,7 +158,7 @@ describe('SqlContractSerializer model validation', () => {
       },
       {
         storage: storageWithNamespacedTables({
-          storageHash: 'sha256:test',
+          storageHash: 'test',
           tables: {
             User: {
               columns: {
@@ -223,7 +223,7 @@ describe('SqlContractSerializer model validation', () => {
       },
       {
         storage: storageWithNamespacedTables({
-          storageHash: 'sha256:test',
+          storageHash: 'test',
           tables: {
             User: {
               columns: {
@@ -294,7 +294,7 @@ describe('SqlContractSerializer model validation', () => {
       },
       {
         storage: storageWithNamespacedTables({
-          storageHash: 'sha256:test',
+          storageHash: 'test',
           tables: {
             User: {
               columns: {

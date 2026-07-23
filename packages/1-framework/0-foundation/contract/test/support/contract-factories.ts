@@ -24,7 +24,7 @@ type ContractOverrides<TStorage extends StorageBase = StorageBase> = {
   sortStorage?: StorageSort;
 };
 
-const DUMMY_HASH = coreHash('sha256:test');
+const DUMMY_HASH = coreHash('test');
 
 const DEFAULT_FRAMEWORK_STORAGE = { namespaces: {} } as const;
 

@@ -62,7 +62,7 @@ describe('SqlContractSerializer logic validation', () => {
     const invalid = {
       ...validContractInput,
       execution: {
-        executionHash: 'sha256:test',
+        executionHash: 'test',
         mutations: {
           defaults: [
             {

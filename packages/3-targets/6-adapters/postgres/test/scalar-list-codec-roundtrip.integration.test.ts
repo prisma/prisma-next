@@ -65,9 +65,9 @@ function buildListContract(): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:scalar-list-codec-roundtrip'),
+    profileHash: profileHash('scalar-list-codec-roundtrip'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:scalar-list-codec-roundtrip'),
+      storageHash: coreHash('scalar-list-codec-roundtrip'),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,

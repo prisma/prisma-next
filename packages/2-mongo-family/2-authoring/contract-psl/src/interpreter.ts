@@ -84,7 +84,7 @@ export interface InterpretPslDocumentToMongoContractInput {
   readonly symbolTable: SymbolTable;
   readonly sourceFile: SourceFile;
   readonly sourceId: string;
-  readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
+  readonly scalarTypeCodecIds: ReadonlyMap<string, string>;
   readonly codecLookup?: CodecLookup;
   readonly seedDiagnostics?: readonly ContractSourceDiagnostic[];
   readonly authoringContributions?: AuthoringContributions;
@@ -833,16 +833,16 @@ const MONGO_OBJECT_ID_PSL_TYPE = 'ObjectId';
 
 function resolveFieldCodecId(
   field: FieldSymbol,
-  scalarTypeDescriptors: ReadonlyMap<string, string>,
+  scalarTypeCodecIds: ReadonlyMap<string, string>,
 ): string | undefined {
-  return scalarTypeDescriptors.get(field.typeName);
+  return scalarTypeCodecIds.get(field.typeName);
 }
 
 function resolveNonRelationField(
   field: FieldSymbol,
   ownerName: string,
   compositeTypeNames: ReadonlySet<string>,
-  scalarTypeDescriptors: ReadonlyMap<string, string>,
+  scalarTypeCodecIds: ReadonlyMap<string, string>,
   codecIdByEnumName: ReadonlyMap<string, string>,
   sourceId: string,
   diagnostics: ContractSourceDiagnostic[],
@@ -878,7 +878,7 @@ function resolveNonRelationField(
     return undefined;
   }
 
-  const codecId = resolveFieldCodecId(field, scalarTypeDescriptors);
+  const codecId = resolveFieldCodecId(field, scalarTypeCodecIds);
   if (!codecId) {
     diagnostics.push({
       code: 'PSL_UNSUPPORTED_FIELD_TYPE',
@@ -952,7 +952,7 @@ function processEnumDeclarations(input: {
 export function interpretPslDocumentToMongoContract(
   input: InterpretPslDocumentToMongoContractInput,
 ): Result<Contract, ContractSourceDiagnostics> {
-  const { symbolTable, sourceFile, scalarTypeDescriptors, codecLookup } = input;
+  const { symbolTable, sourceFile, scalarTypeCodecIds, codecLookup } = input;
   const sourceId = input.sourceId;
   const diagnostics: ContractSourceDiagnostic[] = [...(input.seedDiagnostics ?? [])];
   const topLevel = symbolTable.topLevel;
@@ -1070,7 +1070,7 @@ export function interpretPslDocumentToMongoContract(
         field,
         pslModel.name,
         compositeTypeNames,
-        scalarTypeDescriptors,
+        scalarTypeCodecIds,
         codecIdByEnumName,
         sourceId,
         diagnostics,
@@ -1099,7 +1099,7 @@ export function interpretPslDocumentToMongoContract(
         // on how the user spelled it — `id ObjectId @id @map("_id")` and a field
         // literally named `_id` both satisfy it; a non-objectId or unmapped id
         // does not.
-        const objectIdCodecId = scalarTypeDescriptors.get(MONGO_OBJECT_ID_PSL_TYPE);
+        const objectIdCodecId = scalarTypeCodecIds.get(MONGO_OBJECT_ID_PSL_TYPE);
         const idField = fields['_id'];
         const idIsObjectId =
           idField !== undefined &&
@@ -1144,7 +1144,7 @@ export function interpretPslDocumentToMongoContract(
         field,
         compositeType.name,
         compositeTypeNames,
-        scalarTypeDescriptors,
+        scalarTypeCodecIds,
         codecIdByEnumName,
         sourceId,
         diagnostics,

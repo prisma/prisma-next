@@ -42,11 +42,11 @@ import { createTestRuntime as createRuntime, descriptorsFromCodecs } from './uti
 const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
   target: 'postgres',
-  profileHash: profileHash('sha256:test-profile'),
+  profileHash: profileHash('test-profile'),
   domain: applicationDomainOf({ models: {} }),
   roots: {},
   storage: new SqlStorage({
-    storageHash: coreHash('sha256:test'),
+    storageHash: coreHash('test'),
     namespaces: {
       __unbound__: createTestSqlNamespace({ id: '__unbound__', entries: { table: {} } }),
     },
@@ -69,8 +69,8 @@ function createCodecs(): ReadonlyArray<Codec<string>> {
 
 function markerRecord(overrides: Partial<ContractMarkerRecord> = {}): ContractMarkerRecord {
   return {
-    storageHash: 'sha256:test',
-    profileHash: 'sha256:test-profile',
+    storageHash: 'test',
+    profileHash: 'test-profile',
     contractJson: null,
     canonicalVersion: 1,
     updatedAt: new Date('2026-01-01T00:00:00Z'),
@@ -232,8 +232,8 @@ describe('verifyMarker', () => {
         code: 'CONTRACT.MARKER_MISSING',
         scope: 'marker-verification',
         expected: {
-          storageHash: 'sha256:test',
-          profileHash: 'sha256:test-profile',
+          storageHash: 'test',
+          profileHash: 'test-profile',
         },
         actual: null,
       }),
@@ -273,7 +273,7 @@ describe('verifyMarker', () => {
     const runtime = buildRuntime({
       markerResult: {
         kind: 'present',
-        record: markerRecord({ storageHash: 'sha256:stale' }),
+        record: markerRecord({ storageHash: 'stale' }),
       },
       log,
     });
@@ -286,10 +286,10 @@ describe('verifyMarker', () => {
         code: 'CONTRACT.MARKER_MISMATCH',
         scope: 'marker-verification',
         expected: {
-          storageHash: 'sha256:test',
-          profileHash: 'sha256:test-profile',
+          storageHash: 'test',
+          profileHash: 'test-profile',
         },
-        actual: expect.objectContaining({ storageHash: 'sha256:stale' }),
+        actual: expect.objectContaining({ storageHash: 'stale' }),
       }),
     );
   });
@@ -299,7 +299,7 @@ describe('verifyMarker', () => {
     const runtime = buildRuntime({
       markerResult: {
         kind: 'present',
-        record: markerRecord({ profileHash: 'sha256:other-profile' }),
+        record: markerRecord({ profileHash: 'other-profile' }),
       },
       log,
     });
@@ -311,8 +311,8 @@ describe('verifyMarker', () => {
       expect.objectContaining({
         code: 'CONTRACT.MARKER_MISMATCH',
         scope: 'marker-verification',
-        expected: expect.objectContaining({ profileHash: 'sha256:test-profile' }),
-        actual: expect.objectContaining({ profileHash: 'sha256:other-profile' }),
+        expected: expect.objectContaining({ profileHash: 'test-profile' }),
+        actual: expect.objectContaining({ profileHash: 'other-profile' }),
       }),
     );
   });

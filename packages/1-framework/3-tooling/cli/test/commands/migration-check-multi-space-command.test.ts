@@ -27,9 +27,9 @@ vi.mock('@prisma-next/config-loader', () => ({ loadConfig: mocks.loadConfig }));
 
 const TARGET = 'mock';
 const TARGET_FAMILY = 'mock';
-const HASH_APP = `sha256:${'a'.repeat(64)}`;
-const HASH_EXT = `sha256:${'b'.repeat(64)}`;
-const HASH_DANGLING = `sha256:${'c'.repeat(64)}`;
+const HASH_APP = `${'a'.repeat(64)}`;
+const HASH_EXT = `${'b'.repeat(64)}`;
+const HASH_DANGLING = `${'c'.repeat(64)}`;
 
 const ADDITIVE_OPS: readonly MigrationPlanOperation[] = [
   { id: 'table.users', label: 'Create table users', operationClass: 'additive' },
@@ -101,7 +101,7 @@ async function writeFixture(): Promise<string> {
 async function tamperMigrationHash(pkgDir: string): Promise<void> {
   const manifestPath = join(pkgDir, 'migration.json');
   const raw = JSON.parse(await readFile(manifestPath, 'utf-8')) as Record<string, unknown>;
-  raw['migrationHash'] = `sha256:${'f'.repeat(64)}`;
+  raw['migrationHash'] = `${'f'.repeat(64)}`;
   await writeFile(manifestPath, JSON.stringify(raw, null, 2));
 }
 

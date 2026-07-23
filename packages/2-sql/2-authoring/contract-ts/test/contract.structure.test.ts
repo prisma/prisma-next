@@ -9,7 +9,7 @@ import { unboundTables } from './unbound-tables';
 describe('SqlContractSerializer structure validation', () => {
   const validContractInput = validSqlContractJson({
     storage: storageWithNamespacedTables({
-      storageHash: 'sha256:test',
+      storageHash: 'test',
       tables: {
         User: {
           columns: {
@@ -52,7 +52,7 @@ describe('SqlContractSerializer structure validation', () => {
 
   it('preserves storageHash in storage', () => {
     const result = validateSqlContractFully<Contract<SqlStorage>>(validContractInput);
-    expect(result.storage.storageHash).toMatch(/^sha256:/);
+    expect(result.storage.storageHash).toBe('test');
   });
 
   it('throws on missing storage', () => {
@@ -71,7 +71,7 @@ describe('SqlContractSerializer structure validation', () => {
     const invalid = {
       ...validContractInput,
       storage: storageWithNamespacedTables({
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         tables: {
           User: {
             columns: {
@@ -91,7 +91,7 @@ describe('SqlContractSerializer structure validation', () => {
     const invalid = {
       ...validContractInput,
       storage: storageWithNamespacedTables({
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         tables: {
           User: {
             columns: {
@@ -114,14 +114,14 @@ describe('SqlContractSerializer structure validation', () => {
   it('validates optional fields', () => {
     const withOptional = {
       ...validContractInput,
-      profileHash: 'sha256:profile',
+      profileHash: 'profile',
       capabilities: { feature: { enabled: true } },
       extensions: { pack: { config: true } },
       meta: { key: 'value' },
       roots: {},
     };
     const result = validateSqlContractFully<Contract<SqlStorage>>(withOptional);
-    expect(result.profileHash).toBe('sha256:profile');
+    expect(result.profileHash).toBe('profile');
     expect(result.capabilities).toEqual({ feature: { enabled: true } });
   });
 });

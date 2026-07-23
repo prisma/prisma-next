@@ -4,9 +4,9 @@ import type { MongoContractWithTypeMaps, MongoTypeMaps } from '@prisma-next/mong
 import type { NamespaceId, ProfileHashBase, StorageHashBase } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:vo-test-storage-hash'>;
+  StorageHashBase<'vo-test-storage-hash'>;
 export type ProfileHash =
-  ProfileHashBase<'sha256:vo-test-profile-hash'>;
+  ProfileHashBase<'vo-test-profile-hash'>;
 
 export type CodecTypes = MongoCodecTypes;
 export type Location = {

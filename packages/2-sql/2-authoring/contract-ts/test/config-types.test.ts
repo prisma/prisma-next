@@ -25,7 +25,6 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
 const stubContext: ContractSourceContext = {
   composedExtensions: [],
   composedExtensionContracts: new Map(),
-  scalarTypeDescriptors: new Map(),
   authoringContributions: {
     field: {},
     type: {},

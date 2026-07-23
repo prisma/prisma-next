@@ -27,8 +27,8 @@ describe('PostgresControlAdapter marker/ledger write lowering', () => {
   it('insertMarker lowers to a plain insert with DB-side updated_at', async () => {
     const driver = createCapturingDriver();
     await adapter.insertMarker(driver, 'app', {
-      storageHash: 'sha256:core',
-      profileHash: 'sha256:prof',
+      storageHash: 'core',
+      profileHash: 'prof',
     });
 
     const { sql, params } = driver.calls[0]!;
@@ -39,15 +39,15 @@ describe('PostgresControlAdapter marker/ledger write lowering', () => {
     expect(sql).toContain('VALUES ($1, $2, $3, $4::jsonb, $5, now(), $6, $7::jsonb, $8::text[])');
     expect(sql).not.toContain('ON CONFLICT');
     expect(params[0]).toBe('app');
-    expect(params[1]).toBe('sha256:core');
-    expect(params[2]).toBe('sha256:prof');
+    expect(params[1]).toBe('core');
+    expect(params[2]).toBe('prof');
   });
 
   it('initMarker lowers to an upsert keyed on space with DB-side updated_at', async () => {
     const driver = createCapturingDriver();
     await adapter.initMarker(driver, 'app', {
-      storageHash: 'sha256:core',
-      profileHash: 'sha256:prof',
+      storageHash: 'core',
+      profileHash: 'prof',
       invariants: ['inv-a', 'inv-b'],
     });
 
@@ -62,8 +62,8 @@ describe('PostgresControlAdapter marker/ledger write lowering', () => {
     expect(sql).toContain('"updated_at" = now()');
     expect(sql).toContain('"invariants" = excluded."invariants"');
     expect(params[0]).toBe('app');
-    expect(params[1]).toBe('sha256:core');
-    expect(params[2]).toBe('sha256:prof');
+    expect(params[1]).toBe('core');
+    expect(params[2]).toBe('prof');
     expect(params[7]).toEqual(['inv-a', 'inv-b']);
   });
 
@@ -71,11 +71,11 @@ describe('PostgresControlAdapter marker/ledger write lowering', () => {
     // The capturing driver returns this row for the internal readMarker probe
     // and select; a Postgres driver yields `invariants` as a string[] already.
     const driver = createCapturingDriver([
-      { core_hash: 'sha256:from', profile_hash: 'sha256:prof', invariants: ['inv-a', 'inv-b'] },
+      { core_hash: 'from', profile_hash: 'prof', invariants: ['inv-a', 'inv-b'] },
     ]);
-    const matched = await adapter.updateMarker(driver, 'app', 'sha256:from', {
-      storageHash: 'sha256:to',
-      profileHash: 'sha256:prof',
+    const matched = await adapter.updateMarker(driver, 'app', 'from', {
+      storageHash: 'to',
+      profileHash: 'prof',
       invariants: ['inv-b', 'inv-c'],
     });
 
@@ -86,21 +86,15 @@ describe('PostgresControlAdapter marker/ledger write lowering', () => {
         'WHERE ("marker"."space" = $4 AND "marker"."core_hash" = $5) RETURNING "marker"."space"',
     );
     // union({a,b}, {b,c}) deduped + sorted — not the incoming set verbatim.
-    expect(update.params).toEqual([
-      'sha256:to',
-      'sha256:prof',
-      ['inv-a', 'inv-b', 'inv-c'],
-      'app',
-      'sha256:from',
-    ]);
+    expect(update.params).toEqual(['to', 'prof', ['inv-a', 'inv-b', 'inv-c'], 'app', 'from']);
     expect(matched).toBe(true);
   });
 
   it('updateMarker omits the invariants assignment when none are supplied', async () => {
     const driver = createCapturingDriver([]);
-    const matched = await adapter.updateMarker(driver, 'app', 'sha256:from', {
-      storageHash: 'sha256:to',
-      profileHash: 'sha256:prof',
+    const matched = await adapter.updateMarker(driver, 'app', 'from', {
+      storageHash: 'to',
+      profileHash: 'prof',
     });
 
     const { sql, params } = driver.calls[0]!;
@@ -109,7 +103,7 @@ describe('PostgresControlAdapter marker/ledger write lowering', () => {
         '"updated_at" = now() ' +
         'WHERE ("marker"."space" = $3 AND "marker"."core_hash" = $4) RETURNING "marker"."space"',
     );
-    expect(params).toEqual(['sha256:to', 'sha256:prof', 'app', 'sha256:from']);
+    expect(params).toEqual(['to', 'prof', 'app', 'from']);
     expect(matched).toBe(false);
   });
 
@@ -117,10 +111,10 @@ describe('PostgresControlAdapter marker/ledger write lowering', () => {
     const driver = createCapturingDriver();
     await adapter.writeLedgerEntry(driver, 'app', {
       edgeId: 'edge-1',
-      from: 'sha256:from',
-      to: 'sha256:to',
+      from: 'from',
+      to: 'to',
       migrationName: '001_init',
-      migrationHash: 'sha256:mig',
+      migrationHash: 'mig',
       operations: [{ id: 'op-1' }],
     });
 
@@ -131,23 +125,17 @@ describe('PostgresControlAdapter marker/ledger write lowering', () => {
         '"origin_core_hash", "destination_core_hash", "operations") ' +
         'VALUES ($1, $2, $3, $4, $5, $6::jsonb)',
     );
-    expect(params.slice(0, 5)).toEqual([
-      'app',
-      '001_init',
-      'sha256:mig',
-      'sha256:from',
-      'sha256:to',
-    ]);
+    expect(params.slice(0, 5)).toEqual(['app', '001_init', 'mig', 'from', 'to']);
   });
 
   it('writeLedgerEntry upserts the destination contract by hash before the ledger row', async () => {
     const driver = createCapturingDriver();
     await adapter.writeLedgerEntry(driver, 'app', {
       edgeId: 'edge-1',
-      from: 'sha256:from',
-      to: 'sha256:to',
+      from: 'from',
+      to: 'to',
       migrationName: '002_add_post',
-      migrationHash: 'sha256:mig',
+      migrationHash: 'mig',
       operations: [],
       destinationContractJson: { models: ['user', 'post'] },
     });
@@ -160,7 +148,7 @@ describe('PostgresControlAdapter marker/ledger write lowering', () => {
       'INSERT INTO "prisma_contract"."contract" ("core_hash", "contract_json") ' +
         'VALUES ($1, $2::jsonb) ON CONFLICT ("core_hash") DO NOTHING',
     );
-    expect(contractUpsert.params[0]).toBe('sha256:to');
+    expect(contractUpsert.params[0]).toBe('to');
     expect(contractUpsert.params[1]).toBe(JSON.stringify({ models: ['user', 'post'] }));
 
     const ledgerInsert = driver.calls[1]!;

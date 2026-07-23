@@ -13,6 +13,7 @@ import {
   JoinAst,
   JsonArrayAggExpr,
   JsonObjectExpr,
+  NativeJsonValueProjection,
   OperationExpr,
   OrderByItem,
   ParamRef,
@@ -31,13 +32,13 @@ import { createComposedPostgresAdapter } from './helpers/composed-adapter';
 const contract = new SqlContractSerializer().deserializeContract({
   target: 'postgres',
   targetFamily: 'sql',
-  profileHash: 'sha256:test-profile',
+  profileHash: 'test-profile',
   roots: {},
   capabilities: {},
   extensions: {},
   meta: {},
   storage: {
-    storageHash: 'sha256:test-core',
+    storageHash: 'test-core',
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
@@ -98,10 +99,18 @@ describe('Postgres rich AST lowering', () => {
       ProjectionItem.of(
         'posts',
         JsonArrayAggExpr.of(
-          JsonObjectExpr.fromEntries([
-            JsonObjectExpr.entry('id', ColumnRef.of('post_rows', 'id')),
-            JsonObjectExpr.entry('title', ColumnRef.of('post_rows', 'title')),
-          ]),
+          new NativeJsonValueProjection(
+            JsonObjectExpr.fromEntries([
+              JsonObjectExpr.entry(
+                'id',
+                new NativeJsonValueProjection(ColumnRef.of('post_rows', 'id')),
+              ),
+              JsonObjectExpr.entry(
+                'title',
+                new NativeJsonValueProjection(ColumnRef.of('post_rows', 'title')),
+              ),
+            ]),
+          ),
           'emptyArray',
           [OrderByItem.asc(ColumnRef.of('post_rows', 'title'))],
         ),

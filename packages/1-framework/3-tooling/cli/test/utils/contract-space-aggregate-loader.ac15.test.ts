@@ -22,7 +22,7 @@ import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildContractSpaceAggregate } from '../../src/utils/contract-space-aggregate-loader';
 
-const STUB_HASH = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const STUB_HASH = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
 const STUB_APP_CONTRACT = {
   storage: { storageHash: STUB_HASH, namespaces: {} },

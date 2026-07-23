@@ -84,9 +84,9 @@ function buildContract(
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:rls-rename-planner-test'),
+    profileHash: profileHash('rls-rename-planner-test'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:rls-rename-planner-test'),
+      storageHash: coreHash('rls-rename-planner-test'),
       namespaces: { public: schema },
     }),
     roots: {},

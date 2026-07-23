@@ -210,16 +210,16 @@ Success:
 ```text
 ✔ Database marker and schema match contract
   verification: marker + schema
-  storageHash: sha256:abc123...
-  profileHash: sha256:def456...
+  storageHash: abc123...
+  profileHash: def456...
 ```
 
 Marker-only success:
 ```text
 ✔ Database marker matches contract
   verification: marker only (--marker-only)
-  storageHash: sha256:abc123...
-  profileHash: sha256:def456...
+  storageHash: abc123...
+  profileHash: def456...
 
 ⚠ Schema verification skipped because --marker-only was provided
 ```
@@ -242,12 +242,12 @@ Schema drift failure:
   "summary": "Database marker and schema match contract",
   "mode": "full",
   "contract": {
-    "storageHash": "sha256:abc123...",
-    "profileHash": "sha256:def456..."
+    "storageHash": "abc123...",
+    "profileHash": "def456..."
   },
   "marker": {
-    "storageHash": "sha256:abc123...",
-    "profileHash": "sha256:def456..."
+    "storageHash": "abc123...",
+    "profileHash": "def456..."
   },
   "target": {
     "expected": "postgres"
@@ -584,25 +584,25 @@ export default defineConfig({
 Success (new marker):
 ```
 ✔ Database signed (marker created)
-  storageHash: sha256:abc123...
-  profileHash: sha256:def456...
+  storageHash: abc123...
+  profileHash: def456...
   Total time: 42ms
 ```
 
 Success (updated marker):
 ```
-✔ Database signed (marker updated from sha256:old-hash)
-  storageHash: sha256:abc123...
-  profileHash: sha256:def456...
-  previous storageHash: sha256:old-hash
+✔ Database signed (marker updated from old-hash)
+  storageHash: abc123...
+  profileHash: def456...
+  previous storageHash: old-hash
   Total time: 42ms
 ```
 
 Success (already up-to-date):
 ```
 ✔ Database already signed with this contract
-  storageHash: sha256:abc123...
-  profileHash: sha256:def456...
+  storageHash: abc123...
+  profileHash: def456...
   Total time: 42ms
 ```
 
@@ -619,8 +619,8 @@ Failure (schema mismatch):
   "ok": true,
   "summary": "Database signed (marker created)",
   "contract": {
-    "storageHash": "sha256:abc123...",
-    "profileHash": "sha256:def456..."
+    "storageHash": "abc123...",
+    "profileHash": "def456..."
   },
   "target": {
     "expected": "postgres",
@@ -644,10 +644,10 @@ For updated markers:
 ```json
 {
   "ok": true,
-  "summary": "Database signed (marker updated from sha256:old-hash)",
+  "summary": "Database signed (marker updated from old-hash)",
   "contract": {
-    "storageHash": "sha256:abc123...",
-    "profileHash": "sha256:def456..."
+    "storageHash": "abc123...",
+    "profileHash": "def456..."
   },
   "target": {
     "expected": "postgres",
@@ -657,8 +657,8 @@ For updated markers:
     "created": false,
     "updated": true,
     "previous": {
-      "storageHash": "sha256:old-hash",
-      "profileHash": "sha256:old-profile-hash"
+      "storageHash": "old-hash",
+      "profileHash": "old-profile-hash"
     }
   },
   "meta": {
@@ -803,7 +803,7 @@ prisma-next db init ➜ Bootstrap a database to match the current contract
 ├─ Create index user_email_idx on user [additive]
 └─ Add foreign key post_userId_fkey on post [additive]
 
-Destination hash: sha256:abc123...
+Destination hash: abc123...
 
 This is a dry run. No changes were applied.
 Run without --dry-run to apply changes.
@@ -822,7 +822,7 @@ Applying migration plan and verifying schema...
   → Create index user_email_idx on user...
   → Add foreign key post_userId_fkey on post...
 ✔ Applied 4 operation(s)
-  Marker written: sha256:abc123...
+  Marker written: abc123...
 ```
 
 **Output Format (JSON):**
@@ -834,7 +834,7 @@ Applying migration plan and verifying schema...
   "plan": {
     "targetId": "postgres",
     "destination": {
-      "storageHash": "sha256:abc123..."
+      "storageHash": "abc123..."
     },
     "operations": [
       {
@@ -849,7 +849,7 @@ Applying migration plan and verifying schema...
     "operationsExecuted": 4
   },
   "marker": {
-    "storageHash": "sha256:abc123..."
+    "storageHash": "abc123..."
   }
 }
 ```
@@ -1084,7 +1084,7 @@ prisma-next ref delete <name>                  # Delete a ref
 
 **Ref naming rules:** Lowercase alphanumeric with hyphens or forward slashes (e.g., `staging`, `prod/us-east`). No `.` or `..` segments.
 
-**Ref values:** Must be valid contract hashes (`sha256:<64 hex chars>` or `sha256:empty`).
+**Ref values:** Must be valid contract hashes (64 lowercase hex chars, or the `empty` sentinel).
 
 **Atomic writes:** `refs.json` is written atomically via temp file + rename to prevent corruption from concurrent writes.
 

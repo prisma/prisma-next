@@ -44,7 +44,7 @@ Reference the appropriate JSON schema in your `contract.json` files to enable ID
   "schemaVersion": "1",
   "target": "mongodb",
   "targetFamily": "document",
-  "storageHash": "sha256:..."
+  "storageHash": "..."
 }
 ```
 

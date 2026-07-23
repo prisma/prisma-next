@@ -45,9 +45,9 @@ function makeContract(): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:table-less-ns-parity'),
+    profileHash: profileHash('table-less-ns-parity'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:table-less-ns-parity'),
+      storageHash: coreHash('table-less-ns-parity'),
       namespaces: { public: publicSchema, enums: enumsOnlySchema },
     }),
     roots: {},

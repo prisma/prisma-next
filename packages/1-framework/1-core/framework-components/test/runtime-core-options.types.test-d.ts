@@ -25,7 +25,7 @@ class FixtureRuntime extends RuntimeCore<FixturePlan, FixtureExec, RuntimeMiddle
 
 const meta: PlanMeta = {
   target: 'mock',
-  storageHash: 'sha256:test',
+  storageHash: 'test',
   lane: 'raw-sql',
 };
 

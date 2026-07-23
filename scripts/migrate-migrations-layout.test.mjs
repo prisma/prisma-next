@@ -22,7 +22,7 @@ import {
 } from './migrate-migrations-layout.mjs';
 
 function fakeHash(seed) {
-  return `sha256:${createHash('sha256').update(seed).digest('hex')}`;
+  return createHash('sha256').update(seed).digest('hex');
 }
 
 function fakeContractJson(storageHash, extra = {}) {
@@ -155,7 +155,7 @@ async function withTempDir(fn) {
 }
 
 function storageHashHexOf(hash) {
-  return hash.slice('sha256:'.length);
+  return hash;
 }
 
 describe('rewriteImportSpecifiers', () => {

@@ -2,7 +2,7 @@ import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { validateRefName } from '../refs';
 import type { MigrationRef, RefResolutionContext, RefResolutionError } from './types';
-import { findEdgeByDirName, isFullHash, isHexPrefix, normalizeHashPrefix } from './types';
+import { findEdgeByDirName, isFullHash, isHexPrefix } from './types';
 
 /**
  * Resolve a user-supplied string to a migration using the migration-reference
@@ -79,9 +79,8 @@ export function parseMigrationRef(
   }
 
   if (isHexPrefix(input)) {
-    const prefix = normalizeHashPrefix(input);
     const migMatches = [...ctx.graph.migrationByHash.entries()].filter(([hash]) =>
-      hash.startsWith(prefix),
+      hash.startsWith(input),
     );
 
     const [firstMigMatch] = migMatches;
@@ -105,7 +104,7 @@ export function parseMigrationRef(
       });
     }
 
-    const contractMatches = [...ctx.graph.nodes].filter((n) => n.startsWith(prefix));
+    const contractMatches = [...ctx.graph.nodes].filter((n) => n.startsWith(input));
     if (contractMatches.length > 0) {
       return notOk({
         kind: 'wrong-grammar',

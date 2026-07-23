@@ -43,9 +43,9 @@ function makeContract(
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:contract'),
+      storageHash: coreHash('contract'),
       namespaces: { [UNBOUND_NAMESPACE_ID]: unboundNs },
     }),
     roots: {},
@@ -615,8 +615,8 @@ describe('planIssues', () => {
       if (!result.ok) throw new Error('expected ok');
 
       const ts = renderCallsToTypeScript(result.value.calls, {
-        from: `sha256:${'a'.repeat(64)}`,
-        to: `sha256:${'b'.repeat(64)}`,
+        from: 'a'.repeat(64),
+        to: 'b'.repeat(64),
         snapshotsImportPath: '../../snapshots',
       });
 
@@ -645,9 +645,9 @@ describe('planIssues', () => {
       return {
         target: 'postgres',
         targetFamily: 'sql',
-        profileHash: profileHash('sha256:test'),
+        profileHash: profileHash('test'),
         storage: new SqlStorage({
-          storageHash: coreHash('sha256:contract'),
+          storageHash: coreHash('contract'),
           namespaces: nsMap,
         }),
         roots: {},
@@ -745,9 +745,9 @@ describe('planIssues', () => {
       const toContract: Contract<SqlStorage> = {
         target: 'postgres',
         targetFamily: 'sql',
-        profileHash: profileHash('sha256:test'),
+        profileHash: profileHash('test'),
         storage: new SqlStorage({
-          storageHash: coreHash('sha256:multi-namespace-contract'),
+          storageHash: coreHash('multi-namespace-contract'),
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
             tenant_a: new PostgresSchema({

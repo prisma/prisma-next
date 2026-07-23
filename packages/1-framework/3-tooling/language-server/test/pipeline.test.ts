@@ -67,7 +67,6 @@ describe('runPipeline', () => {
     const { diagnostics: symbolTableDiagnostics } = buildSymbolTable({
       document,
       sourceFile,
-      scalarTypes,
       pslBlockDescriptors: {},
     });
 

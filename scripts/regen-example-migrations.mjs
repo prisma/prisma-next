@@ -156,7 +156,7 @@ function biomeFormatInPlace(filePath) {
 }
 
 /**
- * Rewrite sha256 hash literals in a `migration.ts` file.
+ * Rewrite storage-hash literals (bare lowercase sha-256 hex) in a `migration.ts` file.
  *
  * `newFromHash` is null for baseline migrations (whose `from:` is `null`).
  * For non-baseline migrations both `from:` and `to:` are updated.
@@ -167,7 +167,7 @@ function biomeFormatInPlace(filePath) {
  * regen pipeline re-emits those contract JSONs upstream of this call, so for the
  * new shape there is nothing to rewrite here — the correct hashes already live
  * in the regenerated JSON. Detect that shape (`endContractJson = endContract`
- * with no `to: 'sha256:...'` literal) and skip the rewrite.
+ * with no `to: '<hex>'` literal) and skip the rewrite.
  *
  * Returns true if the file was changed, false if the hashes were already
  * up-to-date (or the file is the new contract-JSON shape).
@@ -175,7 +175,7 @@ function biomeFormatInPlace(filePath) {
 function rewriteMigrationHashes(migrationTsPath, newFromHash, newToHash) {
   const src = readFileSync(migrationTsPath, 'utf8');
 
-  const toPattern = /(to:\s*['"])sha256:[0-9a-f]+(['"])/g;
+  const toPattern = /(to:\s*['"])(?:[0-9a-f]{64}|empty)(['"])/g;
   const isContractJsonShape =
     src.includes('endContractJson = endContract') && [...src.matchAll(toPattern)].length === 0;
   if (isContractJsonShape) {
@@ -187,16 +187,14 @@ function rewriteMigrationHashes(migrationTsPath, newFromHash, newToHash) {
   let updated = src;
 
   if (newFromHash !== null) {
-    const fromPattern = /(from:\s*['"])sha256:[0-9a-f]+(['"])/g;
+    const fromPattern = /(from:\s*['"])(?:[0-9a-f]{64}|empty)(['"])/g;
     const fromMatches = [...src.matchAll(fromPattern)];
     if (fromMatches.length === 0) {
-      throw new Error(
-        `regen-example-migrations: no 'from: sha256:...' literal in ${migrationTsPath}`,
-      );
+      throw new Error(`regen-example-migrations: no 'from: <hash>' literal in ${migrationTsPath}`);
     }
     if (fromMatches.length > 1) {
       throw new Error(
-        `regen-example-migrations: ${fromMatches.length} 'from: sha256:...' literals in ${migrationTsPath}; expected 1`,
+        `regen-example-migrations: ${fromMatches.length} 'from: <hash>' literals in ${migrationTsPath}; expected 1`,
       );
     }
     updated = updated.replace(fromPattern, `$1${newFromHash}$2`);
@@ -204,11 +202,11 @@ function rewriteMigrationHashes(migrationTsPath, newFromHash, newToHash) {
 
   const toMatches = [...updated.matchAll(toPattern)];
   if (toMatches.length === 0) {
-    throw new Error(`regen-example-migrations: no 'to: sha256:...' literal in ${migrationTsPath}`);
+    throw new Error(`regen-example-migrations: no 'to: <hash>' literal in ${migrationTsPath}`);
   }
   if (toMatches.length > 1) {
     throw new Error(
-      `regen-example-migrations: ${toMatches.length} 'to: sha256:...' literals in ${migrationTsPath}; expected 1`,
+      `regen-example-migrations: ${toMatches.length} 'to: <hash>' literals in ${migrationTsPath}; expected 1`,
     );
   }
   updated = updated.replace(toPattern, `$1${newToHash}$2`);
@@ -368,7 +366,7 @@ function emitMigrationContract(exampleDir, migrationDir, realConfigAbsPath, cont
   }
 
   const storageHash = parsed?.storageHash;
-  if (typeof storageHash !== 'string' || !storageHash.startsWith('sha256:')) {
+  if (typeof storageHash !== 'string' || !/^(?:[0-9a-f]{64}|empty)$/.test(storageHash)) {
     rmSync(tmpEmitDir, { recursive: true, force: true });
     throw new Error(
       `regen-example-migrations: emit output missing storageHash for ${migrationDir}:\n${emitOutput}`,

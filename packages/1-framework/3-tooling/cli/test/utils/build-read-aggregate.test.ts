@@ -16,8 +16,8 @@ import {
 
 const TARGET = 'postgres';
 const TARGET_FAMILY = 'sql';
-const CONTRACT_HASH = `sha256:${'b'.repeat(64)}`;
-const HEAD_HASH = `sha256:${'a'.repeat(64)}`;
+const CONTRACT_HASH = `${'b'.repeat(64)}`;
+const HEAD_HASH = `${'a'.repeat(64)}`;
 
 const ADDITIVE_OPS: readonly MigrationPlanOperation[] = [
   { id: 'table.users', label: 'Create users', operationClass: 'additive' },

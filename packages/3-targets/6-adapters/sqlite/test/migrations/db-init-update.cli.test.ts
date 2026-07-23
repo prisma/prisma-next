@@ -56,15 +56,15 @@ const EXT_BASELINE_DIR = '20260101T0000_create_helper';
 
 // Stable 64-hex-char storage hashes: the contract-snapshot store keys its
 // on-disk directory by `storageHashHex(storage.storageHash)`, which requires
-// a well-formed `sha256:<64hex>` value.
-const EXT_STORAGE_HASH_V1 = `sha256:${'1'.repeat(64)}`;
-const EXT_STORAGE_HASH_V2 = `sha256:${'2'.repeat(64)}`;
+// a well-formed 64-hex value.
+const EXT_STORAGE_HASH_V1 = '1'.repeat(64);
+const EXT_STORAGE_HASH_V2 = '2'.repeat(64);
 
 function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
   return {
     target: 'sqlite',
     targetFamily: 'sql',
-    profileHash: profileHash(`sha256:ext-test-v${version}`),
+    profileHash: profileHash(`ext-test-v${version}`),
     storage: new SqlStorage({
       storageHash: coreHash(version === 1 ? EXT_STORAGE_HASH_V1 : EXT_STORAGE_HASH_V2),
       namespaces: {
@@ -457,7 +457,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
     const hookedAppContract: Contract<SqlStorage> = {
       ...appContract,
       storage: new SqlStorage({
-        storageHash: coreHash('sha256:app-with-hooked-email'),
+        storageHash: coreHash('app-with-hooked-email'),
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: sqliteCreateNamespace({
             id: UNBOUND_NAMESPACE_ID,
@@ -482,7 +482,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
           }),
         },
       }),
-      profileHash: profileHash('sha256:app-with-hooked-email'),
+      profileHash: profileHash('app-with-hooked-email'),
     };
 
     const codecHookComponent: TargetBoundComponentDescriptor<'sql', 'sqlite'> = {

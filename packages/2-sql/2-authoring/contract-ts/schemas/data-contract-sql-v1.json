@@ -26,12 +26,12 @@
     },
     "storageHash": {
       "type": "string",
-      "pattern": "^sha256:[a-f0-9]{64}$",
+      "pattern": "^[a-f0-9]{64}$",
       "description": "SHA-256 hash of the storage section (DB-satisfied expectations)"
     },
     "profileHash": {
       "type": "string",
-      "pattern": "^sha256:[a-f0-9]{64}$",
+      "pattern": "^[a-f0-9]{64}$",
       "description": "SHA-256 hash of the pinned capability profile (capability keys/variants and adapter pins)"
     },
     "capabilities": {
@@ -104,7 +104,7 @@
       "properties": {
         "executionHash": {
           "type": "string",
-          "pattern": "^sha256:[a-f0-9]{64}$",
+          "pattern": "^[a-f0-9]{64}$",
           "description": "SHA-256 hash of the execution section (client-side behavior)"
         },
         "mutations": {

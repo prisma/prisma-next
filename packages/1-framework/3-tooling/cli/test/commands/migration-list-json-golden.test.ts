@@ -23,10 +23,10 @@ vi.mock('@prisma-next/config-loader', () => ({
 
 const TARGET = 'postgres';
 const TARGET_FAMILY = 'sql';
-const HASH_4cb4256 = `sha256:4cb4256${'0'.repeat(57)}`;
-const HASH_55bada2 = `sha256:55bada2${'0'.repeat(57)}`;
-const HASH_2f45cc7 = `sha256:2f45cc7${'0'.repeat(57)}`;
-const HASH_804e018 = `sha256:804e018${'0'.repeat(57)}`;
+const HASH_4cb4256 = `4cb4256${'0'.repeat(57)}`;
+const HASH_55bada2 = `55bada2${'0'.repeat(57)}`;
+const HASH_2f45cc7 = `2f45cc7${'0'.repeat(57)}`;
+const HASH_804e018 = `804e018${'0'.repeat(57)}`;
 
 const ADDITIVE_OP: MigrationPlanOperation = {
   id: 'table.users',
@@ -168,7 +168,7 @@ describe('migration list --json golden', () => {
   });
 
   it('pins head ref decoration on extension tip migration --json', async () => {
-    const HASH_POSTGIS = `sha256:9aabbcc${'0'.repeat(57)}`;
+    const HASH_POSTGIS = `9aabbcc${'0'.repeat(57)}`;
     const cwd = await mkdtemp(join(tmpdir(), 'read-cmd-list-head-json-'));
     createdDirs.push(cwd);
     const contractPath = await writeContract(cwd, HASH_55bada2);

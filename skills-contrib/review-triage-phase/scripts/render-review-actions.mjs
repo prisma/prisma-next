@@ -84,14 +84,30 @@ function parseCliArgs(argv) {
 function escapeTableCell(value) {
   return String(value ?? '')
     .replace(/\r?\n/g, ' ')
+    .replace(/\\/g, '\\\\')
     .replace(/\|/g, '\\|')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
+function formatCodeSpan(value) {
+  const text = String(value ?? '')
+    .replace(/\r?\n/g, ' ')
+    .replace(/\|/g, '\\|')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const longestBacktickRun = (text.match(/`+/g) ?? []).reduce(
+    (max, run) => Math.max(max, run.length),
+    0,
+  );
+  const fence = '`'.repeat(longestBacktickRun + 1);
+  const pad = text.startsWith('`') || text.endsWith('`') ? ' ' : '';
+  return `${fence}${pad}${text}${pad}${fence}`;
+}
+
 function formatCodePaths(paths) {
   if (!Array.isArray(paths) || paths.length === 0) return '';
-  return paths.map((p) => `\`${escapeTableCell(p)}\``).join(', ');
+  return paths.map((p) => formatCodeSpan(p)).join(', ');
 }
 
 function computeStatus(actions) {
@@ -113,7 +129,7 @@ export function renderReviewActionsMarkdown(payload, { sourcePath }) {
   assertReviewActionsV1(payload);
 
   const prUrl = payload?.pr?.url ?? '';
-  const source = sourcePath ? escapeTableCell(sourcePath) : 'review-actions.json';
+  const source = formatCodeSpan(sourcePath || 'review-actions.json');
   const actions = Array.isArray(payload?.actions) ? payload.actions : [];
   const view = payload?.meta?.renderView === 'will-address' ? 'will-address' : 'all';
   const includedActions =
@@ -123,7 +139,7 @@ export function renderReviewActionsMarkdown(payload, { sourcePath }) {
   lines.push('# Review Actions');
   lines.push('');
   lines.push(`PR: ${escapeTableCell(prUrl)}`);
-  lines.push(`Source: \`${source}\``);
+  lines.push(`Source: ${source}`);
   lines.push('');
   lines.push(`Status: ${computeStatus(includedActions)}`);
   lines.push('');

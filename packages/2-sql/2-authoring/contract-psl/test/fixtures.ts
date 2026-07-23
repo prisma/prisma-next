@@ -13,6 +13,7 @@ import {
   type AuthoringEntityTypeNamespace,
   type AuthoringFieldPresetDescriptor,
   type AuthoringPslBlockDescriptorNamespace,
+  type AuthoringTypeNamespace,
   type PslExtensionBlock,
   resolveEnumCodecId,
 } from '@prisma-next/framework-components/authoring';
@@ -236,6 +237,30 @@ export const pgvectorExtensionPack: ExtensionPackRef<'sql', 'postgres'> = {
   version: '1.2.3-test',
 };
 
+export const postgresScalarTypeDescriptors = new Map([
+  ['String', { codecId: 'pg/text@1', nativeType: 'text' }],
+  ['Boolean', { codecId: 'pg/bool@1', nativeType: 'bool' }],
+  ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
+  ['BigInt', { codecId: 'pg/int8@1', nativeType: 'int8' }],
+  ['Float', { codecId: 'pg/float8@1', nativeType: 'float8' }],
+  ['Decimal', { codecId: 'pg/numeric@1', nativeType: 'numeric' }],
+  ['DateTime', { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' }],
+  ['Json', { codecId: 'pg/json@1', nativeType: 'json' }],
+  ['Jsonb', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
+  ['Bytes', { codecId: 'pg/bytea@1', nativeType: 'bytea' }],
+] as const);
+
+/** The postgres base scalars in unified-namespace form: top-level zero-arg type constructors. */
+export const postgresScalarAuthoringTypes: AuthoringTypeNamespace = Object.fromEntries(
+  [...postgresScalarTypeDescriptors].map(([name, { codecId, nativeType }]) => [
+    name,
+    {
+      kind: 'typeConstructor' as const,
+      output: { codecId, nativeType },
+    },
+  ]),
+);
+
 /**
  * Controlled test-only descriptor — intentionally uses pg/vector@1 with maximum: 2000 rather than importing the real pgvector pack, so interpreter unit tests stay layer-isolated. Real-pack parity is covered by `test/integration/test/authoring/parity/ts-psl-parity.real-packs.test.ts`.
  */
@@ -245,6 +270,7 @@ export const pgvectorAuthoringContributions = {
   pslBlockDescriptors: {},
   modelAttributes: {},
   type: {
+    ...postgresScalarAuthoringTypes,
     pgvector: {
       Vector: {
         kind: 'typeConstructor',
@@ -259,25 +285,12 @@ export const pgvectorAuthoringContributions = {
       },
     },
   },
-} as const satisfies AuthoringContributions;
-
-export const postgresScalarTypeDescriptors = new Map([
-  ['String', { codecId: 'pg/text@1', nativeType: 'text' }],
-  ['Boolean', { codecId: 'pg/bool@1', nativeType: 'bool' }],
-  ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
-  ['BigInt', { codecId: 'pg/int8@1', nativeType: 'int8' }],
-  ['Float', { codecId: 'pg/float8@1', nativeType: 'float8' }],
-  ['Decimal', { codecId: 'pg/numeric@1', nativeType: 'numeric' }],
-  ['DateTime', { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' }],
-  ['Json', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
-  ['Bytes', { codecId: 'pg/bytea@1', nativeType: 'bytea' }],
-] as const);
+} satisfies AuthoringContributions;
 
 export function buildSymbolTableInput(
   schema: string,
   options?: {
     readonly sourceId?: string;
-    readonly scalarTypes?: readonly string[];
     readonly pslBlockDescriptors?: AuthoringPslBlockDescriptorNamespace;
   },
 ): {
@@ -288,13 +301,11 @@ export function buildSymbolTableInput(
   enumInferenceCodecs: { readonly text: string; readonly int: string };
 } {
   const sourceId = options?.sourceId ?? 'schema.prisma';
-  const scalarTypes = options?.scalarTypes ?? [...postgresScalarTypeDescriptors.keys()];
   const pslBlockDescriptors = options?.pslBlockDescriptors ?? {};
   const { document, sourceFile } = parse(schema);
   const { table, diagnostics } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes,
     pslBlockDescriptors,
   });
   const seedDiagnostics: ContractSourceDiagnostic[] = diagnostics.map((diagnostic) => ({
@@ -331,7 +342,7 @@ export function symbolTableInputFromParseArgs(args: {
   });
 }
 
-export const sqliteScalarTypeDescriptors = new Map([
+export const sqliteScalarColumnDescriptors = new Map([
   ['String', { codecId: 'sqlite/text@1', nativeType: 'text' }],
   ['Boolean', { codecId: 'sqlite/integer@1', nativeType: 'integer' }],
   ['Int', { codecId: 'sqlite/integer@1', nativeType: 'integer' }],
@@ -343,17 +354,15 @@ export const sqliteScalarTypeDescriptors = new Map([
   ['Bytes', { codecId: 'sqlite/blob@1', nativeType: 'blob' }],
 ] as const);
 
-export const postgresCodecIdOnlyDescriptors = new Map<string, string>([
-  ['String', 'pg/text@1'],
-  ['Boolean', 'pg/bool@1'],
-  ['Int', 'pg/int4@1'],
-  ['BigInt', 'pg/int8@1'],
-  ['Float', 'pg/float8@1'],
-  ['Decimal', 'pg/numeric@1'],
-  ['DateTime', 'pg/timestamptz@1'],
-  ['Json', 'pg/jsonb@1'],
-  ['Bytes', 'pg/bytea@1'],
-]);
+export const sqliteScalarAuthoringTypes: AuthoringTypeNamespace = Object.fromEntries(
+  [...sqliteScalarColumnDescriptors].map(([name, { codecId, nativeType }]) => [
+    name,
+    {
+      kind: 'typeConstructor' as const,
+      output: { codecId, nativeType },
+    },
+  ]),
+);
 
 const targetTypesByCodecId: Record<string, readonly string[]> = {
   'pg/text@1': ['text'],
@@ -393,13 +402,13 @@ export function createPostgresTestContext(
   return {
     composedExtensions: [],
     composedExtensionContracts: new Map(),
-    scalarTypeDescriptors: postgresCodecIdOnlyDescriptors,
     authoringContributions: {
       field: {},
-      type: {},
+      type: postgresScalarAuthoringTypes,
       entityTypes: {},
       pslBlockDescriptors: {},
       modelAttributes: {},
+      valueObjectStorageType: 'Jsonb',
     },
     codecLookup: postgresCodecLookup,
     controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
@@ -521,52 +530,22 @@ export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefau
       {
         id: 'uuidv4',
         applicableCodecIds: ['pg/text@1', 'sql/char@1', 'pg/uuid@1'],
-        resolveGeneratedColumnDescriptor: ({ generated }) =>
-          generated.kind === 'generator' && generated.id === 'uuidv4'
-            ? { codecId: 'sql/char@1', nativeType: 'character', typeParams: { length: 36 } }
-            : undefined,
       },
       {
         id: 'uuidv7',
         applicableCodecIds: ['pg/text@1', 'sql/char@1', 'pg/uuid@1'],
-        resolveGeneratedColumnDescriptor: ({ generated }) =>
-          generated.kind === 'generator' && generated.id === 'uuidv7'
-            ? { codecId: 'sql/char@1', nativeType: 'character', typeParams: { length: 36 } }
-            : undefined,
       },
       {
         id: 'cuid2',
         applicableCodecIds: ['pg/text@1', 'sql/char@1'],
-        resolveGeneratedColumnDescriptor: ({ generated }) =>
-          generated.kind === 'generator' && generated.id === 'cuid2'
-            ? { codecId: 'sql/char@1', nativeType: 'character', typeParams: { length: 24 } }
-            : undefined,
       },
       {
         id: 'ulid',
         applicableCodecIds: ['pg/text@1', 'sql/char@1'],
-        resolveGeneratedColumnDescriptor: ({ generated }) =>
-          generated.kind === 'generator' && generated.id === 'ulid'
-            ? { codecId: 'sql/char@1', nativeType: 'character', typeParams: { length: 26 } }
-            : undefined,
       },
       {
         id: 'nanoid',
         applicableCodecIds: ['pg/text@1', 'sql/char@1'],
-        resolveGeneratedColumnDescriptor: ({ generated }) => {
-          if (generated.kind !== 'generator' || generated.id !== 'nanoid') {
-            return undefined;
-          }
-          const rawSize = generated.params?.['size'];
-          const length =
-            typeof rawSize === 'number' &&
-            Number.isInteger(rawSize) &&
-            rawSize >= 2 &&
-            rawSize <= 255
-              ? rawSize
-              : 21;
-          return { codecId: 'sql/char@1', nativeType: 'character', typeParams: { length } };
-        },
       },
       {
         id: 'timestampNow',

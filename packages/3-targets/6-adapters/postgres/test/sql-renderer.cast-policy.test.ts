@@ -56,13 +56,13 @@ function lookupOf(
 const baseContract = new SqlContractSerializer().deserializeContract({
   target: 'postgres',
   targetFamily: 'sql',
-  profileHash: 'sha256:cast-policy-test',
+  profileHash: 'cast-policy-test',
   roots: {},
   capabilities: {},
   extensions: {},
   meta: {},
   storage: {
-    storageHash: 'sha256:cast-policy',
+    storageHash: 'cast-policy',
     namespaces: {
       __unbound__: {
         id: '__unbound__',
@@ -186,7 +186,39 @@ describe('renderLoweredSql cast policy', () => {
     const lowered = renderLoweredSql(ast, baseContract, lookup);
 
     expect(lowered.sql).toBe(
-      'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."status" = $1::aal_level',
+      'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."status" = $1::"aal_level"',
+    );
+  });
+
+  it('quotes a mixed-case native-enum type name in the cast so Postgres does not case-fold it', () => {
+    // Prisma ORM's migration engine creates enum types named after the PSL
+    // enum — PascalCase, created quoted, e.g. "HoldType". An unquoted cast
+    // ($1::HoldType) case-folds to holdtype and fails with
+    // `type "holdtype" does not exist`.
+    const pgEnumCodec: Codec = defineTestCodec({
+      typeId: 'pg/enum@1',
+      encode: (value: string): string => value,
+      decode: (wire: string): string => wire,
+    });
+    const lookup = lookupOf({
+      'pg/enum@1': {
+        codec: pgEnumCodec,
+        metadata: {
+          targetTypes: ['text'],
+          meta: { db: { sql: { postgres: { nativeType: 'text' } } } },
+          metaFor: (typeParams) =>
+            typeParams !== null && typeof typeParams === 'object' && 'typeName' in typeParams
+              ? { db: { sql: { postgres: { nativeType: String(typeParams.typeName) } } } }
+              : undefined,
+        },
+      },
+    });
+
+    const ast = selectWithTypeParams('status', 'pg/enum@1', { typeName: 'HoldType' }, 'active');
+    const lowered = renderLoweredSql(ast, baseContract, lookup);
+
+    expect(lowered.sql).toBe(
+      'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."status" = $1::"HoldType"',
     );
   });
 
@@ -214,7 +246,7 @@ describe('renderLoweredSql cast policy', () => {
     const lowered = renderLoweredSql(ast, baseContract, lookup);
 
     expect(lowered.sql).toBe(
-      'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."status" = $1::auth.aal_level',
+      'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."status" = $1::"auth"."aal_level"',
     );
   });
 
@@ -382,7 +414,7 @@ describe('renderLoweredSql cast policy via stack-derived lookup', () => {
     const lowered = adapter.lower(ast, { contract: baseContract });
 
     expect(lowered.sql).toBe(
-      'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."status" = $1::auth.aal_level',
+      'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."status" = $1::"auth"."aal_level"',
     );
   });
 });

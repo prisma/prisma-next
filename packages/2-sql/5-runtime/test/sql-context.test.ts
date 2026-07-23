@@ -26,11 +26,11 @@ import {
 const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
   target: 'postgres',
-  profileHash: profileHash('sha256:test'),
+  profileHash: profileHash('test'),
   domain: applicationDomainOf({ models: {} }),
   roots: {},
   storage: new SqlStorage({
-    storageHash: coreHash('sha256:test'),
+    storageHash: coreHash('test'),
     namespaces: {
       __unbound__: createTestSqlNamespace({ id: '__unbound__', entries: { table: {} } }),
     },
@@ -303,7 +303,7 @@ describe('contract/stack validation errors', () => {
     const contractWithUnknownGenerator: Contract<SqlStorage> = {
       ...testContract,
       storage: new SqlStorage({
-        storageHash: coreHash('sha256:test'),
+        storageHash: coreHash('test'),
         namespaces: {
           __unbound__: createTestSqlNamespace({
             id: '__unbound__',
@@ -323,7 +323,7 @@ describe('contract/stack validation errors', () => {
         },
       }),
       execution: {
-        executionHash: executionHash('sha256:test'),
+        executionHash: executionHash('test'),
         mutations: {
           defaults: [
             {
@@ -353,7 +353,7 @@ describe('contract/stack validation errors', () => {
     const contractWithMissingGenerators: Contract<SqlStorage> = {
       ...testContract,
       storage: new SqlStorage({
-        storageHash: coreHash('sha256:test'),
+        storageHash: coreHash('test'),
         namespaces: {
           __unbound__: createTestSqlNamespace({
             id: '__unbound__',
@@ -374,7 +374,7 @@ describe('contract/stack validation errors', () => {
         },
       }),
       execution: {
-        executionHash: executionHash('sha256:test'),
+        executionHash: executionHash('test'),
         mutations: {
           defaults: [
             {
@@ -406,7 +406,7 @@ describe('contract/stack validation errors', () => {
     const contractWithRegisteredGenerator: Contract<SqlStorage> = {
       ...testContract,
       storage: new SqlStorage({
-        storageHash: coreHash('sha256:test'),
+        storageHash: coreHash('test'),
         namespaces: {
           __unbound__: createTestSqlNamespace({
             id: '__unbound__',
@@ -426,7 +426,7 @@ describe('contract/stack validation errors', () => {
         },
       }),
       execution: {
-        executionHash: executionHash('sha256:test'),
+        executionHash: executionHash('test'),
         mutations: {
           defaults: [
             {
@@ -448,7 +448,7 @@ describe('applyMutationDefaults', () => {
   const contractWithDefaults: Contract<SqlStorage> = {
     ...testContract,
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       namespaces: {
         __unbound__: createTestSqlNamespace({
           id: '__unbound__',
@@ -470,7 +470,7 @@ describe('applyMutationDefaults', () => {
       },
     }),
     execution: {
-      executionHash: executionHash('sha256:test'),
+      executionHash: executionHash('test'),
       mutations: {
         defaults: [
           {
@@ -570,7 +570,7 @@ describe('applyMutationDefaults', () => {
     const contractWithCounter: Contract<SqlStorage> = {
       ...testContract,
       storage: new SqlStorage({
-        storageHash: coreHash('sha256:test'),
+        storageHash: coreHash('test'),
         namespaces: {
           __unbound__: createTestSqlNamespace({
             id: '__unbound__',
@@ -591,7 +591,7 @@ describe('applyMutationDefaults', () => {
         },
       }),
       execution: {
-        executionHash: executionHash('sha256:test'),
+        executionHash: executionHash('test'),
         mutations: {
           defaults: [
             {
@@ -671,7 +671,7 @@ describe('applyMutationDefaults', () => {
     const contractWithCorrelationId: Contract<SqlStorage> = {
       ...testContract,
       storage: new SqlStorage({
-        storageHash: coreHash('sha256:test'),
+        storageHash: coreHash('test'),
         namespaces: {
           __unbound__: createTestSqlNamespace({
             id: '__unbound__',
@@ -693,7 +693,7 @@ describe('applyMutationDefaults', () => {
         },
       }),
       execution: {
-        executionHash: executionHash('sha256:test'),
+        executionHash: executionHash('test'),
         mutations: {
           defaults: [
             {
@@ -762,7 +762,7 @@ describe('applyMutationDefaults', () => {
     const contractWithCounter: Contract<SqlStorage> = {
       ...testContract,
       storage: new SqlStorage({
-        storageHash: coreHash('sha256:test'),
+        storageHash: coreHash('test'),
         namespaces: {
           __unbound__: createTestSqlNamespace({
             id: '__unbound__',
@@ -782,7 +782,7 @@ describe('applyMutationDefaults', () => {
         },
       }),
       execution: {
-        executionHash: executionHash('sha256:test'),
+        executionHash: executionHash('test'),
         mutations: {
           defaults: [
             {

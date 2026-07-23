@@ -60,7 +60,6 @@ function interpret(source: string, options?: { readonly withoutModelAttributes?:
   const { table: symbolTable, diagnostics } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...scalarTypeDescriptors.keys()],
     pslBlockDescriptors: assembled.pslBlockDescriptors,
   });
   expect(diagnostics).toEqual([]);
@@ -70,7 +69,7 @@ function interpret(source: string, options?: { readonly withoutModelAttributes?:
     sourceFile,
     sourceId: 'schema.prisma',
     target: postgresTarget,
-    scalarTypeDescriptors,
+    scalarColumnDescriptors: scalarTypeDescriptors,
     authoringContributions: options?.withoutModelAttributes
       ? { ...assembled, modelAttributes: {} }
       : assembled,

@@ -121,9 +121,9 @@ function buildContractWith(
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:rls-planner-test'),
+    profileHash: profileHash('rls-planner-test'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:rls-planner-test'),
+      storageHash: coreHash('rls-planner-test'),
       namespaces: { [SCHEMA_NAME]: schema },
     }),
     roots: {},

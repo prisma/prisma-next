@@ -39,7 +39,7 @@ function omitNamespaceKindsForHash(storage: unknown): unknown {
 function sha256(content: string): string {
   const hash = createHash('sha256');
   hash.update(content);
-  return `sha256:${hash.digest('hex')}`;
+  return hash.digest('hex');
 }
 
 type HashContractSection = Record<string, unknown> & {

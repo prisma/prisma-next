@@ -26,10 +26,10 @@ type EnumContract = {
   readonly target: 'postgres';
   readonly targetFamily: 'sql';
   readonly roots: Record<string, never>;
-  readonly storage: StorageBase<'sha256:abc'>;
+  readonly storage: StorageBase<'abc'>;
   readonly capabilities: Record<string, Record<string, boolean>>;
   readonly extensions: Record<string, never>;
-  readonly profileHash: ProfileHashBase<'sha256:def'>;
+  readonly profileHash: ProfileHashBase<'def'>;
   readonly meta: Record<string, never>;
   readonly enumAccessors: {
     readonly Role: Accessor<
@@ -54,9 +54,7 @@ type EnumContract = {
 
 test('EnumContract conforms to the Contract interface', () => {
   expectTypeOf<EnumContract>().toExtend<Contract>();
-  expectTypeOf<EnumContract['storage']['storageHash']>().toEqualTypeOf<
-    StorageHashBase<'sha256:abc'>
-  >();
+  expectTypeOf<EnumContract['storage']['storageHash']>().toEqualTypeOf<StorageHashBase<'abc'>>();
 });
 
 // `NamespacedEnums` accepts any `Contract`; the literal contract above narrows

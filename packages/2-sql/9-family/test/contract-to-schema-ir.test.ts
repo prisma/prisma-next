@@ -47,7 +47,7 @@ function wrap(storage: SqlStorage): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     storage,
     domain: applicationDomainOf({ models: {} }),
     roots: {},
@@ -107,7 +107,7 @@ describe('contractToSchemaIR', () => {
 
   it('converts a single table with columns', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -160,7 +160,7 @@ describe('contractToSchemaIR', () => {
 
   it('drops codecId, typeParams, and typeRef from columns', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -224,7 +224,7 @@ describe('contractToSchemaIR', () => {
 
   it('expands parameterized native types when expandNativeType is provided', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -275,7 +275,7 @@ describe('contractToSchemaIR', () => {
     // `alterColumnType` op) when planning from one revision of the
     // contract to itself.
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -326,7 +326,7 @@ describe('contractToSchemaIR', () => {
 
   it('uses base nativeType when no expandNativeType is provided', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -353,7 +353,7 @@ describe('contractToSchemaIR', () => {
 
   it('converts literal column defaults', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -379,7 +379,7 @@ describe('contractToSchemaIR', () => {
 
   it('escapes single quotes in string literal defaults', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -405,7 +405,7 @@ describe('contractToSchemaIR', () => {
 
   it('escapes repeated single quotes in string literal defaults', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -431,7 +431,7 @@ describe('contractToSchemaIR', () => {
 
   it('converts function column defaults', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -457,7 +457,7 @@ describe('contractToSchemaIR', () => {
 
   it('omits default field when column has no default', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -481,7 +481,7 @@ describe('contractToSchemaIR', () => {
 
   it('converts primary key', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -507,7 +507,7 @@ describe('contractToSchemaIR', () => {
 
   it('converts unique constraints', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -533,7 +533,7 @@ describe('contractToSchemaIR', () => {
 
   it('converts indexes with unique: false', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -559,7 +559,7 @@ describe('contractToSchemaIR', () => {
 
   it('converts foreign keys (reshapes references)', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -614,7 +614,7 @@ describe('contractToSchemaIR', () => {
     // constraint-only and its `indexes[]` already carry any FK-backing
     // entries. This asserts the new pass-through contract directly.
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -677,7 +677,7 @@ describe('contractToSchemaIR', () => {
 
   it('converts multiple tables', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -702,7 +702,7 @@ describe('contractToSchemaIR', () => {
 
   it('propagates storage types into annotations', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -742,7 +742,7 @@ describe('contractToSchemaIR', () => {
 
   it('writes storage type annotations using the configured namespace', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -784,7 +784,7 @@ describe('contractToSchemaIR', () => {
 
   it('handles unique constraints without names', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -809,7 +809,7 @@ describe('contractToSchemaIR', () => {
 
   it('handles foreign keys without names', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -873,7 +873,7 @@ describe('contractToSchemaIR — FK referenced-namespace identity', () => {
 
   it('an FK targeting the unbound namespace derives with an absent referenced namespace', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -890,7 +890,7 @@ describe('contractToSchemaIR — FK referenced-namespace identity', () => {
 
   it('an FK targeting a bound namespace derives its identity as before', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -911,7 +911,7 @@ describe('contractToSchemaIR — FK referenced-namespace identity', () => {
 
   it('an FK targeting a namespace absent from storage keeps its coordinate (cross-space)', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -927,7 +927,7 @@ describe('contractToSchemaIR — FK referenced-namespace identity', () => {
 
   it('stamps dependsOn as the referenced table plus its own columns in the flat tree', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -952,7 +952,7 @@ describe('contractToSchemaIR — FK referenced-namespace identity', () => {
 
   it('stamps own-column dependsOn on index, unique, and primary key in the flat tree', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -989,7 +989,7 @@ describe('contractToSchemaIR — FK referenced-namespace identity', () => {
 
 describe('detectDestructiveChanges', () => {
   it('returns empty for null from', () => {
-    const to = unboundStorage('sha256:test' as StorageHashBase<string>, {
+    const to = unboundStorage('test' as StorageHashBase<string>, {
       T: table({ columns: { a: col({ nativeType: 'text' }) } }),
     });
     expect(detectDestructiveChanges(null, to)).toEqual([]);
@@ -997,7 +997,7 @@ describe('detectDestructiveChanges', () => {
 
   it('returns empty when no removals', () => {
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -1013,20 +1013,20 @@ describe('detectDestructiveChanges', () => {
   });
 
   it('returns empty when columns are added', () => {
-    const from = unboundStorage('sha256:test' as StorageHashBase<string>, {
+    const from = unboundStorage('test' as StorageHashBase<string>, {
       T: table({ columns: { a: col({ nativeType: 'text' }) } }),
     });
-    const to = unboundStorage('sha256:test' as StorageHashBase<string>, {
+    const to = unboundStorage('test' as StorageHashBase<string>, {
       T: table({ columns: { a: col({ nativeType: 'text' }), b: col({ nativeType: 'text' }) } }),
     });
     expect(detectDestructiveChanges(from, to)).toEqual([]);
   });
 
   it('detects removed column', () => {
-    const from = unboundStorage('sha256:test' as StorageHashBase<string>, {
+    const from = unboundStorage('test' as StorageHashBase<string>, {
       T: table({ columns: { a: col({ nativeType: 'text' }), b: col({ nativeType: 'text' }) } }),
     });
-    const to = unboundStorage('sha256:test' as StorageHashBase<string>, {
+    const to = unboundStorage('test' as StorageHashBase<string>, {
       T: table({ columns: { a: col({ nativeType: 'text' }) } }),
     });
 
@@ -1039,11 +1039,11 @@ describe('detectDestructiveChanges', () => {
   });
 
   it('detects removed table', () => {
-    const from = unboundStorage('sha256:test' as StorageHashBase<string>, {
+    const from = unboundStorage('test' as StorageHashBase<string>, {
       A: table({ columns: { id: col({ nativeType: 'text' }) } }),
       B: table({ columns: { id: col({ nativeType: 'text' }) } }),
     });
-    const to = unboundStorage('sha256:test' as StorageHashBase<string>, {
+    const to = unboundStorage('test' as StorageHashBase<string>, {
       A: table({ columns: { id: col({ nativeType: 'text' }) } }),
     });
 
@@ -1056,12 +1056,12 @@ describe('detectDestructiveChanges', () => {
   });
 
   it('does not report columns of a removed table individually', () => {
-    const from = unboundStorage('sha256:test' as StorageHashBase<string>, {
+    const from = unboundStorage('test' as StorageHashBase<string>, {
       T: table({
         columns: { a: col({ nativeType: 'text' }), b: col({ nativeType: 'text' }) },
       }),
     });
-    const to = unboundStorage('sha256:test' as StorageHashBase<string>, {});
+    const to = unboundStorage('test' as StorageHashBase<string>, {});
 
     const conflicts = detectDestructiveChanges(from, to);
     expect(conflicts).toHaveLength(1);
@@ -1069,13 +1069,13 @@ describe('detectDestructiveChanges', () => {
   });
 
   it('detects multiple removals', () => {
-    const from = unboundStorage('sha256:test' as StorageHashBase<string>, {
+    const from = unboundStorage('test' as StorageHashBase<string>, {
       A: table({
         columns: { id: col({ nativeType: 'text' }), name: col({ nativeType: 'text' }) },
       }),
       B: table({ columns: { id: col({ nativeType: 'text' }) } }),
     });
-    const to = unboundStorage('sha256:test' as StorageHashBase<string>, {
+    const to = unboundStorage('test' as StorageHashBase<string>, {
       A: table({ columns: { id: col({ nativeType: 'text' }) } }),
     });
 
@@ -1087,10 +1087,10 @@ describe('detectDestructiveChanges', () => {
   });
 
   it('detects removed table with prototype-name identifier', () => {
-    const from = unboundStorage('sha256:test' as StorageHashBase<string>, {
+    const from = unboundStorage('test' as StorageHashBase<string>, {
       toString: table({ columns: { id: col({ nativeType: 'text' }) } }),
     });
-    const to = unboundStorage('sha256:test' as StorageHashBase<string>, {});
+    const to = unboundStorage('test' as StorageHashBase<string>, {});
 
     const conflicts = detectDestructiveChanges(from, to);
     expect(conflicts).toEqual([
@@ -1102,14 +1102,14 @@ describe('detectDestructiveChanges', () => {
   });
 
   it('detects removed column with prototype-name identifier', () => {
-    const from = unboundStorage('sha256:test' as StorageHashBase<string>, {
+    const from = unboundStorage('test' as StorageHashBase<string>, {
       T: table({
         columns: {
           toString: col({ nativeType: 'text' }),
         },
       }),
     });
-    const to = unboundStorage('sha256:test' as StorageHashBase<string>, {
+    const to = unboundStorage('test' as StorageHashBase<string>, {
       T: table({ columns: {} }),
     });
 
@@ -1125,7 +1125,7 @@ describe('detectDestructiveChanges', () => {
 
 describe('contractToSchemaIR — resolved leaf values', () => {
   it('stamps resolvedNativeType equal to the computed native type', () => {
-    const storage = unboundStorage('sha256:test' as StorageHashBase<string>, {
+    const storage = unboundStorage('test' as StorageHashBase<string>, {
       T: table({ columns: { id: col({ nativeType: 'text' }) } }),
     });
 
@@ -1134,7 +1134,7 @@ describe('contractToSchemaIR — resolved leaf values', () => {
   });
 
   it('stamps the expanded type into resolvedNativeType when expandNativeType is provided', () => {
-    const storage = unboundStorage('sha256:test' as StorageHashBase<string>, {
+    const storage = unboundStorage('test' as StorageHashBase<string>, {
       T: table({
         columns: {
           id: col({ nativeType: 'character', codecId: 'sql/char@1', typeParams: { length: 36 } }),
@@ -1153,7 +1153,7 @@ describe('contractToSchemaIR — resolved leaf values', () => {
   });
 
   it('appends [] to resolvedNativeType for array columns', () => {
-    const storage = unboundStorage('sha256:test' as StorageHashBase<string>, {
+    const storage = unboundStorage('test' as StorageHashBase<string>, {
       T: table({ columns: { tags: col({ nativeType: 'text', many: true }) } }),
     });
 
@@ -1162,7 +1162,7 @@ describe('contractToSchemaIR — resolved leaf values', () => {
   });
 
   it('stamps the contract ColumnDefault into resolvedDefault', () => {
-    const storage = unboundStorage('sha256:test' as StorageHashBase<string>, {
+    const storage = unboundStorage('test' as StorageHashBase<string>, {
       T: table({
         columns: {
           status: col({ nativeType: 'text', default: { kind: 'literal', value: 'draft' } }),
@@ -1189,7 +1189,7 @@ describe('contractToSchemaIR — resolved leaf values', () => {
     // ambiguity in its default syntax) gets by omitting the hook. Proves
     // the hook actually runs, and runs with the resolved (`[]`-suffixed for
     // arrays) native type, not the base one.
-    const storage = unboundStorage('sha256:test' as StorageHashBase<string>, {
+    const storage = unboundStorage('test' as StorageHashBase<string>, {
       T: table({
         columns: {
           tags: col({
@@ -1242,7 +1242,7 @@ describe('contractToSchemaIR — resolved leaf values', () => {
       },
     });
     const storage = new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: { [UNBOUND_NAMESPACE_ID]: ns },
     });
 

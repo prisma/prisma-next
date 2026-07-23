@@ -157,15 +157,39 @@ describe('ast/select', () => {
     expect(ast.collectParamRefs()).toEqual([fromParam, whereParam, havingParam, joinParam]);
   });
 
+  it('rejects empty FunctionSource column aliases with a structured error', () => {
+    expect(() =>
+      FunctionSource.of('json_each', [], {
+        alias: 'entry',
+        columnAliases: [],
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        name: 'StructuredError',
+        code: 'SQL.AST_INVALID',
+        message: 'FunctionSource column aliases must not be empty',
+        meta: { kind: 'function-source', field: 'columnAliases' },
+      }),
+    );
+  });
+
   it('collectParamRefs traverses FunctionSource args in top-level from and in joins', () => {
     const fromArg = param('tbl', 'from_fn_p');
     const joinArg = param('col', 'join_fn_p');
 
-    const ast = SelectAst.from(FunctionSource.of('pragma_table_info', [fromArg], 'pti'))
+    const ast = SelectAst.from(
+      FunctionSource.of('pragma_table_info', [fromArg], {
+        alias: 'pti',
+        columnAliases: ['name', 'ord'],
+      }).withOrdinality(),
+    )
       .addProjection('name', col('pti', 'name'))
       .withJoins([
         JoinAst.inner(
-          FunctionSource.of('some_fn', [joinArg], 'fn'),
+          FunctionSource.of('some_fn', [joinArg], {
+            alias: 'fn',
+            columnAliases: ['col'],
+          }),
           EqColJoinOn.of(col('pti', 'name'), col('fn', 'col')),
         ),
       ]);
@@ -177,11 +201,19 @@ describe('ast/select', () => {
     const fromCol = col('outer', 'tbl');
     const joinCol = col('outer', 'col');
 
-    const ast = SelectAst.from(FunctionSource.of('pragma_table_info', [fromCol], 'pti'))
+    const ast = SelectAst.from(
+      FunctionSource.of('pragma_table_info', [fromCol], {
+        alias: 'pti',
+        columnAliases: ['name', 'ord'],
+      }).withOrdinality(),
+    )
       .addProjection('name', col('pti', 'name'))
       .withJoins([
         JoinAst.inner(
-          FunctionSource.of('some_fn', [joinCol], 'fn'),
+          FunctionSource.of('some_fn', [joinCol], {
+            alias: 'fn',
+            columnAliases: ['col'],
+          }),
           EqColJoinOn.of(col('pti', 'name'), col('fn', 'col')),
         ),
       ]);

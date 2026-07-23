@@ -67,7 +67,7 @@ function makeContractWithValidator(
   return {
     target: 'mongo',
     targetFamily: 'mongo',
-    profileHash: 'sha256:test-profile',
+    profileHash: 'test-profile',
     capabilities: {},
     extensions: {},
     meta: {},
@@ -200,8 +200,8 @@ describe('MongoMigrationRunner - closed validators', () => {
       validationAction: 'error',
     });
     await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
-      storageHash: 'sha256:origin',
-      profileHash: 'sha256:p1',
+      storageHash: 'origin',
+      profileHash: 'p1',
     });
 
     const originIR = new MongoSchemaIR([
@@ -215,11 +215,7 @@ describe('MongoMigrationRunner - closed validators', () => {
       }),
     ]);
 
-    const destContract = makeContractWithValidator(
-      'users',
-      { ...CLOSED_USERS_WIDENED },
-      'sha256:dest',
-    );
+    const destContract = makeContractWithValidator('users', { ...CLOSED_USERS_WIDENED }, 'dest');
 
     // The widening-only policy omits 'destructive'; if the additive field were
     // misclassified the planner would reject the plan as a policy violation.
@@ -269,7 +265,7 @@ describe('MongoMigrationRunner - closed validators', () => {
     ).rejects.toThrow();
 
     const marker = await controlAdapter.readMarker(new MongoControlDriver(db, client), 'app');
-    expect(marker?.storageHash).toBe('sha256:dest');
+    expect(marker?.storageHash).toBe('dest');
   });
 
   it('validates a closed polymorphic (oneOf) collection against live MongoDB', async () => {

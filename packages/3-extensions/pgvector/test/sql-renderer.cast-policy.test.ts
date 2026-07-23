@@ -23,13 +23,13 @@ describe('pgvector cast policy', () => {
     const vectorContract = new SqlContractSerializer().deserializeContract({
       target: 'postgres',
       targetFamily: 'sql',
-      profileHash: 'sha256:vector-cast-policy',
+      profileHash: 'vector-cast-policy',
       roots: {},
       capabilities: {},
       extensions: {},
       meta: {},
       storage: {
-        storageHash: 'sha256:vector-cast-policy',
+        storageHash: 'vector-cast-policy',
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,

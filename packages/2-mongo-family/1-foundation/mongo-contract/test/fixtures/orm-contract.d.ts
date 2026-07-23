@@ -16,9 +16,9 @@ import type {
   StorageHashBase,
 } from '@prisma-next/contract/types';
 
-export type StorageHash = StorageHashBase<'sha256:orm-storage'>;
+export type StorageHash = StorageHashBase<'orm-storage'>;
 export type ExecutionHash = ExecutionHashBase<string>;
-export type ProfileHash = ProfileHashBase<'sha256:orm-profile'>;
+export type ProfileHash = ProfileHashBase<'orm-profile'>;
 
 export type CodecTypes = MongoCodecTypes;
 

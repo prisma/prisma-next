@@ -51,9 +51,9 @@ afterAll(() => {
   vi.resetModules();
 });
 
-const EMPTY = 'sha256:empty';
-const C1 = `sha256:${'1'.repeat(64)}`;
-const C2 = `sha256:${'2'.repeat(64)}`;
+const EMPTY = 'empty';
+const C1 = `${'1'.repeat(64)}`;
+const C2 = `${'2'.repeat(64)}`;
 const TARGET = 'mock';
 const TARGET_FAMILY = 'mock';
 
@@ -193,12 +193,7 @@ describe('migrate --show (read-only + faithfulness)', () => {
     const { createMigrateCommand } = await import('../../src/commands/migrate');
 
     try {
-      await executeCommand(createMigrateCommand(), [
-        '--show',
-        '--from',
-        'sha256:empty',
-        '--no-color',
-      ]);
+      await executeCommand(createMigrateCommand(), ['--show', '--from', 'empty', '--no-color']);
     } catch {
       // process.exit on success
     }
@@ -217,12 +212,7 @@ describe('migrate --show (read-only + faithfulness)', () => {
     const { createMigrateCommand } = await import('../../src/commands/migrate');
 
     try {
-      await executeCommand(createMigrateCommand(), [
-        '--show',
-        '--from',
-        'sha256:empty',
-        '--no-color',
-      ]);
+      await executeCommand(createMigrateCommand(), ['--show', '--from', 'empty', '--no-color']);
     } catch {
       // process.exit on success
     }
@@ -231,7 +221,7 @@ describe('migrate --show (read-only + faithfulness)', () => {
     const [firstCall] = mocks.resolveRecordedPath.mock.calls;
     expect(firstCall).toBeDefined();
     const callArg = firstCall![0] as { currentMarker: unknown; space: { headRef: unknown } };
-    // From sha256:empty — marker should be null (planSpacePath treats EMPTY as no-marker).
+    // From empty — marker should be null (planSpacePath treats EMPTY as no-marker).
     expect(callArg.currentMarker).toBeNull();
     // App space head ref invariants default to [] (synthesised from contract).
     expect((callArg.space.headRef as { invariants: unknown }).invariants).toEqual([]);
@@ -259,7 +249,7 @@ describe('migrate --show (read-only + faithfulness)', () => {
       await executeCommand(createMigrateCommand(), [
         '--show',
         '--from',
-        'sha256:empty',
+        'empty',
         '--to',
         'prod',
         '--no-color',
@@ -287,12 +277,7 @@ describe('migrate --show (read-only + faithfulness)', () => {
     const { createMigrateCommand } = await import('../../src/commands/migrate');
 
     try {
-      await executeCommand(createMigrateCommand(), [
-        '--show',
-        '--from',
-        'sha256:empty',
-        '--no-color',
-      ]);
+      await executeCommand(createMigrateCommand(), ['--show', '--from', 'empty', '--no-color']);
     } catch {
       // process.exit on success
     }
@@ -476,7 +461,7 @@ describe('migrate --show (read-only + faithfulness)', () => {
     const cwd = await mkdtemp(join(tmpdir(), 'cli-migrate-show-ext-'));
     tempDirs.push(cwd);
 
-    const EXT_C1 = `sha256:${'e'.repeat(64)}`;
+    const EXT_C1 = `${'e'.repeat(64)}`;
     const extAppDir = join(cwd, 'migrations', 'app');
     const extVectorDir = join(cwd, 'migrations', 'pgvector');
     await mkdir(extAppDir, { recursive: true });
@@ -583,7 +568,7 @@ describe('migrate --show (read-only + faithfulness)', () => {
     // Repro: with --from <app-hash> --to <app-hash>, extension spaces must NOT receive the
     // app --from hash as their marker. If they did, planSpacePath would try to walk
     // extension-graph from that app hash (which doesn't exist there) and return 'unreachable',
-    // producing "No migration path from sha256:76c1bd5 to sha256:... in space 'pgvector'".
+    // producing "No migration path from 76c1bd5 to ... in space 'pgvector'".
     //
     // Expected behaviour: extension spaces ignore --from and plan from their own live marker
     // (null / greenfield in offline mode) → their own head — exactly as executeMigrate does.
@@ -592,7 +577,7 @@ describe('migrate --show (read-only + faithfulness)', () => {
     const cwd = await mkdtemp(join(tmpdir(), 'cli-migrate-show-leak-'));
     tempDirs.push(cwd);
 
-    const EXT_C1 = `sha256:${'f'.repeat(64)}`;
+    const EXT_C1 = `${'f'.repeat(64)}`;
     const appMigrationsDir = join(cwd, 'migrations', 'app');
     const extMigrationsDir = join(cwd, 'migrations', 'pgvector');
     await mkdir(appMigrationsDir, { recursive: true });
@@ -724,7 +709,7 @@ describe('migrate --show (read-only + faithfulness)', () => {
     const cwd = await mkdtemp(join(tmpdir(), 'cli-migrate-show-order-'));
     tempDirs.push(cwd);
 
-    const EXT_C1 = `sha256:${'a'.repeat(64)}`;
+    const EXT_C1 = `${'a'.repeat(64)}`;
     const appMigrationsDir = join(cwd, 'migrations', 'app');
     const extMigrationsDir = join(cwd, 'migrations', 'pgvector');
     await mkdir(appMigrationsDir, { recursive: true });

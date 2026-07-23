@@ -18,8 +18,7 @@ export function migrationListEmptySource(glyphMode: GlyphMode): string {
 }
 
 export function abbreviateContractHash(hash: string): string {
-  const stripped = hash.startsWith('sha256:') ? hash.slice(7) : hash;
-  return stripped.slice(0, MIGRATION_LIST_HASH_WIDTH);
+  return hash.slice(0, MIGRATION_LIST_HASH_WIDTH);
 }
 
 export function padFromHashColumn(text: string, width: number): string {

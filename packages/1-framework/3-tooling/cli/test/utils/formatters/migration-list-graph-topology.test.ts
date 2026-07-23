@@ -17,7 +17,7 @@ function entry(
 ): MigrationListEntry {
   return {
     name: dirName,
-    hash: migrationHash ?? `sha256:mig-${hashCounter++}`,
+    hash: migrationHash ?? `mig-${hashCounter++}`,
     fromContract: from,
     toContract: to,
     operationCount: 1,
@@ -287,7 +287,7 @@ describe('classifyMigrationListGraphTopology', () => {
   });
 
   it('tolerates duplicate migration hash without throwing', () => {
-    const sharedHash = 'sha256:duplicate';
+    const sharedHash = 'duplicate';
     const eFirst = entry('20250302_first', 'hash_a', 'hash_b', sharedHash);
     const eSecond = entry('20250301_second', 'hash_c', 'hash_d', sharedHash);
     expect(() => classify([eFirst, eSecond])).not.toThrow();
@@ -296,7 +296,7 @@ describe('classifyMigrationListGraphTopology', () => {
   });
 
   it('classifies self-edge as self without forward degree bumps', () => {
-    const contract = 'sha256:self-target';
+    const contract = 'self-target';
     const eSelf = entry('20250305_self', contract, contract);
     const eForward = entry('20250304_forward', null, contract);
     const topology = classify([eSelf, eForward]);

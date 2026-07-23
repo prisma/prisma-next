@@ -9,11 +9,11 @@ import sqliteStatic, { type SqliteStaticContext } from '../src/static/sqlite-sta
 const contract: Contract<SqlStorage> = {
   target: 'sqlite',
   targetFamily: 'sql',
-  profileHash: profileHash('sha256:sqlite-static-test'),
+  profileHash: profileHash('sqlite-static-test'),
   domain: applicationDomainOf({ models: {} }),
   roots: {},
   storage: new SqlStorage({
-    storageHash: coreHash('sha256:sqlite-static-test'),
+    storageHash: coreHash('sqlite-static-test'),
     namespaces: {
       __unbound__: sqliteCreateNamespace({ id: '__unbound__', entries: { table: {} } }),
     },

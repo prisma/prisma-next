@@ -8,6 +8,9 @@ jobs:
   secret-detection:
     name: Secret Detection
     if: github.event_name == 'pull_request'
+    permissions:
+      contents: read # Permission to read repository contents
+      pull-requests: write # Permission for posting comments
     uses: prisma/.github/.github/workflows/secret_detection.yml@main
     secrets: inherit
   code-scanning:

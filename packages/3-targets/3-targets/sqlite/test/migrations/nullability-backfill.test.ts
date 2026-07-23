@@ -37,9 +37,9 @@ function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage
   return {
     target: 'sqlite',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     storage: new SqlStorage({
-      storageHash: coreHash(`sha256:${'c'.repeat(64)}`),
+      storageHash: coreHash('c'.repeat(64)),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: sqliteCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,

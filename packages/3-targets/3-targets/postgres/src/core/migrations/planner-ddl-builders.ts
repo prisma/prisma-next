@@ -1,6 +1,7 @@
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import type { StorageColumn, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { isPgEnumParams } from '../codecs';
 import { escapeLiteral, quoteIdentifier, quoteQualifiedName } from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
 import { resolveColumnTypeMetadata } from './planner-type-resolution';
@@ -70,7 +71,7 @@ export function buildColumnTypeSql(
   // as its quoted, schema-qualified type-name identifier. DDL-render only — the
   // verify comparison value (`resolvedNativeType`) stays the bare name the
   // family expander produces, matching introspection.
-  if (typeof resolved.typeParams?.['typeName'] === 'string') {
+  if (isPgEnumParams(resolved.typeParams)) {
     const quoted = quoteQualifiedName(resolved.nativeType);
     return column.many ? `${quoted}[]` : quoted;
   }

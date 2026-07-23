@@ -99,11 +99,11 @@ describe('loadContractSpaceAggregate', () => {
     it('never throws on a hash-mismatched, unparseable, or self-edge package', async () => {
       // app: a self-edge package (from === to, no data op).
       await writePackage('app', '20260101T0000_self', {
-        from: 'sha256:app-head',
-        to: 'sha256:app-head',
+        from: 'app-head',
+        to: 'app-head',
       });
       // alpha: a hash-mismatched package (retained) and no head ref.
-      await writePackage('alpha', '20260101T0000_init', { from: null, to: 'sha256:a1' });
+      await writePackage('alpha', '20260101T0000_init', { from: null, to: 'a1' });
       await writeFile(join(migrationsDir, 'alpha', '20260101T0000_init', 'ops.json'), '[]');
       // beta: an unparseable package (omitted) and a head ref.
       await mkdir(join(migrationsDir, 'beta', '20260101T0000_broken'), { recursive: true });
@@ -112,7 +112,7 @@ describe('loadContractSpaceAggregate', () => {
         'not json',
       );
       await writeFile(join(migrationsDir, 'beta', '20260101T0000_broken', 'ops.json'), '[]');
-      await writeHeadRef('beta', { hash: 'sha256:b1', invariants: [] });
+      await writeHeadRef('beta', { hash: 'b1', invariants: [] });
 
       const aggregate = await load();
       expect(aggregate.listSpaces()).toEqual(['app', 'alpha', 'beta']);
@@ -166,7 +166,7 @@ describe('loadContractSpaceAggregate', () => {
     });
 
     it('still reports headRefMissing for a migration-backed space with no head.json', async () => {
-      await writePackage('backed', '20260101T0000_init', { from: null, to: 'sha256:b1' });
+      await writePackage('backed', '20260101T0000_init', { from: null, to: 'b1' });
 
       const aggregate = await load();
       const violations = aggregate.checkIntegrity();
@@ -177,8 +177,8 @@ describe('loadContractSpaceAggregate', () => {
 
     it('reports headRefNotInGraph for a migration-backed space whose head hash is not in graph', async () => {
       // A loadable package with a known graph node, but head.json points elsewhere.
-      await writePackage('backed', '20260101T0000_init', { from: null, to: 'sha256:b1' });
-      await writeHeadRef('backed', { hash: 'sha256:not-in-graph', invariants: [] });
+      await writePackage('backed', '20260101T0000_init', { from: null, to: 'b1' });
+      await writeHeadRef('backed', { hash: 'not-in-graph', invariants: [] });
 
       const aggregate = await load();
       const violations = aggregate.checkIntegrity();
@@ -203,7 +203,7 @@ describe('loadContractSpaceAggregate', () => {
     });
 
     it('reads app migration packages from disk', async () => {
-      await writePackage('app', '20260101T0000_init', { from: null, to: 'sha256:app-head' });
+      await writePackage('app', '20260101T0000_init', { from: null, to: 'app-head' });
       const aggregate = await load();
       expect(aggregate.app.packages).toHaveLength(1);
       expect(aggregate.app.packages[0]?.dirName).toBe('20260101T0000_init');
@@ -233,15 +233,15 @@ describe('loadContractSpaceAggregate', () => {
 
   describe('query methods', () => {
     it('lists app first, then extension ids lex-ascending', async () => {
-      await writePackage('zeta', '20260101T0000_init', { from: null, to: 'sha256:z1' });
-      await writePackage('alpha', '20260101T0000_init', { from: null, to: 'sha256:a1' });
+      await writePackage('zeta', '20260101T0000_init', { from: null, to: 'z1' });
+      await writePackage('alpha', '20260101T0000_init', { from: null, to: 'a1' });
       const aggregate = await load();
       expect(aggregate.listSpaces()).toEqual(['app', 'alpha', 'zeta']);
       expect(aggregate.spaces().map((m) => m.spaceId)).toEqual(['app', 'alpha', 'zeta']);
     });
 
     it('hasSpace / space resolve by id', async () => {
-      await writePackage('alpha', '20260101T0000_init', { from: null, to: 'sha256:a1' });
+      await writePackage('alpha', '20260101T0000_init', { from: null, to: 'a1' });
       const aggregate = await load();
       expect(aggregate.hasSpace('app')).toBe(true);
       expect(aggregate.hasSpace('alpha')).toBe(true);
@@ -254,11 +254,11 @@ describe('loadContractSpaceAggregate', () => {
   describe('checkIntegrity', () => {
     it('returns the full structural violation set without bailing at the first', async () => {
       await writePackage('app', '20260101T0000_self', {
-        from: 'sha256:app-head',
-        to: 'sha256:app-head',
+        from: 'app-head',
+        to: 'app-head',
       });
       // alpha: hash-mismatched package (retained) and no head.json → headRefMissing.
-      await writePackage('alpha', '20260101T0000_init', { from: null, to: 'sha256:a1' });
+      await writePackage('alpha', '20260101T0000_init', { from: null, to: 'a1' });
       await writeFile(join(migrationsDir, 'alpha', '20260101T0000_init', 'ops.json'), '[]');
       // beta: unloadable package → packageUnloadable. Head.json present but
       // packages.length === 0 after load, so headRefNotInGraph does NOT fire.
@@ -268,10 +268,10 @@ describe('loadContractSpaceAggregate', () => {
         'not json',
       );
       await writeFile(join(migrationsDir, 'beta', '20260101T0000_broken', 'ops.json'), '[]');
-      await writeHeadRef('beta', { hash: 'sha256:b1', invariants: [] });
+      await writeHeadRef('beta', { hash: 'b1', invariants: [] });
       // gamma: loadable package but head.json points to a hash not in graph → headRefNotInGraph.
-      await writePackage('gamma', '20260101T0000_init', { from: null, to: 'sha256:g1' });
-      await writeHeadRef('gamma', { hash: 'sha256:not-in-graph', invariants: [] });
+      await writePackage('gamma', '20260101T0000_init', { from: null, to: 'g1' });
+      await writeHeadRef('gamma', { hash: 'not-in-graph', invariants: [] });
 
       const violations = (await load()).checkIntegrity();
 
@@ -295,8 +295,8 @@ describe('loadContractSpaceAggregate', () => {
     });
 
     it('omits config/contract checks unless the matching opt is set', async () => {
-      await writePackage('orphan', '20260101T0000_init', { from: null, to: 'sha256:o1' });
-      await writeHeadRef('orphan', { hash: 'sha256:o1', invariants: [] });
+      await writePackage('orphan', '20260101T0000_init', { from: null, to: 'o1' });
+      await writeHeadRef('orphan', { hash: 'o1', invariants: [] });
       const aggregate = await load();
 
       const bare = aggregate.checkIntegrity();
@@ -305,8 +305,8 @@ describe('loadContractSpaceAggregate', () => {
     });
 
     it('gates layout-drift checks behind declaredExtensions', async () => {
-      await writePackage('present', '20260101T0000_init', { from: null, to: 'sha256:p1' });
-      await writeHeadRef('present', { hash: 'sha256:p1', invariants: [] });
+      await writePackage('present', '20260101T0000_init', { from: null, to: 'p1' });
+      await writeHeadRef('present', { hash: 'p1', invariants: [] });
       const aggregate = await load();
 
       const violations = aggregate.checkIntegrity({
@@ -323,7 +323,7 @@ describe('loadContractSpaceAggregate', () => {
     });
 
     it('surfaces duplicateMigrationHash when two packages share a migrationHash', async () => {
-      const meta = { from: null, to: 'sha256:dup-to' };
+      const meta = { from: null, to: 'dup-to' };
       await writePackage('app', '20260101T0000_first', meta);
       await writePackage('app', '20260101T0000_second', meta);
 
@@ -335,7 +335,7 @@ describe('loadContractSpaceAggregate', () => {
         {
           kind: 'duplicateMigrationHash',
           spaceId: 'app',
-          migrationHash: expect.stringMatching(/^sha256:/),
+          migrationHash: expect.stringMatching(/^/),
           dirNames: ['20260101T0000_first', '20260101T0000_second'],
         },
       ]);
@@ -356,7 +356,7 @@ describe('loadContractSpaceAggregate', () => {
       await writeContractSnapshotEntry(sharerHash, sharerContract);
       // broken: head ref points at a hash with no store entry → contract()
       // throws → contractUnreadable.
-      const brokenHash = `sha256:${'9'.repeat(64)}`;
+      const brokenHash = '9'.repeat(64);
       await writePackage('broken', '20260101T0000_init', { from: null, to: brokenHash });
       await writeHeadRef('broken', { hash: brokenHash, invariants: [] });
 
@@ -383,7 +383,7 @@ describe('loadContractSpaceAggregate', () => {
   describe('extension enumeration', () => {
     it('excludes reserved-named and grammar-invalid directories from extensions', async () => {
       // A grammar-valid extension dir is enumerated as a space.
-      await writePackage('valid', '20260101T0000_init', { from: null, to: 'sha256:v1' });
+      await writePackage('valid', '20260101T0000_init', { from: null, to: 'v1' });
       // The reserved per-space `refs` name at the migrations root is not a space.
       await mkdir(join(migrationsDir, 'refs'), { recursive: true });
       await writeFile(join(migrationsDir, 'refs', 'head.json'), '{}');
@@ -400,8 +400,8 @@ describe('loadContractSpaceAggregate', () => {
 
   describe('refUnreadable', () => {
     it('omits a corrupt named ref and surfaces refUnreadable for it', async () => {
-      await writePackage('alpha', '20260101T0000_init', { from: null, to: 'sha256:a1' });
-      await writeHeadRef('alpha', { hash: 'sha256:a1', invariants: [] });
+      await writePackage('alpha', '20260101T0000_init', { from: null, to: 'a1' });
+      await writeHeadRef('alpha', { hash: 'a1', invariants: [] });
       const refsDir = join(migrationsDir, 'alpha', 'refs');
       await mkdir(refsDir, { recursive: true });
       await writeFile(join(refsDir, 'production.json'), 'not json');
@@ -419,7 +419,7 @@ describe('loadContractSpaceAggregate', () => {
     });
 
     it('reports a corrupt head.json as refUnreadable, not headRefMissing', async () => {
-      await writePackage('beta', '20260101T0000_init', { from: null, to: 'sha256:b1' });
+      await writePackage('beta', '20260101T0000_init', { from: null, to: 'b1' });
       const refsDir = join(migrationsDir, 'beta', 'refs');
       await mkdir(refsDir, { recursive: true });
       await writeFile(join(refsDir, 'head.json'), '{ corrupt');
@@ -439,7 +439,7 @@ describe('loadContractSpaceAggregate', () => {
     });
 
     it('still reports headRefMissing when head.json is genuinely absent', async () => {
-      await writePackage('gamma', '20260101T0000_init', { from: null, to: 'sha256:g1' });
+      await writePackage('gamma', '20260101T0000_init', { from: null, to: 'g1' });
 
       const aggregate = await load();
       const violations = aggregate.checkIntegrity();

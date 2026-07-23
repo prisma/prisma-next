@@ -6,7 +6,7 @@ import {
   modelsOf,
   postgresScalarTypeDescriptors,
   postgresTarget,
-  sqliteScalarTypeDescriptors,
+  sqliteScalarColumnDescriptors,
   sqliteTarget,
   symbolTableInputFromParseArgs,
 } from './fixtures';
@@ -30,7 +30,7 @@ describe('interpretPslDocumentToSqlContract scalar-list capability gating', () =
 
     const result = interpretPslDocumentToSqlContract({
       target: sqliteTarget,
-      scalarTypeDescriptors: sqliteScalarTypeDescriptors,
+      scalarColumnDescriptors: sqliteScalarColumnDescriptors,
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
       capabilities: sqliteCapabilities,
@@ -59,7 +59,7 @@ describe('interpretPslDocumentToSqlContract scalar-list capability gating', () =
 
     const result = interpretPslDocumentToSqlContract({
       target: postgresTarget,
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
       capabilities: postgresCapabilities,
@@ -90,7 +90,7 @@ describe('interpretPslDocumentToSqlContract scalar-list capability gating', () =
 
     const result = interpretPslDocumentToSqlContract({
       target: postgresTarget,
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
       capabilities: {},

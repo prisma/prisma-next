@@ -35,7 +35,7 @@ async function plantLegacyMarker(connectionString: string) {
     `);
     await client.query(`
       INSERT INTO prisma_contract.marker (core_hash, profile_hash, updated_at)
-      VALUES ('sha256:legacy', 'sha256:legacy', NOW())
+      VALUES ('legacy', 'legacy', NOW())
     `);
   });
 }

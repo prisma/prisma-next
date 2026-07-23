@@ -83,8 +83,8 @@ export type RefResolutionError =
   | RefResolutionWrongGrammar
   | RefResolutionInvalidFormat;
 
-const FULL_HASH_PATTERN = /^sha256:([0-9a-f]{64}|empty)$/;
-const HEX_PREFIX_PATTERN = /^(sha256:)?[0-9a-f]{6,}$/;
+const FULL_HASH_PATTERN = /^([0-9a-f]{64}|empty)$/;
+const HEX_PREFIX_PATTERN = /^[0-9a-f]{6,}$/;
 
 export function isFullHash(input: string): boolean {
   return FULL_HASH_PATTERN.test(input);
@@ -92,10 +92,6 @@ export function isFullHash(input: string): boolean {
 
 export function isHexPrefix(input: string): boolean {
   return HEX_PREFIX_PATTERN.test(input);
-}
-
-export function normalizeHashPrefix(input: string): string {
-  return input.startsWith('sha256:') ? input : `sha256:${input}`;
 }
 
 export function findEdgeByDirName(

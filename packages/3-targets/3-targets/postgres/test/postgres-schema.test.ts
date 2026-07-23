@@ -67,7 +67,7 @@ describe('PostgresUnboundSchema', () => {
 
 describe('ddlSchemaName', () => {
   const storageWithPublic = new SqlStorage({
-    storageHash: coreHash('sha256:test-with-public'),
+    storageHash: coreHash('test-with-public'),
     namespaces: {
       public: new PostgresSchema({ id: 'public', entries: { table: {} } }),
       [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,
@@ -75,7 +75,7 @@ describe('ddlSchemaName', () => {
   });
 
   const storageWithoutPublic = new SqlStorage({
-    storageHash: coreHash('sha256:test-without-public'),
+    storageHash: coreHash('test-without-public'),
     namespaces: {
       auth: new PostgresSchema({ id: 'auth', entries: { table: {} } }),
       [UNBOUND_NAMESPACE_ID]: PostgresUnboundSchema.instance,

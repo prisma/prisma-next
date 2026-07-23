@@ -1,9 +1,19 @@
+import type { AuthoringTypeNamespace } from '@prisma-next/framework-components/authoring';
+import {
+  collectScalarTypeConstructors,
+  instantiateAuthoringTypeConstructor,
+  validateAuthoringHelperArguments,
+} from '@prisma-next/framework-components/authoring';
 import { describe, expect, it } from 'vitest';
+import { createPostgresBuiltinCodecLookup } from '../src/core/codec-lookup';
 import {
   createPostgresDefaultFunctionRegistry,
   createPostgresMutationDefaultGeneratorDescriptors,
-  createPostgresScalarTypeDescriptors,
+  postgresAuthoringTypes,
+  postgresNativeAuthoringTypes,
+  postgresScalarAuthoringTypes,
 } from '../src/core/control-mutation-defaults';
+import postgresAdapterDescriptor from '../src/exports/control';
 import runtimeAdapterDescriptor from '../src/exports/runtime';
 
 const stubSpan = {
@@ -236,28 +246,13 @@ describe('createPostgresMutationDefaultGeneratorDescriptors', () => {
     expect(descriptor.applicableCodecIds).toBeUndefined();
   });
 
-  it('resolves column descriptor for matching generator', () => {
-    const uuidv4Descriptor = descriptors.find((d) => d.id === 'uuidv4')!;
-    const resolve = uuidv4Descriptor.resolveGeneratedColumnDescriptor;
-    expect(resolve).toBeDefined();
-    const result = resolve!({
-      generated: { kind: 'generator', id: 'uuidv4' },
-    });
-    expect(result).toMatchObject({
-      codecId: 'sql/char@1',
-      nativeType: 'character',
-      typeParams: { length: 36 },
-    });
-  });
-
-  it('returns undefined for non-matching generator', () => {
-    const uuidv4Descriptor = descriptors.find((d) => d.id === 'uuidv4')!;
-    const resolve = uuidv4Descriptor.resolveGeneratedColumnDescriptor;
-    expect(resolve).toBeDefined();
-    const result = resolve!({
-      generated: { kind: 'generator', id: 'nanoid' },
-    });
-    expect(result).toBeUndefined();
+  it('keeps pg/text@1 applicable for every builtin generator so String fields never false-diagnose', () => {
+    // The type position is the only storage decider (TML-2986); a generator
+    // default on a `String` column must validate against pg/text@1.
+    for (const id of ['ulid', 'nanoid', 'uuidv7', 'uuidv4', 'cuid2', 'ksuid'] as const) {
+      const descriptor = descriptors.find((d) => d.id === id)!;
+      expect(descriptor.applicableCodecIds).toContain('pg/text@1');
+    }
   });
 });
 
@@ -271,26 +266,109 @@ describe('postgres runtime mutation default generators', () => {
   });
 });
 
-describe('createPostgresScalarTypeDescriptors', () => {
-  const descriptors = createPostgresScalarTypeDescriptors();
+describe('postgresScalarAuthoringTypes', () => {
+  const codecLookup = createPostgresBuiltinCodecLookup();
+  const namespace: AuthoringTypeNamespace = postgresScalarAuthoringTypes;
 
-  it('maps all standard PSL scalar types', () => {
-    expect([...descriptors.keys()]).toEqual(
-      expect.arrayContaining([
-        'String',
-        'Boolean',
-        'Int',
-        'BigInt',
-        'Float',
-        'Decimal',
-        'DateTime',
-        'Json',
-        'Bytes',
-      ]),
-    );
+  // The legacy scalar-type map channel (name-to-codecId, retired in TML-2985) is gone; the pinned
+  // name → codecId pairs below carry the retired map's claims forward.
+  const expectedScalars = [
+    ['String', 'pg/text@1'],
+    ['Boolean', 'pg/bool@1'],
+    ['Int', 'pg/int4@1'],
+    ['BigInt', 'pg/int8@1'],
+    ['Float', 'pg/float8@1'],
+    ['Decimal', 'pg/numeric@1'],
+    ['DateTime', 'pg/timestamptz@1'],
+    ['Json', 'pg/json@1'],
+    ['Jsonb', 'pg/jsonb@1'],
+    ['Bytes', 'pg/bytea@1'],
+  ] as const;
+
+  it('pins every base scalar as a zero-arg type constructor with manifest-derived nativeType', () => {
+    expect(Object.keys(namespace).sort()).toEqual(expectedScalars.map(([name]) => name).sort());
+    for (const [name, codecId] of expectedScalars) {
+      expect(namespace[name]).toEqual({
+        kind: 'typeConstructor',
+        output: { codecId, nativeType: codecLookup.targetTypesFor(codecId)?.[0] },
+      });
+    }
   });
 
-  it('maps String to pg/text@1', () => {
-    expect(descriptors.get('String')).toBe('pg/text@1');
+  it('is wired into the adapter descriptor authoring type contribution', () => {
+    expect(postgresAdapterDescriptor.authoring?.type).toBe(postgresAuthoringTypes);
+    expect(postgresAuthoringTypes).toEqual({
+      ...postgresScalarAuthoringTypes,
+      ...postgresNativeAuthoringTypes,
+    });
+  });
+
+  it('declares Jsonb as the value-object storage type', () => {
+    expect(postgresAdapterDescriptor.authoring?.valueObjectStorageType).toBe('Jsonb');
+  });
+});
+
+describe('postgresNativeAuthoringTypes', () => {
+  it('contributes all eleven native types as bare-eligible top-level constructors', () => {
+    const derived = collectScalarTypeConstructors(postgresNativeAuthoringTypes);
+
+    expect(Object.fromEntries(derived)).toEqual({
+      VarChar: { codecId: 'sql/varchar@1', nativeType: 'character varying' },
+      Char: { codecId: 'sql/char@1', nativeType: 'character' },
+      Numeric: { codecId: 'pg/numeric@1', nativeType: 'numeric' },
+      Timestamp: { codecId: 'pg/timestamp@1', nativeType: 'timestamp' },
+      Timestamptz: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' },
+      Time: { codecId: 'pg/time@1', nativeType: 'time' },
+      Timetz: { codecId: 'pg/timetz@1', nativeType: 'timetz' },
+      Uuid: { codecId: 'pg/uuid@1', nativeType: 'uuid' },
+      SmallInt: { codecId: 'pg/int2@1', nativeType: 'int2' },
+      Real: { codecId: 'pg/float4@1', nativeType: 'float4' },
+      Date: { codecId: 'pg/timestamptz@1', nativeType: 'date' },
+    });
+  });
+
+  it('materializes typeParams keys only for arguments that are given', () => {
+    expect(
+      instantiateAuthoringTypeConstructor(postgresNativeAuthoringTypes.VarChar, [191]),
+    ).toEqual({
+      codecId: 'sql/varchar@1',
+      nativeType: 'character varying',
+      typeParams: { length: 191 },
+    });
+    expect(instantiateAuthoringTypeConstructor(postgresNativeAuthoringTypes.Numeric, [10])).toEqual(
+      {
+        codecId: 'pg/numeric@1',
+        nativeType: 'numeric',
+        typeParams: { precision: 10 },
+      },
+    );
+    expect(
+      instantiateAuthoringTypeConstructor(postgresNativeAuthoringTypes.Numeric, [10, 2]),
+    ).toEqual({
+      codecId: 'pg/numeric@1',
+      nativeType: 'numeric',
+      typeParams: { precision: 10, scale: 2 },
+    });
+    expect(instantiateAuthoringTypeConstructor(postgresNativeAuthoringTypes.Timetz, [2])).toEqual({
+      codecId: 'pg/timetz@1',
+      nativeType: 'timetz',
+      typeParams: { precision: 2 },
+    });
+  });
+
+  it('rejects out-of-range arguments via the declarative minimums', () => {
+    expect(() =>
+      validateAuthoringHelperArguments('VarChar', postgresNativeAuthoringTypes.VarChar.args, [0]),
+    ).toThrow('must be >= 1');
+    expect(() =>
+      validateAuthoringHelperArguments('Numeric', postgresNativeAuthoringTypes.Numeric.args, [0]),
+    ).toThrow('must be >= 1');
+    expect(() =>
+      validateAuthoringHelperArguments(
+        'Timestamp',
+        postgresNativeAuthoringTypes.Timestamp.args,
+        [-1],
+      ),
+    ).toThrow('must be >= 0');
   });
 });

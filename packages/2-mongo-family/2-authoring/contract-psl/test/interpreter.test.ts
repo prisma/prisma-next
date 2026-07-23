@@ -32,7 +32,6 @@ function buildSymbolTableInput(
   const { table } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...mongoScalarTypeDescriptors.keys()],
     pslBlockDescriptors: {},
   });
   return { symbolTable: table, sourceFile, sourceId };
@@ -111,7 +110,7 @@ function interpret(
 ) {
   return interpretPslDocumentToMongoContract({
     ...buildSymbolTableInput(schema),
-    scalarTypeDescriptors: mongoScalarTypeDescriptors,
+    scalarTypeCodecIds: mongoScalarTypeDescriptors,
     codecLookup: mongoCodecLookup,
     ...overrides,
   });
@@ -197,7 +196,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         }
       `,
         {
-          scalarTypeDescriptors: new Map([
+          scalarTypeCodecIds: new Map([
             ['ObjectId', 'custom/oid@2'],
             ['String', 'custom/text@2'],
           ]),
@@ -746,7 +745,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           },
         },
       });
-      expect(ir.storage.storageHash).toMatch(/^sha256:/);
+      expect(ir.storage.storageHash).toMatch(/^[a-f0-9]{64}$/);
     });
 
     it('includes empty extensions, capabilities, and meta', () => {
@@ -852,7 +851,7 @@ describe('interpretPslDocumentToMongoContract', () => {
         }
       `,
         {
-          scalarTypeDescriptors: mongoScalarTypeDescriptors,
+          scalarTypeCodecIds: mongoScalarTypeDescriptors,
         },
       );
 
@@ -908,7 +907,7 @@ describe('interpretPslDocumentToMongoContract', () => {
       `);
 
       expect(ir).toEqual({
-        profileHash: expect.stringMatching(/^sha256:/),
+        profileHash: expect.stringMatching(/^[a-f0-9]{64}$/),
         targetFamily: 'mongo',
         target: 'mongo',
         roots: {
@@ -967,8 +966,8 @@ describe('interpretPslDocumentToMongoContract', () => {
         },
         storage: new MongoStorage({
           storageHash: expect.stringMatching(
-            /^sha256:/,
-          ) as unknown as StorageHashBase<`sha256:${string}`>,
+            /^[a-f0-9]{64}$/,
+          ) as unknown as StorageHashBase<string>,
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: buildMongoNamespace({
               id: UNBOUND_NAMESPACE_ID,
@@ -1910,7 +1909,7 @@ describe('interpretPslDocumentToMongoContract', () => {
 `,
           'schema.prisma',
         ),
-        scalarTypeDescriptors: mongoScalarTypeDescriptors,
+        scalarTypeCodecIds: mongoScalarTypeDescriptors,
       });
 
       expect(result.ok).toBe(false);
@@ -1940,7 +1939,7 @@ describe('interpretPslDocumentToMongoContract', () => {
 `,
           'schema.prisma',
         ),
-        scalarTypeDescriptors: mongoScalarTypeDescriptors,
+        scalarTypeCodecIds: mongoScalarTypeDescriptors,
       });
 
       expect(result.ok).toBe(false);
@@ -1962,7 +1961,7 @@ describe('interpretPslDocumentToMongoContract', () => {
 `,
           'schema.prisma',
         ),
-        scalarTypeDescriptors: mongoScalarTypeDescriptors,
+        scalarTypeCodecIds: mongoScalarTypeDescriptors,
       });
 
       expect(result.ok).toBe(true);

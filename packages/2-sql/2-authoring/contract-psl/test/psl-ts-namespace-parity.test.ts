@@ -54,7 +54,7 @@ namespace public {
     const pslResult = interpretPslDocumentToSqlContract({
       ...pslDocument,
       target: postgresTarget,
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       createNamespace: createTestSqlNamespace,
@@ -156,10 +156,10 @@ namespace public {
           },
         },
       },
-      storage: { storageHash: coreHash('sha256:test'), namespaces: {} },
+      storage: { storageHash: coreHash('test'), namespaces: {} },
       capabilities: {},
       extensions: {},
-      profileHash: profileHash('sha256:test-profile'),
+      profileHash: profileHash('test-profile'),
       meta: {},
     });
 
@@ -179,7 +179,7 @@ namespace public {
     const pslResult = interpretPslDocumentToSqlContract({
       ...pslDocument,
       target: postgresTarget,
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       composedExtensions: ['supabase'],
       composedExtensionContracts: new Map([['supabase', syntheticExtensionContract]]),
@@ -251,7 +251,7 @@ namespace public {
     const result = interpretPslDocumentToSqlContract({
       ...pslDocument,
       target: postgresTarget,
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
       composedExtensions: ['supabase'],
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,

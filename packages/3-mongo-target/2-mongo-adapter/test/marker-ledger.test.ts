@@ -47,8 +47,8 @@ describe('readMarker', () => {
     await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
       _id: APP,
       space: APP,
-      storageHash: 'sha256:abc',
-      profileHash: 'sha256:def',
+      storageHash: 'abc',
+      profileHash: 'def',
       updatedAt: new Date(),
     });
 
@@ -61,8 +61,8 @@ describe('readMarker', () => {
     await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
       _id: APP,
       space: APP,
-      storageHash: 'sha256:abc',
-      profileHash: 'sha256:def',
+      storageHash: 'abc',
+      profileHash: 'def',
       updatedAt: new Date(),
     });
 
@@ -74,8 +74,8 @@ describe('readMarker', () => {
     await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
       _id: APP,
       space: APP,
-      storageHash: 'sha256:abc',
-      profileHash: 'sha256:def',
+      storageHash: 'abc',
+      profileHash: 'def',
     });
 
     const marker = await controlAdapter.readMarker(driver, APP);
@@ -88,8 +88,8 @@ describe('readMarker', () => {
     await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
       _id: APP,
       space: APP,
-      storageHash: 'sha256:abc',
-      profileHash: 'sha256:def',
+      storageHash: 'abc',
+      profileHash: 'def',
       updatedAt: new Date(),
       invariants: [1, 2, 3],
     });
@@ -105,8 +105,8 @@ describe('readMarker', () => {
     await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
       _id: APP,
       space: APP,
-      storageHash: 'sha256:abc',
-      profileHash: 'sha256:def',
+      storageHash: 'abc',
+      profileHash: 'def',
       updatedAt: new Date(),
       invariants: 'not-an-array',
     });
@@ -119,20 +119,20 @@ describe('readMarker', () => {
 
   it('partitions reads by space — a marker for one space is invisible to another', async () => {
     await controlAdapter.initMarker(driver, APP, {
-      storageHash: 'sha256:app1',
-      profileHash: 'sha256:appp1',
+      storageHash: 'app1',
+      profileHash: 'appp1',
     });
     await controlAdapter.initMarker(driver, EXT, {
-      storageHash: 'sha256:ext1',
-      profileHash: 'sha256:extp1',
+      storageHash: 'ext1',
+      profileHash: 'extp1',
     });
 
     const appMarker = await controlAdapter.readMarker(driver, APP);
     const extMarker = await controlAdapter.readMarker(driver, EXT);
     const otherMarker = await controlAdapter.readMarker(driver, 'unknown-space');
 
-    expect(appMarker?.storageHash).toBe('sha256:app1');
-    expect(extMarker?.storageHash).toBe('sha256:ext1');
+    expect(appMarker?.storageHash).toBe('app1');
+    expect(extMarker?.storageHash).toBe('ext1');
     expect(otherMarker).toBeNull();
   });
 });
@@ -140,8 +140,8 @@ describe('readMarker', () => {
 describe('initMarker', () => {
   it('writes a doc keyed by space: _id and space both equal the supplied space id', async () => {
     await controlAdapter.initMarker(driver, APP, {
-      storageHash: 'sha256:abc',
-      profileHash: 'sha256:def',
+      storageHash: 'abc',
+      profileHash: 'def',
     });
 
     const raw = await db
@@ -149,20 +149,20 @@ describe('initMarker', () => {
       .findOne({ _id: APP });
     expect(raw?.['_id']).toBe(APP);
     expect(raw?.['space']).toBe(APP);
-    expect(raw?.['storageHash']).toBe('sha256:abc');
-    expect(raw?.['profileHash']).toBe('sha256:def');
+    expect(raw?.['storageHash']).toBe('abc');
+    expect(raw?.['profileHash']).toBe('def');
   });
 
   it('initializes a marker that can be read back', async () => {
     await controlAdapter.initMarker(driver, APP, {
-      storageHash: 'sha256:abc',
-      profileHash: 'sha256:def',
+      storageHash: 'abc',
+      profileHash: 'def',
     });
 
     const marker = await controlAdapter.readMarker(driver, APP);
     expect(marker).not.toBeNull();
-    expect(marker?.storageHash).toBe('sha256:abc');
-    expect(marker?.profileHash).toBe('sha256:def');
+    expect(marker?.storageHash).toBe('abc');
+    expect(marker?.profileHash).toBe('def');
     expect(marker?.updatedAt).toBeInstanceOf(Date);
     expect(marker?.meta).toEqual({});
     expect(marker?.contractJson).toBeNull();
@@ -173,8 +173,8 @@ describe('initMarker', () => {
 
   it('writes invariants to the marker document', async () => {
     await controlAdapter.initMarker(driver, APP, {
-      storageHash: 'sha256:abc',
-      profileHash: 'sha256:def',
+      storageHash: 'abc',
+      profileHash: 'def',
       invariants: ['alpha', 'beta'],
     });
 
@@ -184,12 +184,12 @@ describe('initMarker', () => {
 
   it('co-existing markers for different spaces do not collide', async () => {
     await controlAdapter.initMarker(driver, APP, {
-      storageHash: 'sha256:app1',
-      profileHash: 'sha256:appp1',
+      storageHash: 'app1',
+      profileHash: 'appp1',
     });
     await controlAdapter.initMarker(driver, EXT, {
-      storageHash: 'sha256:ext1',
-      profileHash: 'sha256:extp1',
+      storageHash: 'ext1',
+      profileHash: 'extp1',
     });
 
     const docs = await db.collection('_prisma_migrations').find({}).sort({ _id: 1 }).toArray();
@@ -201,71 +201,71 @@ describe('initMarker', () => {
 describe('updateMarker', () => {
   it('succeeds with correct expected hash (CAS)', async () => {
     await controlAdapter.initMarker(driver, APP, {
-      storageHash: 'sha256:v1',
-      profileHash: 'sha256:p1',
+      storageHash: 'v1',
+      profileHash: 'p1',
     });
 
-    const updated = await controlAdapter.updateMarker(driver, APP, 'sha256:v1', {
-      storageHash: 'sha256:v2',
-      profileHash: 'sha256:p2',
+    const updated = await controlAdapter.updateMarker(driver, APP, 'v1', {
+      storageHash: 'v2',
+      profileHash: 'p2',
     });
 
     expect(updated).toBe(true);
 
     const marker = await controlAdapter.readMarker(driver, APP);
-    expect(marker?.storageHash).toBe('sha256:v2');
-    expect(marker?.profileHash).toBe('sha256:p2');
+    expect(marker?.storageHash).toBe('v2');
+    expect(marker?.profileHash).toBe('p2');
   });
 
   it('fails with wrong expected hash (CAS failure)', async () => {
     await controlAdapter.initMarker(driver, APP, {
-      storageHash: 'sha256:v1',
-      profileHash: 'sha256:p1',
+      storageHash: 'v1',
+      profileHash: 'p1',
     });
 
-    const updated = await controlAdapter.updateMarker(driver, APP, 'sha256:wrong', {
-      storageHash: 'sha256:v2',
-      profileHash: 'sha256:p2',
+    const updated = await controlAdapter.updateMarker(driver, APP, 'wrong', {
+      storageHash: 'v2',
+      profileHash: 'p2',
     });
 
     expect(updated).toBe(false);
 
     const marker = await controlAdapter.readMarker(driver, APP);
-    expect(marker?.storageHash).toBe('sha256:v1');
+    expect(marker?.storageHash).toBe('v1');
   });
 
   it('does not cross-update a different space (CAS is per-space)', async () => {
     await controlAdapter.initMarker(driver, APP, {
-      storageHash: 'sha256:v1',
-      profileHash: 'sha256:p1',
+      storageHash: 'v1',
+      profileHash: 'p1',
     });
     await controlAdapter.initMarker(driver, EXT, {
-      storageHash: 'sha256:v1',
-      profileHash: 'sha256:p1',
+      storageHash: 'v1',
+      profileHash: 'p1',
     });
 
-    const updated = await controlAdapter.updateMarker(driver, APP, 'sha256:v1', {
-      storageHash: 'sha256:v2',
-      profileHash: 'sha256:p2',
+    const updated = await controlAdapter.updateMarker(driver, APP, 'v1', {
+      storageHash: 'v2',
+      profileHash: 'p2',
     });
 
     expect(updated).toBe(true);
     const appMarker = await controlAdapter.readMarker(driver, APP);
     const extMarker = await controlAdapter.readMarker(driver, EXT);
-    expect(appMarker?.storageHash).toBe('sha256:v2');
-    expect(extMarker?.storageHash).toBe('sha256:v1');
+    expect(appMarker?.storageHash).toBe('v2');
+    expect(extMarker?.storageHash).toBe('v1');
   });
 
   it('merges caller-supplied invariants into the existing field server-side', async () => {
     await controlAdapter.initMarker(driver, APP, {
-      storageHash: 'sha256:v1',
-      profileHash: 'sha256:p1',
+      storageHash: 'v1',
+      profileHash: 'p1',
       invariants: ['alpha'],
     });
 
-    const updated = await controlAdapter.updateMarker(driver, APP, 'sha256:v1', {
-      storageHash: 'sha256:v2',
-      profileHash: 'sha256:p2',
+    const updated = await controlAdapter.updateMarker(driver, APP, 'v1', {
+      storageHash: 'v2',
+      profileHash: 'p2',
       invariants: ['beta', 'gamma'],
     });
 
@@ -276,14 +276,14 @@ describe('updateMarker', () => {
 
   it('dedupes and sorts the merged set', async () => {
     await controlAdapter.initMarker(driver, APP, {
-      storageHash: 'sha256:v1',
-      profileHash: 'sha256:p1',
+      storageHash: 'v1',
+      profileHash: 'p1',
       invariants: ['gamma', 'alpha'],
     });
 
-    await controlAdapter.updateMarker(driver, APP, 'sha256:v1', {
-      storageHash: 'sha256:v2',
-      profileHash: 'sha256:p2',
+    await controlAdapter.updateMarker(driver, APP, 'v1', {
+      storageHash: 'v2',
+      profileHash: 'p2',
       invariants: ['delta', 'alpha', 'beta'],
     });
 
@@ -293,14 +293,14 @@ describe('updateMarker', () => {
 
   it('leaves existing invariants untouched when the caller omits the field', async () => {
     await controlAdapter.initMarker(driver, APP, {
-      storageHash: 'sha256:v1',
-      profileHash: 'sha256:p1',
+      storageHash: 'v1',
+      profileHash: 'p1',
       invariants: ['alpha'],
     });
 
-    await controlAdapter.updateMarker(driver, APP, 'sha256:v1', {
-      storageHash: 'sha256:v2',
-      profileHash: 'sha256:p2',
+    await controlAdapter.updateMarker(driver, APP, 'v1', {
+      storageHash: 'v2',
+      profileHash: 'p2',
     });
 
     const marker = await controlAdapter.readMarker(driver, APP);
@@ -309,14 +309,14 @@ describe('updateMarker', () => {
 
   it('treats [] as a no-op merge (does not clobber existing invariants)', async () => {
     await controlAdapter.initMarker(driver, APP, {
-      storageHash: 'sha256:v1',
-      profileHash: 'sha256:p1',
+      storageHash: 'v1',
+      profileHash: 'p1',
       invariants: ['alpha', 'beta'],
     });
 
-    await controlAdapter.updateMarker(driver, APP, 'sha256:v1', {
-      storageHash: 'sha256:v2',
-      profileHash: 'sha256:p2',
+    await controlAdapter.updateMarker(driver, APP, 'v1', {
+      storageHash: 'v2',
+      profileHash: 'p2',
       invariants: [],
     });
 
@@ -328,20 +328,20 @@ describe('updateMarker', () => {
     // Each `findOneAndUpdate` runs its `$setUnion` against the doc's
     // current value, so concurrent updates accumulate atomically.
     await controlAdapter.initMarker(driver, APP, {
-      storageHash: 'sha256:v1',
-      profileHash: 'sha256:p1',
+      storageHash: 'v1',
+      profileHash: 'p1',
       invariants: [],
     });
 
     const [updatedA, updatedB] = await Promise.all([
-      controlAdapter.updateMarker(driver, APP, 'sha256:v1', {
-        storageHash: 'sha256:v1',
-        profileHash: 'sha256:p1',
+      controlAdapter.updateMarker(driver, APP, 'v1', {
+        storageHash: 'v1',
+        profileHash: 'p1',
         invariants: ['alpha'],
       }),
-      controlAdapter.updateMarker(driver, APP, 'sha256:v1', {
-        storageHash: 'sha256:v1',
-        profileHash: 'sha256:p1',
+      controlAdapter.updateMarker(driver, APP, 'v1', {
+        storageHash: 'v1',
+        profileHash: 'p1',
         invariants: ['beta'],
       }),
     ]);
@@ -372,15 +372,15 @@ describe('readLedger', { timeout: timeouts.databaseOperation }, () => {
   });
 
   it('returns entries in insertion order with cross-target LedgerEntryRecord shape', async () => {
-    const hashA = 'sha256:ledger-mid-a';
-    const hashB = 'sha256:ledger-mid-b';
-    const destHash = 'sha256:ledger-dest';
+    const hashA = 'ledger-mid-a';
+    const hashB = 'ledger-mid-b';
+    const destHash = 'ledger-dest';
     await controlAdapter.writeLedgerEntry(driver, APP, {
-      edgeId: 'sha256:empty->sha256:ledger-mid-a',
-      from: 'sha256:empty',
+      edgeId: 'empty->ledger-mid-a',
+      from: 'empty',
       to: hashA,
       migrationName: '001_a',
-      migrationHash: 'sha256:mig-a',
+      migrationHash: 'mig-a',
       operations: [{ id: 'edge.a' }],
     });
     await controlAdapter.writeLedgerEntry(driver, APP, {
@@ -388,7 +388,7 @@ describe('readLedger', { timeout: timeouts.databaseOperation }, () => {
       from: hashA,
       to: hashB,
       migrationName: '002_b',
-      migrationHash: 'sha256:mig-b',
+      migrationHash: 'mig-b',
       operations: [{ id: 'edge.b1' }, { id: 'edge.b2' }],
     });
     await controlAdapter.writeLedgerEntry(driver, APP, {
@@ -396,7 +396,7 @@ describe('readLedger', { timeout: timeouts.databaseOperation }, () => {
       from: hashB,
       to: destHash,
       migrationName: '003_c',
-      migrationHash: 'sha256:mig-c',
+      migrationHash: 'mig-c',
       operations: [{ id: 'edge.c' }],
     });
 
@@ -405,7 +405,7 @@ describe('readLedger', { timeout: timeouts.databaseOperation }, () => {
       {
         space: APP,
         migrationName: '001_a',
-        migrationHash: 'sha256:mig-a',
+        migrationHash: 'mig-a',
         from: null,
         to: hashA,
         operationCount: 1,
@@ -413,7 +413,7 @@ describe('readLedger', { timeout: timeouts.databaseOperation }, () => {
       {
         space: APP,
         migrationName: '002_b',
-        migrationHash: 'sha256:mig-b',
+        migrationHash: 'mig-b',
         from: hashA,
         to: hashB,
         operationCount: 2,
@@ -421,7 +421,7 @@ describe('readLedger', { timeout: timeouts.databaseOperation }, () => {
       {
         space: APP,
         migrationName: '003_c',
-        migrationHash: 'sha256:mig-c',
+        migrationHash: 'mig-c',
         from: hashB,
         to: destHash,
         operationCount: 1,
@@ -434,17 +434,17 @@ describe('readLedger', { timeout: timeouts.databaseOperation }, () => {
       type: 'ledger',
       space: APP,
       edgeId: 'legacy-edge',
-      from: 'sha256:v1',
-      to: 'sha256:v2',
+      from: 'v1',
+      to: 'v2',
       appliedAt: new Date('2024-01-01T00:00:00.000Z'),
       operations: [],
     });
     await controlAdapter.writeLedgerEntry(driver, APP, {
       edgeId: 'edge-1',
-      from: 'sha256:v1',
-      to: 'sha256:v2',
+      from: 'v1',
+      to: 'v2',
       migrationName: '001_ok',
-      migrationHash: 'sha256:ok',
+      migrationHash: 'ok',
       operations: [{ id: 'op.one' }],
     });
 
@@ -453,9 +453,9 @@ describe('readLedger', { timeout: timeouts.databaseOperation }, () => {
       {
         space: APP,
         migrationName: '001_ok',
-        migrationHash: 'sha256:ok',
-        from: 'sha256:v1',
-        to: 'sha256:v2',
+        migrationHash: 'ok',
+        from: 'v1',
+        to: 'v2',
         operationCount: 1,
       },
     ]);
@@ -463,11 +463,11 @@ describe('readLedger', { timeout: timeouts.databaseOperation }, () => {
 
   it('maps synth empty-string from to null', async () => {
     await controlAdapter.writeLedgerEntry(driver, APP, {
-      edgeId: '->sha256:v1',
+      edgeId: '->v1',
       from: '',
-      to: 'sha256:v1',
+      to: 'v1',
       migrationName: '',
-      migrationHash: 'sha256:v1',
+      migrationHash: 'v1',
       operations: [],
     });
 
@@ -476,9 +476,9 @@ describe('readLedger', { timeout: timeouts.databaseOperation }, () => {
       {
         space: APP,
         migrationName: '',
-        migrationHash: 'sha256:v1',
+        migrationHash: 'v1',
         from: null,
-        to: 'sha256:v1',
+        to: 'v1',
         operationCount: 0,
       },
     ]);
@@ -487,18 +487,18 @@ describe('readLedger', { timeout: timeouts.databaseOperation }, () => {
   it('returns rows for every space when space is omitted', async () => {
     await controlAdapter.writeLedgerEntry(driver, APP, {
       edgeId: 'edge-app',
-      from: 'sha256:empty',
-      to: 'sha256:app-dest',
+      from: 'empty',
+      to: 'app-dest',
       migrationName: '001_app',
-      migrationHash: 'sha256:mig-app',
+      migrationHash: 'mig-app',
       operations: [{ id: 'app.op' }],
     });
     await controlAdapter.writeLedgerEntry(driver, EXT, {
       edgeId: 'edge-ext',
-      from: 'sha256:empty',
-      to: 'sha256:ext-dest',
+      from: 'empty',
+      to: 'ext-dest',
       migrationName: '001_ext',
-      migrationHash: 'sha256:mig-ext',
+      migrationHash: 'mig-ext',
       operations: [{ id: 'ext.op' }],
     });
 
@@ -507,17 +507,17 @@ describe('readLedger', { timeout: timeouts.databaseOperation }, () => {
       {
         space: APP,
         migrationName: '001_app',
-        migrationHash: 'sha256:mig-app',
+        migrationHash: 'mig-app',
         from: null,
-        to: 'sha256:app-dest',
+        to: 'app-dest',
         operationCount: 1,
       },
       {
         space: EXT,
         migrationName: '001_ext',
-        migrationHash: 'sha256:mig-ext',
+        migrationHash: 'mig-ext',
         from: null,
-        to: 'sha256:ext-dest',
+        to: 'ext-dest',
         operationCount: 1,
       },
     ]);
@@ -529,10 +529,10 @@ describe('writeLedgerEntry', { timeout: timeouts.databaseOperation }, () => {
   it('writes a ledger entry that exists in collection, tagged with space', async () => {
     await controlAdapter.writeLedgerEntry(driver, APP, {
       edgeId: 'edge-1',
-      from: 'sha256:v1',
-      to: 'sha256:v2',
+      from: 'v1',
+      to: 'v2',
       migrationName: '001_init',
-      migrationHash: 'sha256:mig-1',
+      migrationHash: 'mig-1',
       operations: [{ id: 'op.one' }],
     });
 
@@ -542,10 +542,10 @@ describe('writeLedgerEntry', { timeout: timeouts.databaseOperation }, () => {
       type: 'ledger',
       space: APP,
       edgeId: 'edge-1',
-      from: 'sha256:v1',
-      to: 'sha256:v2',
+      from: 'v1',
+      to: 'v2',
       migrationName: '001_init',
-      migrationHash: 'sha256:mig-1',
+      migrationHash: 'mig-1',
       operations: [{ id: 'op.one' }],
     });
     expect(entries[0]?.['appliedAt']).toBeInstanceOf(Date);
@@ -554,18 +554,18 @@ describe('writeLedgerEntry', { timeout: timeouts.databaseOperation }, () => {
   it('appends multiple ledger entries (append-only)', async () => {
     await controlAdapter.writeLedgerEntry(driver, APP, {
       edgeId: 'edge-1',
-      from: 'sha256:v1',
-      to: 'sha256:v2',
+      from: 'v1',
+      to: 'v2',
       migrationName: '001_a',
-      migrationHash: 'sha256:a',
+      migrationHash: 'a',
       operations: [{ id: 'a' }],
     });
     await controlAdapter.writeLedgerEntry(driver, APP, {
       edgeId: 'edge-2',
-      from: 'sha256:v2',
-      to: 'sha256:v3',
+      from: 'v2',
+      to: 'v3',
       migrationName: '002_b',
-      migrationHash: 'sha256:b',
+      migrationHash: 'b',
       operations: [{ id: 'b' }],
     });
 
@@ -583,17 +583,17 @@ describe('writeLedgerEntry', { timeout: timeouts.databaseOperation }, () => {
     await controlAdapter.writeLedgerEntry(driver, APP, {
       edgeId: 'edge-1',
       from: '',
-      to: 'sha256:v1',
+      to: 'v1',
       migrationName: '',
-      migrationHash: 'sha256:v1',
+      migrationHash: 'v1',
       operations: [],
     });
     await controlAdapter.writeLedgerEntry(driver, EXT, {
       edgeId: 'edge-1',
       from: '',
-      to: 'sha256:v1',
+      to: 'v1',
       migrationName: '',
-      migrationHash: 'sha256:v1',
+      migrationHash: 'v1',
       operations: [],
     });
 
@@ -616,8 +616,8 @@ describe('mismatched _id and space (defence-in-depth)', () => {
     db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
       _id: APP,
       space: EXT,
-      storageHash: 'sha256:rogue',
-      profileHash: 'sha256:rogue',
+      storageHash: 'rogue',
+      profileHash: 'rogue',
       updatedAt: new Date(),
     });
 
@@ -631,21 +631,21 @@ describe('mismatched _id and space (defence-in-depth)', () => {
   it('readAllMarkers excludes rows whose _id does not equal space', async () => {
     await insertMismatched();
     await controlAdapter.initMarker(driver, EXT, {
-      storageHash: 'sha256:ext1',
-      profileHash: 'sha256:p1',
+      storageHash: 'ext1',
+      profileHash: 'p1',
     });
 
     const markers = await controlAdapter.readAllMarkers(driver);
     expect(markers.size).toBe(1);
-    expect(markers.get(EXT)?.storageHash).toBe('sha256:ext1');
+    expect(markers.get(EXT)?.storageHash).toBe('ext1');
   });
 
   it('updateMarker CAS does not match a row whose _id does not equal space', async () => {
     await insertMismatched();
 
-    const updated = await controlAdapter.updateMarker(driver, APP, 'sha256:rogue', {
-      storageHash: 'sha256:v2',
-      profileHash: 'sha256:p2',
+    const updated = await controlAdapter.updateMarker(driver, APP, 'rogue', {
+      storageHash: 'v2',
+      profileHash: 'p2',
     });
 
     expect(updated).toBe(false);
@@ -660,31 +660,31 @@ describe('readAllMarkers', () => {
 
   it('returns one entry per space, keyed by space id', async () => {
     await controlAdapter.initMarker(driver, APP, {
-      storageHash: 'sha256:app1',
-      profileHash: 'sha256:p1',
+      storageHash: 'app1',
+      profileHash: 'p1',
     });
     await controlAdapter.initMarker(driver, EXT, {
-      storageHash: 'sha256:ext1',
-      profileHash: 'sha256:p2',
+      storageHash: 'ext1',
+      profileHash: 'p2',
     });
 
     const markers = await controlAdapter.readAllMarkers(driver);
     expect(markers.size).toBe(2);
-    expect(markers.get(APP)?.storageHash).toBe('sha256:app1');
-    expect(markers.get(EXT)?.storageHash).toBe('sha256:ext1');
+    expect(markers.get(APP)?.storageHash).toBe('app1');
+    expect(markers.get(EXT)?.storageHash).toBe('ext1');
   });
 
   it('excludes ledger entries (filter keys on string _id with a space field)', async () => {
     await controlAdapter.initMarker(driver, APP, {
-      storageHash: 'sha256:app1',
-      profileHash: 'sha256:p1',
+      storageHash: 'app1',
+      profileHash: 'p1',
     });
     await controlAdapter.writeLedgerEntry(driver, APP, {
       edgeId: 'edge-1',
       from: '',
-      to: 'sha256:app1',
+      to: 'app1',
       migrationName: '',
-      migrationHash: 'sha256:app1',
+      migrationHash: 'app1',
       operations: [],
     });
 
@@ -696,13 +696,13 @@ describe('readAllMarkers', () => {
   it('filters out malformed docs that lack the required space field', async () => {
     await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
       _id: 'malformed',
-      storageHash: 'sha256:abc',
-      profileHash: 'sha256:def',
+      storageHash: 'abc',
+      profileHash: 'def',
       updatedAt: new Date(),
     });
     await controlAdapter.initMarker(driver, EXT, {
-      storageHash: 'sha256:ext1',
-      profileHash: 'sha256:p2',
+      storageHash: 'ext1',
+      profileHash: 'p2',
     });
 
     const markers = await controlAdapter.readAllMarkers(driver);

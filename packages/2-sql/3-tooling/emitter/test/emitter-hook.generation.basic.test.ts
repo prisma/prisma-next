@@ -956,7 +956,7 @@ describe('sql-target-family-hook', () => {
         },
       },
       execution: {
-        executionHash: 'sha256:test-exec-hash' as ExecutionHashBase<string>,
+        executionHash: 'test-exec-hash' as ExecutionHashBase<string>,
         mutations: {
           defaults: [
             {

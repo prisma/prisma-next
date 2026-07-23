@@ -83,7 +83,7 @@ function makeSyntheticPlan(targetId: string): MigrationPlanWithAuthoringSurface 
   return {
     targetId,
     origin: null,
-    destination: { storageHash: 'sha256:synth-destination' },
+    destination: { storageHash: 'synth-destination' },
     operations: [{ id: 'synth.op', label: 'Synthesised op', operationClass: 'additive' }],
     renderTypeScript: () => 'export {};',
   };
@@ -119,7 +119,7 @@ describe('planMigration', () => {
   });
 
   it('resolves the recorded path for an extension space with a non-empty graph reaching its head ref', async () => {
-    const headHash = 'sha256:cipher-head';
+    const headHash = 'cipher-head';
     const cipherPkg = createAttestedPackage('20260101T0000_init', { from: null, to: headHash });
     const extension = makeSpace({
       spaceId: 'cipherstash',
@@ -312,7 +312,7 @@ describe('planMigration', () => {
     const extension = makeSpace({
       spaceId: 'broken-extension',
       contract: managedContract,
-      headRef: { hash: 'sha256:broken-extension-head', invariants: [] },
+      headRef: { hash: 'broken-extension-head', invariants: [] },
     });
     const aggregate = makeAggregate({
       app: makeSpace({ spaceId: 'app' }),
@@ -342,7 +342,7 @@ describe('planMigration', () => {
     expect(failure).toEqual({
       kind: 'extensionPathUnreachable',
       spaceId: 'broken-extension',
-      target: 'sha256:broken-extension-head',
+      target: 'broken-extension-head',
     });
   });
 
@@ -364,7 +364,7 @@ describe('planMigration', () => {
     const extension = makeSpace({
       spaceId: 'supabase-like',
       contract: externalContract,
-      headRef: { hash: 'sha256:supabase-like-head', invariants: [] },
+      headRef: { hash: 'supabase-like-head', invariants: [] },
     });
     const aggregate = makeAggregate({
       app: makeSpace({ spaceId: 'app' }),
@@ -394,7 +394,7 @@ describe('planMigration', () => {
     const plan = success.perSpace.get('supabase-like');
     expect(plan?.strategy).toBe('declared-state');
     expect(plan?.plan.operations).toEqual([]);
-    expect(plan?.plan.destination.storageHash).toBe('sha256:supabase-like-head');
+    expect(plan?.plan.destination.storageHash).toBe('supabase-like-head');
   });
 
   it('forwards plan-from-diff planner failures as planFromDiffFailed', async () => {

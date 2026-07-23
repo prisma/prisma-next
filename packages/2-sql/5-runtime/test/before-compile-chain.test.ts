@@ -44,7 +44,7 @@ function createContext(): SqlMiddlewareContext & {
 
 const meta: PlanMeta = {
   target: 'postgres',
-  storageHash: 'sha256:test',
+  storageHash: 'test',
   lane: 'dsl',
 };
 
@@ -299,7 +299,7 @@ describe('runBeforeCompileChain', () => {
         ast: baseDraft.ast,
         meta: {
           target: 'postgres',
-          storageHash: 'sha256:test',
+          storageHash: 'test',
           lane: 'orm-client',
         },
       };

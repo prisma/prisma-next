@@ -10,7 +10,7 @@ import { applicationDomainOf } from '@prisma-next/test-utils';
 
 export function namespacedMongoStorageFromCollections(
   collections: Record<string, unknown>,
-  storageHash = 'sha256:test',
+  storageHash = 'test',
 ) {
   return {
     storageHash: coreHash(storageHash),
@@ -46,7 +46,7 @@ export function createMongoContract(
     capabilities: {},
     meta: {},
     roots: {},
-    profileHash: 'sha256:test' as const,
+    profileHash: 'test' as const,
     ...rest,
   } as Contract;
 }

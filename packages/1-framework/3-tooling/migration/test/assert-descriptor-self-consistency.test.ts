@@ -66,7 +66,7 @@ describe('assertDescriptorSelfConsistency', () => {
         target: TARGET,
         targetFamily: FAMILY,
         storage: STORAGE,
-        headRefHash: 'sha256:stale-hash',
+        headRefHash: 'stale-hash',
         ...SQL_HOOKS,
       }),
     ).toThrowError(MigrationToolsError);
@@ -80,7 +80,7 @@ describe('assertDescriptorSelfConsistency', () => {
         target: TARGET,
         targetFamily: FAMILY,
         storage: STORAGE,
-        headRefHash: 'sha256:stale-hash',
+        headRefHash: 'stale-hash',
         ...SQL_HOOKS,
       });
     } catch (error) {
@@ -88,12 +88,12 @@ describe('assertDescriptorSelfConsistency', () => {
     }
     expect(captured?.code).toBe('MIGRATION.DESCRIPTOR_HEAD_HASH_MISMATCH');
     expect(captured?.why).toContain('"cipherstash"');
-    expect(captured?.why).toContain('sha256:stale-hash');
+    expect(captured?.why).toContain('stale-hash');
     expect(captured?.why).toContain(REAL_HASH);
     expect(captured?.details).toEqual({
       extensionId: 'cipherstash',
       recomputedHash: REAL_HASH,
-      headRefHash: 'sha256:stale-hash',
+      headRefHash: 'stale-hash',
     });
   });
 

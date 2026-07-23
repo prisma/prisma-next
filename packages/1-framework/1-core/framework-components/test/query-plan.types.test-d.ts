@@ -4,7 +4,7 @@ import type { ExecutionPlan, QueryPlan, ResultType } from '../src/execution/quer
 
 const meta: PlanMeta = {
   target: 'mock',
-  storageHash: 'sha256:test',
+  storageHash: 'test',
   lane: 'raw-sql',
 };
 

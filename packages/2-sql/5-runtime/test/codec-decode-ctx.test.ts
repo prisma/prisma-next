@@ -14,7 +14,7 @@ import { buildDecodeContext, decodeRow } from '../src/codecs/decoding';
 import { defineTestCodec } from './test-codec';
 import { buildTestContractCodecs } from './utils';
 
-const TEST_HASH = coreHash('sha256:test');
+const TEST_HASH = coreHash('test');
 
 function buildPlan(projections: ReadonlyArray<ProjectionItem>): SqlExecutionPlan {
   const ast = SelectAst.from(TableSource.named('users')).withProjection(projections);

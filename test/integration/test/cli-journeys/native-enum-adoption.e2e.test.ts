@@ -76,9 +76,9 @@ function readEmittedContractJson(ctx: JourneyContext): {
 const authIntrospectionContract: Contract<SqlStorage> = {
   target: 'postgres',
   targetFamily: 'sql',
-  profileHash: profileHash('sha256:test'),
+  profileHash: profileHash('test'),
   storage: new SqlStorage({
-    storageHash: coreHash('sha256:auth-introspection'),
+    storageHash: coreHash('auth-introspection'),
     namespaces: {
       auth: postgresCreateNamespace({ id: 'auth', entries: { table: {} } }),
     },

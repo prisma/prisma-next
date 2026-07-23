@@ -8,9 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { createTestSqlNamespace } from '../../../1-core/contract/test/test-support';
 import { codecRefForStorageColumn } from '../src/codec-ref-for-column';
 
-const STORAGE_HASH = blindCast<SqlStorageType['storageHash'], 'test storage hash literal'>(
-  'sha256:test',
-);
+const STORAGE_HASH = blindCast<SqlStorageType['storageHash'], 'test storage hash literal'>('test');
 
 function usersTable(columnName: string, codecId: string): StorageTable {
   return new StorageTable({

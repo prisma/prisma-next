@@ -22,7 +22,7 @@ function makeStubContext(): ExecutionContext<Contract> {
       capabilities: {},
       target: 'postgres',
       storage: {
-        storageHash: 'sha256:raw-sql-composition-core',
+        storageHash: 'raw-sql-composition-core',
         namespaces: {
           public: {
             id: 'public',

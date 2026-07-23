@@ -7,7 +7,7 @@ import type {
   RefResolutionContext,
   RefResolutionError,
 } from './types';
-import { findEdgeByDirName, isFullHash, isHexPrefix, normalizeHashPrefix } from './types';
+import { findEdgeByDirName, isFullHash, isHexPrefix } from './types';
 
 /**
  * Resolve a user-supplied string to a contract hash using the unified
@@ -19,7 +19,7 @@ import { findEdgeByDirName, isFullHash, isHexPrefix, normalizeHashPrefix } from 
  * - `@db` — the live database marker (connection-required); callers MUST
  *   check `result.value.provenance.kind === 'reserved-db'` and resolve the
  *   actual hash via `readAllMarkers()` before using `result.value.hash`
- * - Full storage hash (`sha256:<64 hex>` or `sha256:empty`)
+ * - Full storage hash (64 hex chars or `empty`)
  * - Hex prefix (6+ hex chars, must uniquely identify one contract)
  * - Ref name (looked up in the refs index)
  * - Migration directory name (resolves to the migration's `to`-contract)
@@ -96,8 +96,7 @@ export function parseContractRef(
   }
 
   if (isHexPrefix(input)) {
-    const prefix = normalizeHashPrefix(input);
-    const matches = [...ctx.graph.nodes].filter((n) => n.startsWith(prefix));
+    const matches = [...ctx.graph.nodes].filter((n) => n.startsWith(input));
     const [firstMatch] = matches;
     if (matches.length === 1 && firstMatch !== undefined) {
       candidates.push({

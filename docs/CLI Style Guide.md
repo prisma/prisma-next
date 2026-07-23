@@ -293,7 +293,7 @@ Concrete examples (from the migration CLI verb refactor, TML-2546). Each entry b
   - `migrate --to production --db $DATABASE_URL`
   - `db verify --db $DATABASE_URL`
   - `db sign --db $DATABASE_URL --contract production`
-  - `ref set production sha256:abc123`
+  - `ref set production abc123`
 
 ## Internal Architecture
 - **TerminalUI** (`src/utils/terminal-ui.ts`): Composable output abstraction. All decoration goes to stderr via `@clack/prompts`, data goes to stdout. Accepts `color` and `interactive` overrides.

@@ -105,7 +105,7 @@ describe('emitter', () => {
       };
 
       const result = await emit(ir, options, mockSqlHook);
-      expect(result.storageHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+      expect(result.storageHash).toMatch(/^[a-f0-9]{64}$/);
       expect(result.contractDts).toContain('export type Contract');
       expect(result.contractDts).toContain('CodecTypes');
 
@@ -496,8 +496,8 @@ describe('emitter', () => {
       },
     };
     const dts = generateContractDts(contract, mockSqlHook, [], {
-      storageHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000001',
-      profileHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000002',
+      storageHash: '0000000000000000000000000000000000000000000000000000000000000001',
+      profileHash: '0000000000000000000000000000000000000000000000000000000000000002',
     });
     // The per-namespace valueObjects block must appear inside the namespace block.
     // A positive match on the nested structure proves it is inside domain.namespaces.public.
@@ -522,8 +522,8 @@ describe('emitter', () => {
       },
     };
     const dts = generateContractDts(contract, mockSqlHook, [], {
-      storageHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000001',
-      profileHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000002',
+      storageHash: '0000000000000000000000000000000000000000000000000000000000000001',
+      profileHash: '0000000000000000000000000000000000000000000000000000000000000002',
     });
     expect(dts).toContain('readonly auth:');
     expect(dts).toContain('readonly public:');
@@ -540,8 +540,8 @@ describe('emitter', () => {
     } as unknown as Contract;
     expect(() =>
       generateContractDts(contract, mockSqlHook, [], {
-        storageHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000001',
-        profileHash: 'sha256:0000000000000000000000000000000000000000000000000000000000000002',
+        storageHash: '0000000000000000000000000000000000000000000000000000000000000001',
+        profileHash: '0000000000000000000000000000000000000000000000000000000000000002',
       }),
     ).toThrow('domain namespace "public" is not present on the contract');
   });
@@ -550,7 +550,7 @@ describe('emitter', () => {
     const ir = createTestContract({
       storage: emptySqlStorage,
       execution: {
-        executionHash: 'sha256:abc123',
+        executionHash: 'abc123',
         operations: {},
       },
     });
@@ -563,6 +563,6 @@ describe('emitter', () => {
     const result = await emit(ir, options, mockSqlHook);
     expect(result.contractDts).toContain('readonly execution:');
     expect(result.contractDts).toContain('readonly executionHash: ExecutionHash');
-    expect(result.executionHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(result.executionHash).toMatch(/^[a-f0-9]{64}$/);
   });
 });

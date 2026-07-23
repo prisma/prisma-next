@@ -39,7 +39,7 @@ function createTestContract(
     target: 'postgres',
     targetFamily: 'sql',
     storage: {
-      storageHash: 'sha256:test',
+      storageHash: 'test',
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
@@ -95,7 +95,7 @@ function createTestContract(
     extensions: {},
     capabilities: {},
     meta: {},
-    profileHash: 'sha256:test',
+    profileHash: 'test',
   };
 }
 

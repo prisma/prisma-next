@@ -32,11 +32,11 @@ vi.mock('@prisma-next/migration-tools/refs', async (importOriginal) => {
   };
 });
 
-const HASH_A = `sha256:${'a'.repeat(64)}`;
-const HASH_B = `sha256:${'b'.repeat(64)}`;
-const HASH_C = `sha256:${'c'.repeat(64)}`;
-const HASH_FLOAT = `sha256:${'f'.repeat(64)}`;
-const PROFILE_HASH = `sha256:${'p'.repeat(64)}`;
+const HASH_A = `${'a'.repeat(64)}`;
+const HASH_B = `${'b'.repeat(64)}`;
+const HASH_C = `${'c'.repeat(64)}`;
+const HASH_FLOAT = `${'f'.repeat(64)}`;
+const PROFILE_HASH = `${'p'.repeat(64)}`;
 
 function createTableOp(table: string): MigrationPlanOperation {
   return {

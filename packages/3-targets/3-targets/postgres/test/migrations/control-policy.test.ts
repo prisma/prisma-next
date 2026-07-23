@@ -52,10 +52,10 @@ function makeContract(): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:control-policy-subject-test'),
+    profileHash: profileHash('control-policy-subject-test'),
     defaultControlPolicy: 'managed',
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:control-policy-subject-test'),
+      storageHash: coreHash('control-policy-subject-test'),
       namespaces: { sales: schema },
     }),
     roots: {},

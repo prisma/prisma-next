@@ -29,7 +29,7 @@ describe('readContractSpaceHeadRef', () => {
   });
 
   it('round-trips with emitContractSpaceArtifacts', async () => {
-    const hash = `sha256:${'0'.repeat(63)}1`;
+    const hash = `${'0'.repeat(63)}1`;
     const invariants = ['inv-2', 'inv-1', 'inv-3'];
     await emitContractSpaceArtifacts(migrationsDir, 'cipherstash', {
       contract: { storage: { storageHash: hash }, foo: 1 },
@@ -43,7 +43,7 @@ describe('readContractSpaceHeadRef', () => {
   });
 
   it('round-trips for the app space (uniform with extensions)', async () => {
-    const hash = `sha256:${'a'.repeat(64)}`;
+    const hash = 'a'.repeat(64);
     await emitContractSpaceArtifacts(migrationsDir, APP_SPACE_ID, {
       contract: { storage: { storageHash: hash } },
       contractDts: '\n',
@@ -57,7 +57,7 @@ describe('readContractSpaceHeadRef', () => {
   it('throws when refs/head.json is missing the invariants array', async () => {
     const dir = join(migrationsDir, 'cipherstash', 'refs');
     await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, 'head.json'), `${canonicalizeJson({ hash: 'sha256:abc' })}\n`);
+    await writeFile(join(dir, 'head.json'), `${canonicalizeJson({ hash: 'abc' })}\n`);
 
     let captured: unknown;
     try {

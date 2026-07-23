@@ -2,13 +2,7 @@
 //
 // Each `*.test.ts` file in this set is intentionally small (≤ ~13 tests,
 // matching the project convention visible across other files in
-// `test/integration/`). Each integration test spins up its own
-// prisma/dev PGlite instance via `withCollectionRuntime` (see
-// `./helpers`), and at higher per-file test counts the test
-// infrastructure exhibits worker-pool contention that surfaces as
-// spurious `portal "C_N" does not exist` errors. Splitting the corpus
-// across multiple files keeps each invocation under that threshold
-// while preserving the breadth of the coverage.
+// `test/integration/`), split by functionality for readability.
 
 import type { Contract } from '@prisma-next/contract/types';
 import { Collection } from '@prisma-next/sql-orm-client';

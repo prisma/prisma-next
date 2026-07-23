@@ -66,7 +66,7 @@ Encoded under an `ext` wrapper owned by the pack:
     "pack": "pg",
     "tag": "predicate",
     "body": "(status = 'active') AND (created_at > now() - interval '7 days')",
-    "bodyHash": "sha256:…"
+    "bodyHash": "…"
   }
 }
 ```

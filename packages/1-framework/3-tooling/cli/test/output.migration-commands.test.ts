@@ -9,7 +9,7 @@ describe('formatMigrationApplyCommandOutput', () => {
     const output = formatMigrationApplyCommandOutput(
       {
         migrationsApplied: 0,
-        markerHash: 'sha256:marker',
+        markerHash: 'marker',
         applied: [],
         summary: 'Already up to date across 1 space(s)',
         perSpace: [],
@@ -29,7 +29,7 @@ describe('formatMigrationApplyCommandOutput', () => {
     const output = formatMigrationApplyCommandOutput(
       {
         migrationsApplied: 2,
-        markerHash: 'sha256:app-marker',
+        markerHash: 'app-marker',
         applied: [
           { spaceId: 'pgvector', operationsExecuted: 1 },
           { spaceId: 'app', operationsExecuted: 1 },
@@ -40,13 +40,13 @@ describe('formatMigrationApplyCommandOutput', () => {
             spaceId: 'pgvector',
             kind: 'extension',
             operations: [{ id: 'op-vec', label: 'Install vector ext', operationClass: 'additive' }],
-            marker: { storageHash: 'sha256:ext' },
+            marker: { storageHash: 'ext' },
           },
           {
             spaceId: 'app',
             kind: 'app',
             operations: [{ id: 'op-user', label: 'Create user', operationClass: 'additive' }],
-            marker: { storageHash: 'sha256:app-marker' },
+            marker: { storageHash: 'app-marker' },
           },
         ],
       },
@@ -63,8 +63,8 @@ describe('formatMigrationApplyCommandOutput', () => {
     expect(appIdx).toBeGreaterThan(extensionIdx);
     // Per-space markers are observable so consumers can confirm each
     // space landed on the expected hash.
-    expect(stripped).toContain('sha256:ext');
-    expect(stripped).toContain('sha256:app-marker');
+    expect(stripped).toContain('ext');
+    expect(stripped).toContain('app-marker');
   });
 
   it('includes total timing in verbose mode', () => {
@@ -72,7 +72,7 @@ describe('formatMigrationApplyCommandOutput', () => {
     const output = formatMigrationApplyCommandOutput(
       {
         migrationsApplied: 1,
-        markerHash: 'sha256:marker',
+        markerHash: 'marker',
         applied: [{ spaceId: 'app', operationsExecuted: 1 }],
         summary: 'Applied 1 operation(s) across 1 contract space(s)',
         perSpace: [
@@ -80,7 +80,7 @@ describe('formatMigrationApplyCommandOutput', () => {
             spaceId: 'app',
             kind: 'app',
             operations: [{ id: 'op-user', label: 'Create user', operationClass: 'additive' }],
-            marker: { storageHash: 'sha256:marker' },
+            marker: { storageHash: 'marker' },
           },
         ],
         timings: { total: 42 },

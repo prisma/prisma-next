@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
+  "profileHash": "3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
   "roots": {
     "feature_flag": {
       "model": "FeatureFlag",
@@ -81,7 +81,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "sha256:7d110d82b575662c90102339516066ae91f9633527a9fa7c2f2769b714234a98"
+    "storageHash": "7d110d82b575662c90102339516066ae91f9633527a9fa7c2f2769b714234a98"
   },
   "capabilities": {
     "postgres": {

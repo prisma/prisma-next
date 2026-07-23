@@ -2,7 +2,7 @@
   "schemaVersion": "1",
   "targetFamily": "sql",
   "target": "postgres",
-  "profileHash": "sha256:fixture-codec-instance",
+  "profileHash": "fixture-codec-instance",
   "roots": {},
   "domain": {
     "namespaces": {
@@ -12,7 +12,7 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:fixture-codec-instance",
+    "storageHash": "fixture-codec-instance",
     "namespaces": {
       "__unbound__": {
         "id": "__unbound__",

@@ -15,14 +15,14 @@ import {
 import { applicationDomainOf } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
-const TO_STORAGE_HASH = `sha256:${'2'.repeat(64)}`;
-const FROM_STORAGE_HASH = `sha256:${'3'.repeat(64)}`;
+const TO_STORAGE_HASH = '2'.repeat(64);
+const FROM_STORAGE_HASH = '3'.repeat(64);
 
 function createEmptyContract(): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     storage: new SqlStorage({
       storageHash: coreHash(TO_STORAGE_HASH),
       namespaces: {
@@ -101,7 +101,8 @@ describe('PostgresMigrationPlanner authoring surface', () => {
       expect(source).toContain('export default class M extends Migration<Start, End>');
       expect(source).toContain('override readonly endContractJson = endContract;');
       expect(source).not.toContain('describe()');
-      expect(source).not.toContain(coreHash(FROM_STORAGE_HASH));
+      expect(source).not.toContain(`'${FROM_STORAGE_HASH}'`);
+      expect(source).not.toContain(`"${FROM_STORAGE_HASH}"`);
     });
   });
 
@@ -112,7 +113,7 @@ describe('PostgresMigrationPlanner authoring surface', () => {
         {
           packageDir: '/tmp/migration-pkg',
           fromHash: null,
-          toHash: 'sha256:to',
+          toHash: 'to-hash-stub',
           snapshotsImportPath: '../../snapshots',
         },
         APP_SPACE_ID,
@@ -120,13 +121,13 @@ describe('PostgresMigrationPlanner authoring surface', () => {
 
       expect(empty.targetId).toBe('postgres');
       expect(empty.operations).toEqual([]);
-      expect(empty.destination).toEqual({ storageHash: 'sha256:to' });
+      expect(empty.destination).toEqual({ storageHash: 'to-hash-stub' });
     });
 
     it('renders a stub that derives from/to from contract JSON and has an empty operations list', () => {
       const planner = makeFrameworkPlanner();
-      const fromHash = `sha256:${'e'.repeat(64)}`;
-      const toHash = `sha256:${'f'.repeat(64)}`;
+      const fromHash = 'e'.repeat(64);
+      const toHash = 'f'.repeat(64);
       const empty = planner.emptyMigration(
         {
           packageDir: '/tmp/migration-pkg',

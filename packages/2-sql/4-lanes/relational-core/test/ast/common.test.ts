@@ -4,6 +4,7 @@ import {
   JsonArrayAggExpr,
   JsonObjectExpr,
   LiteralExpr,
+  NativeJsonValueProjection,
   OperationExpr,
   OrderByItem,
   ParamRef,
@@ -74,21 +75,23 @@ describe('ast/common', () => {
 
   it('creates JSON expression nodes from rich entries and order items', () => {
     const objectExpr = JsonObjectExpr.fromEntries([
-      JsonObjectExpr.entry('id', col('user', 'id')),
-      JsonObjectExpr.entry('name', lit('Alice')),
+      JsonObjectExpr.entry('id', new NativeJsonValueProjection(col('user', 'id'))),
+      JsonObjectExpr.entry('name', new NativeJsonValueProjection(lit('Alice'))),
     ]);
-    const arrayExpr = JsonArrayAggExpr.of(col('post', 'id'), 'emptyArray', [
-      OrderByItem.desc(col('post', 'createdAt')),
-    ]);
+    const arrayExpr = JsonArrayAggExpr.of(
+      new NativeJsonValueProjection(col('post', 'id')),
+      'emptyArray',
+      [OrderByItem.desc(col('post', 'createdAt'))],
+    );
 
     expect(objectExpr).toEqual(
       new JsonObjectExpr([
-        { key: 'id', value: col('user', 'id') },
-        { key: 'name', value: lit('Alice') },
+        { key: 'id', value: new NativeJsonValueProjection(col('user', 'id')) },
+        { key: 'name', value: new NativeJsonValueProjection(lit('Alice')) },
       ]),
     );
     expect(arrayExpr).toEqual(
-      new JsonArrayAggExpr(col('post', 'id'), 'emptyArray', [
+      new JsonArrayAggExpr(new NativeJsonValueProjection(col('post', 'id')), 'emptyArray', [
         OrderByItem.desc(col('post', 'createdAt')),
       ]),
     );

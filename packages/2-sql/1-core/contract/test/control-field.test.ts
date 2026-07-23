@@ -8,7 +8,7 @@ import { createSqlContractSchema, validateStorage } from '../src/validators';
 
 function storageWithColumn(control?: unknown) {
   return {
-    storageHash: 'sha256:test',
+    storageHash: 'test',
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
@@ -36,7 +36,7 @@ function storageWithColumn(control?: unknown) {
 
 function storageWithTable(control?: unknown) {
   return {
-    storageHash: 'sha256:test',
+    storageHash: 'test',
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,
@@ -62,9 +62,9 @@ function minimalContract(defaultControlPolicy?: unknown) {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: 'sha256:profile',
+    profileHash: 'profile',
     domain: { namespaces: { main: { models: {} } } },
-    storage: { storageHash: 'sha256:test' },
+    storage: { storageHash: 'test' },
     ...(defaultControlPolicy !== undefined ? { defaultControlPolicy } : {}),
   };
 }

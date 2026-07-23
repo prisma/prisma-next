@@ -50,10 +50,10 @@ function makeContract(members: readonly string[]): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:native-enum-add-value'),
+    profileHash: profileHash('native-enum-add-value'),
     defaultControlPolicy: 'managed',
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:native-enum-add-value'),
+      storageHash: coreHash('native-enum-add-value'),
       namespaces: { sales: schema },
     }),
     roots: {},

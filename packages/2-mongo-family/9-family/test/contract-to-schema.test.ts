@@ -30,14 +30,14 @@ function makeContract(collections: Record<string, MongoCollectionData>): MongoCo
   return {
     target: 'mongo',
     targetFamily: 'mongo',
-    profileHash: 'sha256:test-profile',
+    profileHash: 'test-profile',
     capabilities: {},
     extensions: {},
     meta: {},
     roots: {},
     models: {},
     storage: {
-      storageHash: 'sha256:test-storage',
+      storageHash: 'test-storage',
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,

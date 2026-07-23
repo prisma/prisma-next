@@ -30,7 +30,6 @@ function buildSourceContext(
   return {
     composedExtensions: stack.extensions.map((p) => p.id),
     composedExtensionContracts: new Map(),
-    scalarTypeDescriptors: stack.scalarTypeDescriptors,
     authoringContributions: stack.authoringContributions,
     codecLookup: stack.codecLookup,
     controlMutationDefaults: stack.controlMutationDefaults,

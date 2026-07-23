@@ -81,7 +81,7 @@ model Place {
 ```json
 {
   "target": "postgres",
-  "coreHash": "sha256:…",
+  "coreHash": "…",
   "tables": {
     "document": {
       "columns": {

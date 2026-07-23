@@ -40,9 +40,9 @@ function makeContract(tables: Record<string, TableSpec>): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:node-planner'),
+    profileHash: profileHash('node-planner'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:node-planner'),
+      storageHash: coreHash('node-planner'),
       namespaces: { public: publicSchema },
     }),
     roots: {},

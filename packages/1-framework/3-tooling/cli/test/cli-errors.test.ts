@@ -39,8 +39,8 @@ describe('CliStructuredError.toEnvelope()', () => {
 });
 
 describe('errorPathUnreachable', () => {
-  const targetHash = `sha256:${'a'.repeat(64)}`;
-  const fromHash = `sha256:${'b'.repeat(64)}`;
+  const targetHash = `${'a'.repeat(64)}`;
+  const fromHash = `${'b'.repeat(64)}`;
 
   it('emits a fully-qualified --from --to --name plan step plus a migrate apply step for the pathUnreachable runner kind', () => {
     const failure: MigrateFailure = {
@@ -147,8 +147,8 @@ describe('errorPathUnreachable', () => {
 });
 
 describe('errorRefSetHashNotInGraph', () => {
-  const resolvedHash = `sha256:${'x'.repeat(64)}`;
-  const reachableHashes = [`sha256:${'a'.repeat(64)}`, `sha256:${'b'.repeat(64)}`];
+  const resolvedHash = `${'x'.repeat(64)}`;
+  const reachableHashes = [`${'a'.repeat(64)}`, `${'b'.repeat(64)}`];
   const graphTip = reachableHashes[1]!;
 
   it('emits MIGRATION.HASH_NOT_IN_GRAPH with reachable hashes and graph tip', () => {
@@ -173,7 +173,7 @@ describe('errorRefSetHashNotInGraph', () => {
 
 describe('errorRefSetEmptySentinel', () => {
   it('emits MIGRATION.REF_SET_EMPTY_SENTINEL', () => {
-    const envelope = errorRefSetEmptySentinel('sha256:empty').toEnvelope();
+    const envelope = errorRefSetEmptySentinel('empty').toEnvelope();
     expect(envelope.meta?.['code']).toBe('MIGRATION.REF_SET_EMPTY_SENTINEL');
     expect(envelope.summary).toContain('empty-database sentinel');
   });

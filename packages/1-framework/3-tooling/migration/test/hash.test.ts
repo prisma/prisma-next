@@ -13,14 +13,14 @@ describe('computeMigrationHash', () => {
     expect(id1).toBe(id2);
   });
 
-  it('returns sha256: prefixed string', () => {
+  it('returns a bare hex string', () => {
     const id = computeMigrationHash(createTestMetadata(), createTestOps());
-    expect(id).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(id).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it('ignores existing migrationHash on metadata', () => {
     const metadata = createTestMetadata();
-    const withMigrationHash = createTestMetadata({ migrationHash: 'sha256:fakehash' });
+    const withMigrationHash = createTestMetadata({ migrationHash: 'fakehash' });
     const ops = createTestOps();
     expect(computeMigrationHash(metadata, ops)).toBe(computeMigrationHash(withMigrationHash, ops));
   });
@@ -28,7 +28,7 @@ describe('computeMigrationHash', () => {
   it('changes when a metadata field changes', () => {
     const ops = createTestOps();
     const id1 = computeMigrationHash(createTestMetadata({ from: null }), ops);
-    const id2 = computeMigrationHash(createTestMetadata({ from: 'sha256:custom' }), ops);
+    const id2 = computeMigrationHash(createTestMetadata({ from: 'custom' }), ops);
     expect(id1).not.toBe(id2);
   });
 
@@ -42,14 +42,14 @@ describe('computeMigrationHash', () => {
   it('changes when metadata.from changes', () => {
     const ops = createTestOps();
     const m1 = createTestMetadata({ from: null });
-    const m2 = createTestMetadata({ from: 'sha256:different' });
+    const m2 = createTestMetadata({ from: 'different' });
     expect(computeMigrationHash(m1, ops)).not.toBe(computeMigrationHash(m2, ops));
   });
 
   it('changes when metadata.to changes', () => {
     const ops = createTestOps();
-    const m1 = createTestMetadata({ to: 'sha256:abc123' });
-    const m2 = createTestMetadata({ to: 'sha256:different' });
+    const m1 = createTestMetadata({ to: 'abc123' });
+    const m2 = createTestMetadata({ to: 'different' });
     expect(computeMigrationHash(m1, ops)).not.toBe(computeMigrationHash(m2, ops));
   });
 
@@ -63,18 +63,16 @@ describe('computeMigrationHash', () => {
     const partHashes = canonicalParts.map((part) =>
       createHash('sha256').update(part).digest('hex'),
     );
-    const expected = `sha256:${createHash('sha256')
-      .update(canonicalizeJson(partHashes))
-      .digest('hex')}`;
+    const expected = `${createHash('sha256').update(canonicalizeJson(partHashes)).digest('hex')}`;
 
-    const legacy = `sha256:${createHash('sha256').update(canonicalParts.join(':')).digest('hex')}`;
+    const legacy = `${createHash('sha256').update(canonicalParts.join(':')).digest('hex')}`;
 
     expect(computeMigrationHash(metadata, ops)).toBe(expected);
     expect(computeMigrationHash(metadata, ops)).not.toBe(legacy);
   });
 
   it('changes when canonical part boundaries change', () => {
-    const metadata = createTestMetadata({ from: 'sha256:a:b' });
+    const metadata = createTestMetadata({ from: 'a:b' });
     const baseOps = createTestOps();
     const boundaryShiftedOps = baseOps.map((op) => ({ ...op, label: `${op.label}:suffix` }));
 
@@ -101,7 +99,7 @@ describe('verifyMigrationHash', () => {
     const ops = createTestOps();
     const baseMetadata = {
       from: null,
-      to: 'sha256:abc123',
+      to: 'abc123',
       providedInvariants: [],
       createdAt: '2026-02-25T14:30:00.000Z',
     };

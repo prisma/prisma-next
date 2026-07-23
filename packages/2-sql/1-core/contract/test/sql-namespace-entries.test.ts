@@ -182,7 +182,7 @@ describe('TestSqlNamespace — entries open dictionary', () => {
       entries: { table: {}, bogus: { myEntity: {} } } as never,
     });
     const storage = new SqlStorage({
-      storageHash: coreHash('sha256:carry-test'),
+      storageHash: coreHash('carry-test'),
       namespaces: { app: ns },
     });
     const coords = [...elementCoordinates(storage)];

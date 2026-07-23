@@ -19,7 +19,7 @@ describe('composed mutation default registries', () => {
     input: Omit<
       InterpretPslDocumentToSqlContractInput,
       | 'target'
-      | 'scalarTypeDescriptors'
+      | 'scalarColumnDescriptors'
       | 'composedExtensionContracts'
       | 'createNamespace'
       | 'capabilities'
@@ -28,7 +28,7 @@ describe('composed mutation default registries', () => {
   ) =>
     interpretPslDocumentToSqlContractInternal({
       target: postgresTarget,
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       createNamespace: createTestSqlNamespace,
       capabilities: { sql: { scalarList: true } },
