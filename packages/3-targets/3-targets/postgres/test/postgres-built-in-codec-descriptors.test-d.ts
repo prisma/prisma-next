@@ -11,6 +11,7 @@ import {
   type PgBitCodec,
   type PgInt4Codec,
   pgBitColumn,
+  type pgDateDescriptor,
   pgInt4Column,
   pgInt4Descriptor,
   postgresSqlCharDescriptor,
@@ -55,9 +56,8 @@ test('emitted descriptor map keeps generic adapters and intentional omissions', 
   expectTypeOf(codecDescriptorMap.char).toExtend<AnyPostgresCodecDescriptor>();
   expectTypeOf(codecDescriptorMap['sql-timestamp']).toExtend<AnyPostgresCodecDescriptor>();
   expectTypeOf(codecDescriptorMap.int4).toEqualTypeOf<typeof pgInt4Descriptor>();
+  expectTypeOf(codecDescriptorMap.date).toEqualTypeOf<typeof pgDateDescriptor>();
 
-  // @ts-expect-error -- pg/date@1 remains runtime-only in the emitted type map
-  codecDescriptorMap.date;
   // @ts-expect-error -- pg/text-array@1 remains runtime-only in the emitted type map
   codecDescriptorMap['text-array'];
 });
