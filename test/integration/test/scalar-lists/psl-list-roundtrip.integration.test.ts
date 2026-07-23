@@ -171,9 +171,6 @@ describe.sequential('PSL scalar-list end-to-end', () => {
     async () => {
       if (!database) throw new Error('database not initialised');
 
-      // `Decimal` is a parameterized codec (`pg/numeric@1`); a bare list element
-      // would carry no precision/scale, so a `Numeric(...)` named type pins the
-      // element parameters.
       const authored = await authorSqlContractFromPsl(`types {
   Amount = Numeric(30, 10)
 }
