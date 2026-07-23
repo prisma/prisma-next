@@ -107,7 +107,7 @@ The on-disk layout mirrors migration bundle snapshots:
 
 ```text
 migrations/app/refs/
-├── db.json                 # { "hash": "sha256:…", "invariants": [] }
+├── db.json                 # { "hash": "<hex>", "invariants": [] }
 ├── db.contract.json        # full contract IR at that hash
 └── db.contract.d.ts        # typed import handle
 ```
@@ -300,7 +300,7 @@ import { RawAggregateCommand, RawUpdateManyCommand } from '@prisma-next/mongo-qu
 
 class M extends Migration {
   override describe() {
-    return { from: 'sha256:…', to: 'sha256:…', labels: ['normalize-names'] };
+    return { from: '<hex>', to: '<hex>', labels: ['normalize-names'] };
   }
 
   override get operations() {
