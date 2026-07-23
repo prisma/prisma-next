@@ -2,7 +2,7 @@
 
 Prisma Next — the contract-first rewrite of Prisma — ships as **Prisma 8**. On **July 31** we publish **`prisma@8.0.0-rc.1`** from the `prisma/prisma` repository: the same repository and the same npm package Prisma users already know. The release candidate is published under a pre-release tag, so `npm install prisma` keeps installing Prisma 7 until 8.0.0 final ships. Prisma 8 carries **PostgreSQL to general availability** — and that is all: **MongoDB ships in early access**, and **SQLite is a proof of concept** at this stage. A release candidate freezes the public API; it does not promise Prisma 7 feature parity. Its promise is different: **everything it ships works and is proven by a test**, everything experimental is labeled, and everything absent is named rather than silently missing.
 
-**Updated July 21 · Health: on track · Ships July 31 · Tasks: 1 done / 12 in flight / 21 not started · [Scoreboard](https://github.com/prisma/prisma-next/pull/1000): ~450 proven / ~500 unproven / ~30 experimental / ~250 not in 8.0**
+**Updated July 23 · Health: on track · Ships July 31 · Tasks: 3 done / 11 in flight / 20 not started · [Scoreboard](https://github.com/prisma/prisma-next/pull/1000): ~450 proven / ~500 unproven / ~30 experimental / ~250 not in 8.0**
 
 ## What needs to happen to release v8-RC1
 
@@ -10,12 +10,12 @@ Six things must be true on release day. Everything on this page belongs to one o
 
 1. **[Queries must return correct values](#1-queries-must-return-correct-values)** — *in progress · Alexey.* The main remaining defect: values read through relation-loading corrupt or fail.
 2. **[The schema language must reach its final form](#2-the-schema-language-must-reach-its-final-form)** — *in flight · Serhii.* Whatever syntax the RC ships is permanent for the life of v8; three language projects are running.
-3. **[Every name and format users depend on must be final](#3-every-name-and-format-users-depend-on-must-be-final)** — *in progress · Will.* The error-code consolidation is in review; config keys, hashes, and generated-file layouts still to do.
+3. **[Every name and format users depend on must be final](#3-every-name-and-format-users-depend-on-must-be-final)** — *in progress · Will.* The error-code consolidation and the migrations-folder snapshot store have landed; config keys, hashes, and the name sweep still to do.
 4. **[The release's claims must be proven](#4-the-releases-claims-must-be-proven)** — *scoreboard drafted, proofs open · everyone.* "It works" and "you can migrate incrementally" each need a runnable receipt.
 5. **[The code must move into prisma/prisma](#5-the-code-must-move-into-prismaprisma)** — *starting · Alexey.* Repository merge, publishing pipeline, and years of open v7 issues.
 6. **[The rough edges users hit on day one must be gone](#6-the-rough-edges-users-hit-on-day-one-must-be-gone)** — *not started · everyone.* Small fixes that would be embarrassing under announcement-day attention.
 
-Two decisions gate work and have dates: the minimum supported Postgres version (July 22 — it blocks final scoreboard verdicts), and the polymorphism stable-or-experimental call (July 24, decided by whether its bug stream has flattened). A third is already made: error codes standardize on dotted namespace codes (like `ORM.DECODE_FAILED`), and the consolidation is in review. July 24 is also the day the scoreboard verdicts freeze and scope stops moving. There is no other internal schedule: we work these sections as fast as they'll go and ship when they're done.
+Two decisions gate work and have dates: the minimum supported Postgres version (July 22 — it blocks final scoreboard verdicts), and the polymorphism stable-or-experimental call (July 24, decided by whether its bug stream has flattened). A third is already made and delivered: error codes standardize on dotted namespace codes (like `ORM.DECODE_FAILED`), and the consolidation has landed. July 24 is also the day the scoreboard verdicts freeze and scope stops moving. There is no other internal schedule: we work these sections as fast as they'll go and ship when they're done.
 
 ---
 
@@ -112,9 +112,9 @@ All of the above changes what generated schema and migration files look like. Th
 
 Users write `catch` blocks against error codes, commit generated contract and migration files to their repositories, and write config files against our keys. All of that becomes permanent API at the RC. Five changes must land first — sequenced together, because several of them alter the same generated files and users should see one change, not five.
 
-<details><summary>⏳ <b>One error-code scheme instead of four</b> · format decided, consolidation in review</summary>
+<details><summary>✅ <b>One error-code scheme instead of four</b> · landed</summary>
 
-Prisma 8 grew four separate error systems with two incompatible code formats — about 46 codes shaped like `PN-CLI-4001` and about 89 shaped like `RUNTIME.DECODE_FAILED` — plus roughly sixteen error classes carrying no code at all, including the database driver errors users hit most often. The format decision is made: **dotted namespace codes win** (`RUNTIME.DECODE_FAILED`-style). The structural consolidation is in review ([TML-3067](https://linear.app/prisma-company/issue/TML-3067)), and the sweep converting the ORM's codeless throws into structured `ORM.*` errors is in progress ([TML-3070](https://linear.app/prisma-company/issue/TML-3070)). Still to come with it: the published table mapping every old code to its new one. Prisma 7's `P1001`-style codes are deliberately not carried over — the upgrade guide will include a translation table for migrating monitoring rules and runbooks.
+Prisma 8 grew four separate error systems with two incompatible code formats — about 46 codes shaped like `PN-CLI-4001` and about 89 shaped like `RUNTIME.DECODE_FAILED` — plus roughly sixteen error classes carrying no code at all. That's over: every published error is now a structural envelope with a dotted `NAMESPACE.SUBCODE` code, recognized by a type predicate instead of `instanceof` ([TML-3067](https://linear.app/prisma-company/issue/TML-3067)); the ORM's and the contract-authoring plane's formerly codeless throws carry structured `ORM.*` / `CONTRACT.*` codes ([TML-3070](https://linear.app/prisma-company/issue/TML-3070), [TML-3075](https://linear.app/prisma-company/issue/TML-3075)); and the reference page documenting all 221 published codes ships in-repo with a CI check that fails any change adding an undocumented code ([TML-3071](https://linear.app/prisma-company/issue/TML-3071)). The old→new crosswalk is published in ADR 239 and feeds the v8 upgrade guide. What continues after the freeze is non-breaking by construction: sweeping the adapter and extension planes' remaining codeless throws onto the same scheme only *adds* codes. Prisma 7's `P1001`-style codes are deliberately not carried over — the upgrade guide will include a translation table for migrating monitoring rules and runbooks.
 </details>
 
 <details><summary>⬜ <b>Rename the `extensionPacks` config key to `extensions`</b></summary>
@@ -127,9 +127,9 @@ A simple rename with a deep reach: the key appears in user config files, in the 
 Prisma 8 identifies contracts and migrations by content hash, and today every hash is written with an algorithm prefix: `"storageHash": "sha256:9f49…"`. The prefix adds nothing (the algorithm isn't going to vary per hash) and it appears everywhere users see a hash — generated contract files, migration manifests, the bookkeeping tables Prisma maintains in the user's database. The textual form of hashes freezes at the RC, so the prefix is dropped now, in one sweep across roughly 368 source files plus regenerated examples.
 </details>
 
-<details><summary>⬜ <b>Store each contract snapshot once instead of copying it into every migration</b></summary>
+<details><summary>✅ <b>Store each contract snapshot once instead of copying it into every migration</b> · landed</summary>
 
-Every migration folder currently carries full copies of the data contract it goes from and to — so a project with N migrations stores roughly 2N copies of N+1 distinct documents. They move to a single `migrations/snapshots/` folder, one file per distinct contract, named by its content hash; migration folders already record which hashes they go from and to, so they need no new linking files. Safe to do (a migration's identity hash deliberately doesn't cover the snapshots, so no existing migration is invalidated) and urgent to do (the migrations folder layout is one of the things that freezes — users commit these folders to their repositories).
+Every migration folder used to carry full copies of the data contract it goes from and to — so a project with N migrations stored roughly 2N copies of N+1 distinct documents. They now live in a single `migrations/snapshots/` folder, one file per distinct contract, named by its content hash ([TML-3059](https://linear.app/prisma-company/issue/TML-3059)); ref-paired snapshots fold into the same store ([TML-3072](https://linear.app/prisma-company/issue/TML-3072)). A migration's identity hash deliberately doesn't cover the snapshots, so no existing migration was invalidated, and a one-shot migrator converts existing projects' committed migration trees.
 </details>
 
 <details><summary>⬜ <b>Sweep out the old `prisma-next` name everywhere it's baked in</b></summary>
@@ -259,6 +259,8 @@ Support statements that end up in the announcement get checked first: Windows, B
 
 ## Recently landed
 
+- **One error-code scheme, delivered end-to-end** — every published error is a structural envelope with a dotted code; the ORM and contract-authoring planes' codeless throws were swept onto it; the 221-code reference page ships with a CI check that keeps it complete (section 3).
+- **Migration folders moved to a content-addressed snapshot store** — each distinct contract stored once under `migrations/snapshots/` instead of copied into every migration, with a one-shot migrator for existing projects (section 3).
 - **Adopting an existing database round-trips cleanly** — seven defects fixed, proven against live databases (details in section 4).
 - **Polymorphism fixes narrowed to edge cases** — count-write scoping, field-selection restriction, relation-uniqueness validation (section 1).
 - **The last big contract-format changes landed ahead of the freeze** — foreign keys and indexes became first-class entities in the contract document, and migration operations are now ordered by a real dependency graph.
