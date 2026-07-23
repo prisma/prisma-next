@@ -12,7 +12,7 @@ interface Contract<Storage extends StorageBase, ModelStorage> {
   readonly models: Record<string, ContractModel<ModelStorage>>;
   readonly storage: Storage;                                     // ← family-controlled
   readonly capabilities?: Record<string, Record<string, boolean>>;
-  readonly extensionPacks?: Record<string, unknown>;
+  readonly extensions?: Record<string, unknown>;
 }
 
 interface StorageBase {

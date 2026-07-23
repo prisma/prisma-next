@@ -27,7 +27,7 @@
 - `target`
 - `storage`
 
-It intentionally excludes `models`, `relations`, `capabilities`, `extensionPacks`, and `meta`.
+It intentionally excludes `models`, `relations`, `capabilities`, and `meta`, and the *content* of `extensions`. The canonicalized object always carries an `extensions` key (an empty object when no extension contributes), so the key itself is part of the hashed bytes even though extension content never contributes.
 
 ### What contributes to profileHash
 
@@ -38,7 +38,7 @@ It intentionally excludes `models`, `relations`, `capabilities`, `extensionPacks
 - `target`
 - `capabilities`
 
-It intentionally excludes `storage`, `models`, `relations`, `extensionPacks`, and `meta`.
+It intentionally excludes `storage`, `models`, `relations`, and `meta`, and the *content* of `extensions` (the empty `extensions` key is present in the canonical form, as above).
 
 ### Emission and storage
 

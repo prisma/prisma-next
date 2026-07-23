@@ -174,7 +174,7 @@ The 46 numeric codes. Grouped by destination namespace; a `↦ merges` note mark
 | PN-CLI-4007 | `errorFamilyReadMarkerSqlRequired` | `CONFIG.FAMILY_READ_MARKER_REQUIRED` |
 | PN-CLI-4009 | `errorConfigValidation` | `CONFIG.VALIDATION_FAILED` |
 | PN-CLI-4010 | `errorDriverRequired` | `CONFIG.DRIVER_REQUIRED` |
-| PN-CLI-4011 | `errorContractMissingExtensionPacks` | `CONFIG.MISSING_EXTENSION_PACKS` |
+| PN-CLI-4011 | `errorContractMissingExtensions` | `CONFIG.MISSING_EXTENSION_PACKS` |
 
 ### → CLI
 

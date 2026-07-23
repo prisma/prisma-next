@@ -75,6 +75,33 @@ changes:
     detection:
       glob: "**/refs/*.contract.json"
       anyMatch: true
+  - id: extension-packs-key-renamed-to-extensions
+    summary: |
+      The `extensionPacks` key is renamed to `extensions` across the config
+      surface, the SPI, and the contract document. In your extension repo:
+      (1) any `prisma-next.config.ts` (the extension's own contract space, a
+      sibling example app, tests) renames `extensionPacks:` to `extensions:` —
+      the old key fails loudly with "Config.extensionPacks is no longer
+      supported; rename it to Config.extensions"; (2) the provider-API field
+      `ContractSourceContext.composedExtensionPacks` is now
+      `composedExtensions`; (3) the emitted `contract.json` / `contract.d.ts`
+      top-level key is `extensions`, and because the key sits in the
+      canonicalized bytes, every contract's `storageHash` / `executionHash` /
+      `profileHash` changes. Re-run your contract-space build
+      (`build:contract-space` or `prisma-next contract emit`), re-anchor
+      `migrations/refs/head.json` and the `migrations/snapshots/<hex>/` store
+      to the new hashes, and re-emit `ops.json` / `migration.json` for the
+      head migration (its `to` hash changes). Concept-level SPI type names
+      (`ExtensionPackRef`, `ControlExtensionDescriptor`,
+      `validateExtensionPackRefs`) are unchanged. Also renamed in the same
+      release: `contract.source.sourceFormat` → `format`, and the target
+      façades' `defineConfig` option `outputPath` → `output`.
+    detection:
+      glob: "**/*.{ts,json}"
+      contains:
+        - "extensionPacks"
+        - "composedExtensionPacks"
+      anyMatch: true
 ---
 
 Also in this release, the ORM client's internal `throw new Error(...)` sites

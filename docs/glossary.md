@@ -35,7 +35,7 @@ Configured via the `contract:` property in `prisma-next.config.ts`.
 
 An installable package that adds features to Prisma Next — new data types, database-specific operations, or custom behavior. For example, the pgvector extension adds vector search support. Extensions integrate across the full stack: they can extend the contract language, contribute types and capabilities, and provide runtime behavior.
 
-> **Divergence:** Currently named "extension pack" / `extensionPacks` in code and config. The desired user-facing term is simply "extension" / `extensions`. **Status: pending refactor.**
+Configured via the `extensions` array in `prisma-next.config.ts`; emitted into the contract under the top-level `extensions` key. Concept-level type names (`ExtensionPackRef`, `ControlExtensionDescriptor`) keep the "pack" vocabulary.
 
 ### Middleware
 
@@ -290,7 +290,7 @@ A read-only filesystem operation that verifies on-disk migration packages are in
 | `PN-MIG-CHECK-006 SNAPSHOT_UNREADABLE` | Migration's snapshot store entry exists but cannot be parsed |
 | `PN-MIG-CHECK-007 SELF_EDGE` | Migration's source equals its target (`from === to`) with no data invariant — a true no-op self-edge |
 | `PN-MIG-CHECK-008 ORPHAN_SPACE_DIR` | A contract-space directory exists on disk but no extension declares it |
-| `PN-MIG-CHECK-009 UNMATERIALISED_EXTENSION` | An extension is declared in `extensionPacks` but has no on-disk migrations directory |
+| `PN-MIG-CHECK-009 UNMATERIALISED_EXTENSION` | An extension is declared in `extensions` but has no on-disk migrations directory |
 | `PN-MIG-CHECK-010 HEAD_REF_MISSING` | A contract space is missing its `refs/head.json` head ref |
 | `PN-MIG-CHECK-011 HEAD_REF_NOT_IN_GRAPH` | A contract space's head ref points at a hash absent from its migration graph |
 | `PN-MIG-CHECK-012 REF_UNREADABLE` | A contract space's ref file is corrupt or unparseable |
@@ -309,7 +309,7 @@ Planned refactors to bring internal naming in line with user-facing terminology:
 
 | User-facing term          | Current internal term               | Scope                                                             | Status  |
 | ------------------------- | ----------------------------------- | ----------------------------------------------------------------- | ------- |
-| extension / `extensions`  | extension pack / `extensionPacks`   | Config property, types, docs, CLI output, error messages          | Pending |
+| extension / `extensions`  | extension pack / `extensions`   | Config property, contract key, docs, CLI output, error messages   | **Done** |
 | middleware / `middleware` | plugin / `plugins`                  | Runtime options, types, docs                                      | **Done** |
 | query builder             | query lane / lane                   | Architecture docs, package names, internal naming                 | Pending |
 | `migrate` (advance DB) / `run` (execute a migration) | `apply` (verb) / `migrationApply` | Control-api method + types, internal naming, docs | **In progress** |

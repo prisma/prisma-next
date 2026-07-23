@@ -27,7 +27,7 @@ Before changing any code, refuse to upgrade past any installed extension's pinne
 
 Steps:
 
-1. **Read `prisma-next.config.ts`** (or its TS-discoverable equivalent at the project root) and enumerate the list of extension packages it imports. Each `extensionPacks: [...]` entry corresponds to an installed npm package.
+1. **Read `prisma-next.config.ts`** (or its TS-discoverable equivalent at the project root) and enumerate the list of extension packages it imports. Each `extensions: [...]` entry corresponds to an installed npm package.
 2. **For each extension**, read its installed `package.json` from `node_modules/<extension-package-name>/package.json` and find any `@prisma-next/*` entry under `dependencies`, `peerDependencies`, or `optionalDependencies`. By construction those entries are exact-version pins (e.g. `"0.7.0"`), set when the extension author last ran their own upgrade.
 3. **Compute the lowest pinned version across all extensions.** That is the highest Prisma Next version reachable by this app on its current extension set.
 4. **Compare to the user's target.** If the target exceeds the lowest pin, halt with a structured message naming each lagging extension and its pinned version, and offer two paths:

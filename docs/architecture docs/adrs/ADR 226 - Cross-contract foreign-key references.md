@@ -24,7 +24,7 @@ namespace public {
 }
 ```
 
-The only new piece of syntax is the `supabase:` prefix on the relation's type: it names the contract space the target model lives in. Everything else — `@relation`, `@unique`, the field declaration — is ordinary. The app declares which spaces it can reach through `extensionPacks` in its config; `supabase` resolves against that list.
+The only new piece of syntax is the `supabase:` prefix on the relation's type: it names the contract space the target model lives in. Everything else — `@relation`, `@unique`, the field declaration — is ordinary. The app declares which spaces it can reach through `extensions` in its config; `supabase` resolves against that list.
 
 This lowers to a real Postgres constraint at migration time:
 
@@ -40,7 +40,7 @@ Three choices make this work, and the rest of this ADR explains them in turn:
 
 1. The FK carrier in the IR gains an optional `spaceId` — present means cross-space, absent means local.
 2. Authoring uses one call shape for both; the brand on the imported model handle is what distinguishes them.
-3. Cross-space names resolve implicitly against the contract aggregate already built from `extensionPacks` — no new resolver, no import directive.
+3. Cross-space names resolve implicitly against the contract aggregate already built from `extensions` — no new resolver, no import directive.
 
 ## Context
 
@@ -48,7 +48,7 @@ An extension that ships a contract space (see [ADR 212](./ADR%20212%20-%20Contra
 
 The framework had no seam for this. The FK reference carrier in the Contract IR named only local coordinates; neither the TypeScript builders nor PSL had a way to name a model in another space; and the planner had no rule for resolving a target it didn't own. An author's only options were to drop database-level referential integrity entirely, or to hand-write FK SQL in a raw migration the framework could neither see nor verify.
 
-The information needed to close the gap was already present: the contract aggregate the framework assembles from `extensionPacks` contains every reachable extension contract. What was missing was a carrier shape that could hold a cross-space coordinate, an authoring surface that could produce one, and a resolution rule that walked the aggregate. This ADR adds those three things.
+The information needed to close the gap was already present: the contract aggregate the framework assembles from `extensions` contains every reachable extension contract. What was missing was a carrier shape that could hold a cross-space coordinate, an authoring surface that could produce one, and a resolution rule that walked the aggregate. This ADR adds those three things.
 
 ## Design
 
@@ -97,15 +97,15 @@ type_ref ::= [ <space>: ] <namespace>. <name>
 
 `@relation(fields: …, references: …)` is unchanged: `references:` still takes plain column names, because the parser knows which model they belong to from the type position. The AST carries the prefix on `PslField.typeContractSpace?`, alongside the `typeNamespace?` coordinate used for within-space cross-namespace references.
 
-### Names resolve implicitly through `extensionPacks`
+### Names resolve implicitly through `extensions`
 
-There is no PSL `use` directive, no TypeScript resolver call, and no separate registration step. The lowering pass walks each FK reference: if `spaceId` is absent it resolves within the current contract; if present it looks up the named space in the aggregate, then the model, then the column. A reference to a space that isn't in `extensionPacks`, a model that doesn't exist, or a missing column fails fast at lowering time with a diagnostic that names the missing pack.
+There is no PSL `use` directive, no TypeScript resolver call, and no separate registration step. The lowering pass walks each FK reference: if `spaceId` is absent it resolves within the current contract; if present it looks up the named space in the aggregate, then the model, then the column. A reference to a space that isn't in `extensions`, a model that doesn't exist, or a missing column fails fast at lowering time with a diagnostic that names the missing pack.
 
-`extensionPacks` does double duty here. It is both the *import* declaration — which extension models the app can name — and the *dependency* declaration that orders aggregate loading. That conflation is intentional and sufficient for the cases we have; splitting it is an additive change we have not needed (see [Alternatives](#alternatives-considered)).
+`extensions` does double duty here. It is both the *import* declaration — which extension models the app can name — and the *dependency* declaration that orders aggregate loading. That conflation is intentional and sufficient for the cases we have; splitting it is an additive change we have not needed (see [Alternatives](#alternatives-considered)).
 
 ### Dependency graph and ownership
 
-`extensionPacks` declares a contract's dependencies, and extensions can declare their own recursively, so the spaces form a directed graph. The aggregate loads depended-on spaces first and rejects two shapes at load time, each with a fail-fast diagnostic:
+`extensions` declares a contract's dependencies, and extensions can declare their own recursively, so the spaces form a directed graph. The aggregate loads depended-on spaces first and rejects two shapes at load time, each with a fail-fast diagnostic:
 
 - **Cycles** — A depends on B depends on A.
 - **Reverse references** — an extension referencing an application model. References point from dependents toward dependencies, never back.
@@ -126,16 +126,16 @@ This is deliberate. The relationship's value today is the database constraint �
 
 - **The carrier is additive.** Contracts with no cross-space references are unaffected, and their serialized form does not change.
 - **Native-type matching is the author's responsibility.** The branded column reference carries a space id, not a storage type. When a cross-space FK targets a column with a non-default native type — `auth.users.id` is `uuid` — the author must match that type on the source column, which is why the grounding example declares `types { Uuid = String @db.Uuid }` and types `userId` as `Uuid`. Postgres rejects mismatched FK column types at apply time; the framework does not coerce.
-- **`extensionPacks` carries two meanings at once** (imports and load-order dependency). This is acceptable while every app that imports a space also depends on it, but it leaves no way to depend on a space for ordering without importing its models.
+- **`extensions` carries two meanings at once** (imports and load-order dependency). This is acceptable while every app that imports a space also depends on it, but it leaves no way to depend on a space for ordering without importing its models.
 - **Relations are non-navigable.** Declaring a relation the ORM cannot traverse is a partial capability: the constraint and migration work, the query surface does not. This matches how the target tables are used in practice but is a seam that a future cross-space query model will need to fill.
 
 ## Alternatives considered
 
 - **A `source: 'local' | 'space'` discriminator (or a parallel carrier type)** instead of an optional `spaceId`. Rejected because it would change the serialized shape of every existing local FK; presence-based discrimination on an optional field keeps local-FK JSON byte-identical and additive.
 - **A separate call surface** — `refExt`, `belongsToExternal`, or similar — to mark a cross-space reference explicitly. Rejected in favor of keying off the imported handle's brand. The cross-space signal already lives at the import statement; a second call name would duplicate it at every use site and split one concept into two APIs.
-- **A PSL `use … as` import/aliasing directive** for naming external spaces. Rejected in favor of implicit resolution against `extensionPacks`. A `use … as` form remains available as a future additive layer *if* name collisions ever make aliasing necessary, but implicit resolution is the canonical path and nothing depends on aliasing today.
+- **A PSL `use … as` import/aliasing directive** for naming external spaces. Rejected in favor of implicit resolution against `extensions`. A `use … as` form remains available as a future additive layer *if* name collisions ever make aliasing necessary, but implicit resolution is the canonical path and nothing depends on aliasing today.
 - **Automatic native-type coercion** from the FK target to the source column. Rejected: the framework matches Postgres's own behavior and does not coerce. The author matches the native type explicitly, which keeps the storage type visible at the authoring site rather than inferred invisibly.
-- **Splitting `extensionPacks` into `dependsOn` + `imports`.** Deferred. The split is additive and can be made when a real case needs dependency-without-import; conflating them is sufficient and simpler for now.
+- **Splitting `extensions` into `dependsOn` + `imports`.** Deferred. The split is additive and can be made when a real case needs dependency-without-import; conflating them is sufficient and simpler for now.
 - **Navigable cross-space relations** (ORM `include` across spaces). Deferred. It requires a runtime contract-space aggregate that merges loaded spaces into the query surface — an undesigned model — and the constraint-only capability covers the motivating use case.
 
 ## References

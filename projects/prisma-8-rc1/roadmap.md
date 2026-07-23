@@ -117,7 +117,7 @@ Users write `catch` blocks against error codes, commit generated contract and mi
 Prisma 8 grew four separate error systems with two incompatible code formats — about 46 codes shaped like `PN-CLI-4001` and about 89 shaped like `RUNTIME.DECODE_FAILED` — plus roughly sixteen error classes carrying no code at all, including the database driver errors users hit most often. The format decision is made: **dotted namespace codes win** (`RUNTIME.DECODE_FAILED`-style). The structural consolidation is in review ([TML-3067](https://linear.app/prisma-company/issue/TML-3067)), and the sweep converting the ORM's codeless throws into structured `ORM.*` errors is in progress ([TML-3070](https://linear.app/prisma-company/issue/TML-3070)). Still to come with it: the published table mapping every old code to its new one. Prisma 7's `P1001`-style codes are deliberately not carried over — the upgrade guide will include a translation table for migrating monitoring rules and runbooks.
 </details>
 
-<details><summary>⬜ <b>Rename the `extensionPacks` config key to `extensions`</b></summary>
+<details><summary>✅ <b>Rename the `extensionPacks` config key to `extensions`</b></summary>
 
 A simple rename with a deep reach: the key appears in user config files, in the schema of the generated contract document, and in the code that canonicalizes and hashes contracts — about 350 files. Breaking, so it happens now or never. While in there, the config format gets a sweep for any other key we'd regret freezing as-is. ([TML-2462](https://linear.app/prisma-company/issue/TML-2462))
 </details>

@@ -24,7 +24,7 @@ Every event is a single JSON object with the fields below. Nothing else is sent.
 | `databaseTarget` | string \| null | `"postgres"` | The `target.targetId` field from your `prisma-next.config.ts`, if a config is loaded |
 | `tsVersion` | string \| null | `"5.9.3"` | The TypeScript version declared in your project's `package.json`, if readable |
 | `agent` | string \| null | `"claude"` | The detected AI coding agent, or `null`. See [Agent detection](#agent-detection) |
-| `extensions` | string[] | `["pgvector"]` | The `.id` values of the `extensionPacks` declared in your config |
+| `extensions` | string[] | `["pgvector"]` | The `.id` values of the `extensions` declared in your config |
 
 A server-side ingestion timestamp is added when the backend stores the event; no client clock is transmitted.
 

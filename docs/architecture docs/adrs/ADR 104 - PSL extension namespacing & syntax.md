@@ -17,7 +17,7 @@ Extensions must be discoverable, versionable, and enforceable across local build
 
 ## Decision
 
-Introduce a namespaced PSL extension syntax and mapping rules that produce deterministic contract JSON under `contract.extensionPacks.<namespace>` and optional capabilities claims.
+Introduce a namespaced PSL extension syntax and mapping rules that produce deterministic contract JSON under `contract.extensions.<namespace>` and optional capabilities claims.
 
 **Composition constraint:** PSL does not “activate” extensions or carry extension configuration. Extension packs are composed via `prisma-next.config.ts`, which determines which namespaces/attributes exist. The emitter/interpreter then **infers** the PSL authoring surface (valid namespaces, attributes, and argument schemas) from the composed pack’s existing manifest/metadata. PSL remains versionless and purely declarative.
 
@@ -72,7 +72,7 @@ model Place {
 
 ### Mapping to the data contract
 
-- All extension data is emitted under `contract.extensionPacks.<namespace>` and never mixed into core tables unless explicitly mapped by the pack's schema
+- All extension data is emitted under `contract.extensions.<namespace>` and never mixed into core tables unless explicitly mapped by the pack's schema
 - Core storage mapping remains under `tables.*` with standard columns, constraints, and indexes
 - Extension-specific column metadata may be referenced by core nodes via stable references, e.g. a column `meta.ext.pgvector = { length: 1536, distance: "cosine" }` when the pack declares such links in its schema
 
@@ -99,7 +99,7 @@ model Place {
       }
     }
   },
-  "extensionPacks": {
+  "extensions": {
     "vector": {
       "version": "1.2.0",
       "columns": {
@@ -123,9 +123,9 @@ model Place {
 
 ### Versioning model
 
-- Versions are pinned in `prisma-next.config.ts` where packs are composed (e.g. `extensionPacks: [pgvector]`)
+- Versions are pinned in `prisma-next.config.ts` where packs are composed (e.g. `extensions: [pgvector]`)
 - Attributes omit version for readability and are validated against the composed/pinned pack version
-- The emitter records the resolved version under `contract.extensionPacks.<namespace>.version`
+- The emitter records the resolved version under `contract.extensions.<namespace>.version`
 - Version changes are reflected in the contract hash and capability surface
 
 ### Determinism and canonicalization
@@ -179,7 +179,7 @@ import postgres from '@prisma-next/target-postgres/pack';
 export const contract = defineContract({
   family: sqlFamily,
   target: postgres,
-  extensionPacks: { pgvector },
+  extensions: { pgvector },
   models: {
     Document: model('Document', {
       fields: {
@@ -204,13 +204,13 @@ export const contract = defineContract({
 ## Alternatives considered
 
 - **Inline version suffix `@pgvector@1.2.column(…)`**: Rejected for readability and because multiple attributes would repeat versions
-- **Mixing extension payloads directly into core nodes without a dedicated `contract.extensionPacks.<namespace>` section**: Rejected due to ambiguity and difficulty for agents to locate extension data
+- **Mixing extension payloads directly into core nodes without a dedicated `contract.extensions.<namespace>` section**: Rejected due to ambiguity and difficulty for agents to locate extension data
 
 ## Consequences
 
 ### Positive
 - Clear, collision-free extension mechanism that maps cleanly to deterministic JSON
-- Agents and tools can rely on `contract.extensionPacks.<namespace>` to discover features without executing code
+- Agents and tools can rely on `contract.extensions.<namespace>` to discover features without executing code
 - Capability gating prevents authoring features that cannot run on the selected target
 
 ### Negative

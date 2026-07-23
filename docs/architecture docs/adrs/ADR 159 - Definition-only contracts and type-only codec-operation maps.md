@@ -12,7 +12,7 @@ sequenceDiagram
   participant Ctx as createExecutionContext
 
   alt No-emit (TS authoring)
-    App->>TS: defineContract({ family, target, extensionPacks, models, ... })
+    App->>TS: defineContract({ family, target, extensions, models, ... })
     TS-->>App: Contract value (definition-only)\n+ ContractWithTypeMaps phantom for inference
   else Emit (JSON + .d.ts)
     App->>JSON: import contract.json
@@ -125,7 +125,7 @@ Key properties:
 In TS authoring (no-emit), developers already provide a single point of configuration by selecting:
 
 - a target pack (`target: postgresPack`)
-- extension packs (`extensionPacks: { pgvector }`)
+- extension packs (`extensions: { pgvector }`)
 
 The codec/operation **type maps** used for inference are therefore derivable from those pack refs at compile time. We should not require users to manually write unions/intersections like:
 
