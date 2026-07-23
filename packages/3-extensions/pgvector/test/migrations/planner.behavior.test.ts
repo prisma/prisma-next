@@ -592,7 +592,7 @@ function createTestContract(
       },
       primaryKey: { columns: ['id'] },
       uniques: [{ columns: ['email'] }],
-      indexes: [{ columns: ['email'] }],
+      indexes: [{ name: 'user_email_idx', columns: ['email'], unique: false }],
       foreignKeys: [],
     },
     post: {
