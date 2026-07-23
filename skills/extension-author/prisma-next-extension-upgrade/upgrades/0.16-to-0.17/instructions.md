@@ -185,6 +185,30 @@ changes:
         - "@default(nanoid("
         - "@default(ulid("
       anyMatch: true
+  - id: postgres-date-rebound-to-pg-date
+    summary: |
+      On the postgres target, PSL `date` columns re-bind from `pg/timestamptz@1` to the
+      dedicated `pg/date@1` codec on both spellings: the legacy `DateTime @db.Date` attribute
+      path (`NATIVE_TYPE_SPECS` in `@prisma-next/sql-contract-psl`) and the bare `Date` type
+      constructor (`postgresNativeAuthoringTypes` in `@prisma-next/adapter-postgres`). The
+      stored native type is unchanged (`date`). Extension assertions that pin the `Date`
+      constructor's derived binding — e.g. over
+      `collectScalarTypeConstructors(stack.authoringContributions.type)` or parity fixtures
+      interpreting `@db.Date` — now expect `Date -> { codecId: 'pg/date@1', nativeType: 'date' }`.
+      Extension test schemas and fixtures with `@db.Date` / `Date` columns produce a different
+      codec ref and contract storage hash on re-emit; regenerate committed contract artefacts
+      and update pinned hash or codec-ref literals. Runtime fixtures change shape too:
+      `pg/date@1` canonicalizes the JS value as a `Date` at UTC midnight
+      (`new Date(Date.UTC(y, m, d))`) instead of passing through the driver's local-midnight
+      `Date`, and its JSON form is the bare `YYYY-MM-DD` string, so relation `.include()`
+      decode over date columns now succeeds instead of failing with `RUNTIME.DECODE_FAILED`.
+      Contracts emitted before the upgrade keep working (`pg/timestamptz@1` still exists).
+    detection:
+      glob: "**/*.{prisma,ts,mts,cts}"
+      contains:
+        - "@db.Date"
+        - "Date"
+      anyMatch: true
 
 ---
 
