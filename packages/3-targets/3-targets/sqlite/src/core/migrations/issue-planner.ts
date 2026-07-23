@@ -22,7 +22,6 @@ import type {
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaDiffIssue } from '@prisma-next/framework-components/control';
 import { issueOutcome, orderIssuesByDependencies } from '@prisma-next/framework-components/control';
-import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import {
   RelationalSchemaNodeKind,
   type SqlColumnIR,
@@ -218,7 +217,7 @@ function buildCreateTableCalls(table: SqlTableIR): SqliteOpFactoryCall[] {
     new CreateTableCall(table.name, columns, constraints.length > 0 ? constraints : undefined),
   ];
   for (const index of table.indexes) {
-    const indexName = index.name ?? defaultIndexName(table.name, index.columns ?? []);
+    const indexName = index.name;
     calls.push(new CreateIndexCall(table.name, indexName, index.columns ?? []));
   }
   return calls;
@@ -319,7 +318,7 @@ function mapIndexIssue(
       SqlIndexIR,
       'a not-found index issue always carries the expected index node'
     >(issue.expected);
-    const indexName = index.name ?? defaultIndexName(tableName, index.columns ?? []);
+    const indexName = index.name;
     return ok([new CreateIndexCall(tableName, indexName, index.columns ?? [])]);
   }
   if (issueOutcome(issue) === 'not-expected') {
@@ -327,7 +326,7 @@ function mapIndexIssue(
       SqlIndexIR,
       'a not-expected index issue always carries the actual index node'
     >(issue.actual);
-    const indexName = index.name ?? defaultIndexName(tableName, index.columns ?? []);
+    const indexName = index.name;
     return ok([new DropIndexCall(tableName, indexName)]);
   }
   // not-equal: index type/options/uniqueness drift. SQLite can't ALTER an

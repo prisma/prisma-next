@@ -157,9 +157,10 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
  * Option-bag equality ported from the relational walk: same key set, values
  * compared via `String()` coercion — Postgres introspection returns
  * reloptions values as raw strings (`'70'`, `'false'`) while contract option
- * leaves are typed (number, boolean, string).
+ * leaves are typed (number, boolean, string). Exported for the planner's
+ * rename content-pairing, which reuses this exact relation.
  */
-function indexOptionsLooselyEqual(
+export function indexOptionsLooselyEqual(
   a: Record<string, unknown> | undefined,
   b: Record<string, unknown> | undefined,
 ): boolean {

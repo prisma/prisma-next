@@ -30,6 +30,7 @@ import {
   DropTableCall,
   EnableRowLevelSecurityCall,
   RawSqlCall,
+  RenameIndexCall,
   RenamePostgresRlsPolicyCall,
   SetDefaultCall,
   SetNotNullCall,
@@ -534,7 +535,7 @@ describe('CreateSchemaCall', () => {
 describe('CreateIndexCall', () => {
   it('lowers typed index-existence checks and builds a plain CREATE INDEX', async () => {
     const { lowerer, received } = recordingCheckLowerer();
-    const call = new CreateIndexCall('public', 'user', 'idx_user_email', ['email']);
+    const call = new CreateIndexCall('public', 'user', 'idx_user_email', { columns: ['email'] });
     const op = await call.toOp(lowerer);
 
     const checks = indexExistsAst('public', 'idx_user_email');
@@ -560,10 +561,16 @@ describe('CreateIndexCall', () => {
 
   it('renders and executes a USING/WITH clause when type and options are given', async () => {
     const { lowerer } = recordingCheckLowerer();
-    const call = new CreateIndexCall('public', 'user', 'idx_user_email', ['email'], {
-      type: 'btree',
-      options: { fillfactor: 90 },
-    });
+    const call = new CreateIndexCall(
+      'public',
+      'user',
+      'idx_user_email',
+      { columns: ['email'] },
+      {
+        type: 'btree',
+        options: { fillfactor: 90 },
+      },
+    );
     const op = await call.toOp(lowerer);
     expect(op.execute[0]?.sql).toBe(
       'CREATE INDEX "idx_user_email" ON "public"."user" USING "btree" ("email") WITH ("fillfactor" = 90)',
@@ -574,14 +581,86 @@ describe('CreateIndexCall', () => {
   });
 
   it('toOp() throws when no lowerer is provided', async () => {
-    const call = new CreateIndexCall('public', 'user', 'idx_user_email', ['email']);
+    const call = new CreateIndexCall('public', 'user', 'idx_user_email', { columns: ['email'] });
     await expect(async () => call.toOp()).rejects.toThrow('createPostgresMigrationPlanner');
   });
 
   it('renders this.createIndex with no facade import', () => {
-    const call = new CreateIndexCall('public', 'user', 'idx_user_email', ['email']);
+    const call = new CreateIndexCall('public', 'user', 'idx_user_email', { columns: ['email'] });
     expect(call.renderTypeScript()).toBe(
       'this.createIndex({ schema: "public", table: "user", index: "idx_user_email", columns: ["email"] })',
+    );
+    expect(call.importRequirements()).toEqual([]);
+  });
+
+  it('renders and executes an expression element with unique and where extras', async () => {
+    const { lowerer } = recordingCheckLowerer();
+    const call = new CreateIndexCall(
+      'public',
+      'user',
+      'user_email_eq',
+      { expression: 'lower(email)' },
+      { unique: true, where: 'deleted_at IS NULL' },
+    );
+    const op = await call.toOp(lowerer);
+    expect(op.execute[0]?.sql).toBe(
+      'CREATE UNIQUE INDEX "user_email_eq" ON "public"."user" (lower(email)) WHERE (deleted_at IS NULL)',
+    );
+    expect(call.renderTypeScript()).toBe(
+      'this.createIndex({ schema: "public", table: "user", index: "user_email_eq", expression: "lower(email)", extras: { where: "deleted_at IS NULL", unique: true } })',
+    );
+  });
+});
+
+describe('RenameIndexCall', () => {
+  it('renders ALTER INDEX RENAME with from-present/to-absent prechecks and to-present postcheck', async () => {
+    const { lowerer, received } = recordingCheckLowerer();
+    const call = new RenameIndexCall('public', 'user', 'old_email_idx', 'user_email_idx_46df9cad');
+    const op = await call.toOp(lowerer);
+
+    const fromChecks = indexExistsAst('public', 'old_email_idx');
+    const toChecks = indexExistsAst('public', 'user_email_idx_46df9cad');
+    expect(received[0]).toEqual(fromChecks.indexPresent());
+    expect(received[1]).toEqual(toChecks.indexAbsent());
+    expect(received[2]).toEqual(toChecks.indexPresent());
+    expect(op.operationClass).toBe('widening');
+    expect(op.execute).toEqual([
+      {
+        description: 'rename index "old_email_idx" to "user_email_idx_46df9cad"',
+        sql: 'ALTER INDEX "public"."old_email_idx" RENAME TO "user_email_idx_46df9cad"',
+      },
+    ]);
+    expect(op.precheck).toEqual([
+      {
+        description: 'ensure index "old_email_idx" exists',
+        sql: 'LOWERED 1',
+        params: ['p1'],
+      },
+      {
+        description: 'ensure index "user_email_idx_46df9cad" does not exist',
+        sql: 'LOWERED 2',
+        params: ['p2'],
+      },
+    ]);
+    expect(op.postcheck).toEqual([
+      {
+        description: 'verify index "user_email_idx_46df9cad" exists',
+        sql: 'LOWERED 3',
+        params: ['p3'],
+      },
+    ]);
+    expect(call.label).toBe('Rename index "old_email_idx" to "user_email_idx_46df9cad" on "user"');
+  });
+
+  it('toOp() throws when no lowerer is provided', async () => {
+    const call = new RenameIndexCall('public', 'user', 'old_email_idx', 'user_email_idx_46df9cad');
+    await expect(async () => call.toOp()).rejects.toThrow('createPostgresMigrationPlanner');
+  });
+
+  it('renders this.renameIndex(...) with no facade import', () => {
+    const call = new RenameIndexCall('public', 'user', 'old_email_idx', 'user_email_idx_46df9cad');
+    expect(call.renderTypeScript()).toBe(
+      'this.renameIndex({ schema: "public", table: "user", from: "old_email_idx", to: "user_email_idx_46df9cad" })',
     );
     expect(call.importRequirements()).toEqual([]);
   });
