@@ -62,7 +62,7 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 ### packages/client/tests/functional/0-legacy-ports/malformed-id/tests.ts
 
 - [x] `should throw Malformed ObjectID error: in 2 different fields` — create with invalid id and ids rejects with error snapshot [providers: mongodb-only] → non-ported
-- [x] `should throw Malformed ObjectID error for: _id` — create with invalid ids array element rejects [providers: mongodb-only] → non-ported
+- [x] `should throw Malformed ObjectID error for: _id` — create with invalid ids array element rejects [providers: mongodb-only] → ports/prisma/functional/legacy-malformed-id/legacy-malformed-id.test.ts
 - [x] `should throw Malformed ObjectID error for: ids String[] @db.ObjectId` — create with invalid id rejects [providers: mongodb-only] → non-ported
 
 ### packages/client/tests/functional/0-legacy-ports/optional-relation-filters/tests.ts
