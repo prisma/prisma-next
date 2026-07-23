@@ -5,20 +5,36 @@ import { RelationalSchemaNodeKind } from './schema-node-kinds';
 import type { SqlAnnotations } from './sql-column-ir';
 import { assertNode, defineNonEnumerable, SqlSchemaIRNode } from './sql-schema-ir-node';
 
+/**
+ * Every field is a required key. Values that may legitimately be absent
+ * (an unnamed `@@index`, the btree→undefined type normalization) are typed
+ * `| undefined` instead of optional, so each construction site states the
+ * absence explicitly rather than omitting the key silently. Undefined values
+ * still produce an instance without the property.
+ */
 export interface SqlIndexIRInput {
   readonly columns: readonly string[];
   readonly unique: boolean;
-  readonly name?: string;
-  readonly type?: string;
-  readonly options?: Record<string, unknown>;
-  readonly annotations?: SqlAnnotations;
+  readonly name: string | undefined;
+  readonly type: string | undefined;
+  readonly options: Record<string, unknown> | undefined;
+  readonly annotations: SqlAnnotations | undefined;
   /**
    * The index's own column nodes, as root-anchored chains. The derivation
    * stamps them so an index is dropped before the columns it is built on
    * (Postgres auto-drops the index when a covered column goes). Never
    * compared by `isEqualTo`.
    */
-  readonly dependsOn?: readonly SchemaNodeRef[];
+  readonly dependsOn: readonly SchemaNodeRef[] | undefined;
+  /**
+   * Whether the index is partial (has a row predicate). Required: every
+   * producer must assert partiality explicitly, because a partial unique
+   * index does not guarantee at-most-one row per key and so cannot back a
+   * 1:1 relation — "unknown" must not silently default to "total". Never
+   * compared by `isEqualTo` and never serialized: differ/verify semantics
+   * are unchanged, and surfacing partial-index drift is out of scope.
+   */
+  readonly partial: boolean;
 }
 
 /**
@@ -58,6 +74,8 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
   declare readonly annotations?: SqlAnnotations;
   /** See {@link SqlIndexIRInput.dependsOn}. Non-enumerable so it stays out of JSON and structural equality, matching `SqlColumnIR.codecRef`. */
   declare readonly dependsOn?: readonly SchemaNodeRef[];
+  /** See {@link SqlIndexIRInput.partial}. Non-enumerable so it stays out of JSON and structural equality, matching `dependsOn`. */
+  declare readonly partial: boolean;
 
   constructor(input: SqlIndexIRInput) {
     super();
@@ -68,6 +86,7 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
     if (input.options !== undefined) this.options = input.options;
     if (input.annotations !== undefined) this.annotations = input.annotations;
     defineNonEnumerable(this, 'dependsOn', input.dependsOn);
+    defineNonEnumerable(this, 'partial', input.partial);
     freezeNode(this);
   }
 

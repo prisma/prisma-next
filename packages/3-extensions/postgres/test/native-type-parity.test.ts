@@ -230,7 +230,7 @@ const parityCases: readonly ParityCase[] = [
     title: 'Date — bare',
     bare: 'Date',
     legacy: 'DateTime @db.Date',
-    expected: { codecId: 'pg/timestamptz@1', nativeType: 'date', typeParams: {} },
+    expected: { codecId: 'pg/date@1', nativeType: 'date', typeParams: {} },
   },
 ];
 

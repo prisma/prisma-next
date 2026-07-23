@@ -1,0 +1,196 @@
+{
+  "schemaVersion": "1",
+  "targetFamily": "sql",
+  "target": "postgres",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "roots": {
+    "testModel": {
+      "model": "TestModel",
+      "namespace": "public"
+    }
+  },
+  "domain": {
+    "namespaces": {
+      "public": {
+        "models": {
+          "TestModel": {
+            "fields": {
+              "d10_0": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/numeric@1",
+                  "kind": "scalar"
+                }
+              },
+              "d20_10": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/numeric@1",
+                  "kind": "scalar"
+                }
+              },
+              "d38_30": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/numeric@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 24
+                  }
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "d10_0": {
+                  "column": "d10_0"
+                },
+                "d20_10": {
+                  "column": "d20_10"
+                },
+                "d38_30": {
+                  "column": "d38_30"
+                },
+                "id": {
+                  "column": "id"
+                }
+              },
+              "namespaceId": "public",
+              "table": "testModel"
+            }
+          }
+        }
+      }
+    }
+  },
+  "storage": {
+    "namespaces": {
+      "public": {
+        "entries": {
+          "table": {
+            "testModel": {
+              "columns": {
+                "d10_0": {
+                  "codecId": "pg/numeric@1",
+                  "nativeType": "numeric",
+                  "nullable": true,
+                  "typeRef": "Decimal10_0"
+                },
+                "d20_10": {
+                  "codecId": "pg/numeric@1",
+                  "nativeType": "numeric",
+                  "nullable": true,
+                  "typeRef": "Decimal20_10"
+                },
+                "d38_30": {
+                  "codecId": "pg/numeric@1",
+                  "nativeType": "numeric",
+                  "nullable": true,
+                  "typeRef": "Decimal38_30"
+                },
+                "id": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 24
+                  }
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            }
+          }
+        },
+        "id": "public",
+        "kind": "postgres-schema"
+      }
+    },
+    "storageHash": "sha256:c8cc97e2ead3eeb7ddfc8784f5220c8fee1c7976fb5d612ba9a913ec6c8e3c0c",
+    "types": {
+      "Decimal10_0": {
+        "codecId": "pg/numeric@1",
+        "kind": "codec-instance",
+        "nativeType": "numeric",
+        "typeParams": {
+          "precision": 10,
+          "scale": 0
+        }
+      },
+      "Decimal20_10": {
+        "codecId": "pg/numeric@1",
+        "kind": "codec-instance",
+        "nativeType": "numeric",
+        "typeParams": {
+          "precision": 20,
+          "scale": 10
+        }
+      },
+      "Decimal38_30": {
+        "codecId": "pg/numeric@1",
+        "kind": "codec-instance",
+        "nativeType": "numeric",
+        "typeParams": {
+          "precision": 38,
+          "scale": 30
+        }
+      }
+    }
+  },
+  "execution": {
+    "executionHash": "sha256:873039be78a535d166bf2cd970324b24fc256745726fffdc741948f2cf0d24ac",
+    "mutations": {
+      "defaults": [
+        {
+          "onCreate": {
+            "id": "cuid2",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "public",
+            "table": "testModel"
+          }
+        }
+      ]
+    }
+  },
+  "capabilities": {
+    "postgres": {
+      "distinctOn": true,
+      "jsonAgg": true,
+      "lateral": true,
+      "limit": true,
+      "orderBy": true,
+      "returning": true
+    },
+    "sql": {
+      "defaultInInsert": true,
+      "enums": true,
+      "lateral": true,
+      "returning": true,
+      "scalarList": true
+    }
+  },
+  "extensionPacks": {},
+  "meta": {},
+  "_generated": {
+    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+    "message": "This file is automatically generated by \"prisma-next contract emit\".",
+    "regenerate": "To regenerate, run: prisma-next contract emit"
+  }
+}

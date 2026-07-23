@@ -280,11 +280,13 @@ function convertIndex(index: Index, tableName: string): SqlIndexIRInput {
   return {
     columns: index.columns,
     unique: false,
-    ...ifDefined('name', index.name),
+    partial: false,
+    name: index.name,
     // Carried so the derived index node compares type/options against the
     // introspected side (the legacy walk read them from the contract).
-    ...ifDefined('type', index.type),
-    ...ifDefined('options', index.options),
+    type: index.type,
+    options: index.options,
+    annotations: undefined,
     dependsOn: flatColumnDependsOn(tableName, index.columns),
   };
 }

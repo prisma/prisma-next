@@ -54,8 +54,26 @@ describe('buildSchemaLookupMap', () => {
       tables: {
         user: makeTable({
           indexes: [
-            { columns: ['created_at'], unique: false },
-            { columns: ['email'], unique: true },
+            {
+              columns: ['created_at'],
+              unique: false,
+              partial: false,
+              name: undefined,
+              type: undefined,
+              options: undefined,
+              annotations: undefined,
+              dependsOn: undefined,
+            },
+            {
+              columns: ['email'],
+              unique: true,
+              partial: false,
+              name: undefined,
+              type: undefined,
+              options: undefined,
+              annotations: undefined,
+              dependsOn: undefined,
+            },
           ],
         }),
       },
@@ -87,7 +105,18 @@ describe('hasUniqueConstraint', () => {
     tables: {
       user: makeTable({
         uniques: [{ columns: ['email'] }],
-        indexes: [{ columns: ['tenant', 'slug'], unique: true }],
+        indexes: [
+          {
+            columns: ['tenant', 'slug'],
+            unique: true,
+            partial: false,
+            name: undefined,
+            type: undefined,
+            options: undefined,
+            annotations: undefined,
+            dependsOn: undefined,
+          },
+        ],
       }),
     },
   });
@@ -115,7 +144,18 @@ describe('hasIndex', () => {
     tables: {
       user: makeTable({
         uniques: [{ columns: ['email'] }],
-        indexes: [{ columns: ['created_at'], unique: false }],
+        indexes: [
+          {
+            columns: ['created_at'],
+            unique: false,
+            partial: false,
+            name: undefined,
+            type: undefined,
+            options: undefined,
+            annotations: undefined,
+            dependsOn: undefined,
+          },
+        ],
       }),
     },
   });

@@ -106,6 +106,31 @@ describe.sequential('Postgres index introspection — type and options', () => {
     expect(idx?.options).toEqual({ fastupdate: 'false' });
   });
 
+  it('stamps partial: true on a partial unique index and partial: false on total indexes', {
+    timeout: testTimeout,
+  }, async () => {
+    await driver!.query(
+      'CREATE TABLE doc (id int PRIMARY KEY, owner_id int NOT NULL, archived boolean NOT NULL)',
+    );
+    await driver!.query('CREATE UNIQUE INDEX doc_owner_total_idx ON doc (owner_id)');
+    await driver!.query(
+      'CREATE UNIQUE INDEX doc_owner_active_idx ON doc (owner_id, archived) WHERE NOT archived',
+    );
+
+    const result = await familyInstance.introspect({ driver: driver! });
+    PostgresDatabaseSchemaNode.assert(result);
+    const ns = result.namespaces['public']!;
+    const indexes = ns.tables['doc']?.indexes ?? [];
+    const totalIdx = indexes.find((i) => i.name === 'doc_owner_total_idx');
+    const partialIdx = indexes.find((i) => i.name === 'doc_owner_active_idx');
+    expect(totalIdx?.partial).toBe(false);
+    expect(partialIdx?.partial).toBe(true);
+    // Partiality stays out of JSON so serialized schema snapshots and differ
+    // semantics are unchanged.
+    expect(JSON.parse(JSON.stringify(partialIdx))).not.toHaveProperty('partial');
+    expect(JSON.parse(JSON.stringify(totalIdx))).not.toHaveProperty('partial');
+  });
+
   // Regression: composite index columns must be reported in the order they
   // appear in the index definition, not in the order they appear in the
   // table. Verification compares `columns` to the contract index columns
