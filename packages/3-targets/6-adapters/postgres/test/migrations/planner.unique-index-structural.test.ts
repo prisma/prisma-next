@@ -130,7 +130,7 @@ describe('PostgresMigrationPlanner - unique constraints vs indexes (structural n
         },
         primaryKey: { columns: ['id'] },
         uniques: [],
-        indexes: [{ columns: ['email'] }],
+        indexes: [{ name: 'user_email_idx', columns: ['email'], unique: false }],
         foreignKeys: [],
       },
     });
@@ -154,7 +154,7 @@ describe('PostgresMigrationPlanner - unique constraints vs indexes (structural n
         },
         primaryKey: { columns: ['id'] },
         uniques: [],
-        indexes: [{ columns: ['email'] }],
+        indexes: [{ name: 'user_email_idx', columns: ['email'], unique: false }],
         foreignKeys: [],
       },
     });
@@ -179,7 +179,7 @@ describe('PostgresMigrationPlanner - unique constraints vs indexes (structural n
         },
         primaryKey: { columns: ['id'], name: 'user_pk' },
         uniques: [{ columns: ['email'], name: 'user_email_unique' }],
-        indexes: [{ columns: ['email'], name: 'user_email_index' }],
+        indexes: [{ columns: ['email'], name: 'user_email_index', unique: false }],
         foreignKeys: [],
       },
     });

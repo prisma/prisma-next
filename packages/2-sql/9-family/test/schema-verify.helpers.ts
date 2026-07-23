@@ -92,8 +92,12 @@ export function createContractTable(
     }>;
     uniques?: ReadonlyArray<{ columns: readonly string[]; name?: string }>;
     indexes?: ReadonlyArray<{
-      columns: readonly string[];
-      name?: string;
+      name: string;
+      prefix?: string;
+      columns?: readonly string[];
+      expression?: string;
+      where?: string;
+      unique: boolean;
       type?: string;
       options?: Record<string, unknown>;
     }>;

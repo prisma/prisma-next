@@ -1078,7 +1078,7 @@ describe('SQL contract validators', () => {
             },
             {
               pk: { columns: ['id'], name: 'user_pkey' },
-              indexes: [{ columns: ['id'], name: 'user_pkey' }],
+              indexes: [{ columns: ['id'], name: 'user_pkey', unique: false }],
             },
           ),
         }),
@@ -1101,7 +1101,7 @@ describe('SQL contract validators', () => {
             },
             {
               uniques: [unique('email'), unique('email')],
-              indexes: [index('email'), index('email')],
+              indexes: [index('user_email_idx1', ['email']), index('user_email_idx2', ['email'])],
             },
           ),
         }),
@@ -1124,7 +1124,7 @@ describe('SQL contract validators', () => {
             {
               pk: pk('id', 'id'),
               uniques: [unique('email', 'email')],
-              indexes: [index('email', 'email')],
+              indexes: [index('user_email_idx', ['email', 'email'])],
             },
           ),
         }),
@@ -1170,8 +1170,20 @@ describe('SQL contract validators', () => {
             },
             {
               indexes: [
-                { columns: ['email'], type: 'gin', options: { a: '1', b: '2' } },
-                { columns: ['email'], type: 'gin', options: { b: '2', a: '1' } },
+                {
+                  name: 'user_email_gin1',
+                  columns: ['email'],
+                  unique: false,
+                  type: 'gin',
+                  options: { a: '1', b: '2' },
+                },
+                {
+                  name: 'user_email_gin2',
+                  columns: ['email'],
+                  unique: false,
+                  type: 'gin',
+                  options: { b: '2', a: '1' },
+                },
               ],
             },
           ),
@@ -1255,7 +1267,7 @@ describe('SQL contract validators', () => {
               role: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
             },
             uniques: [],
-            indexes: [{ columns: ['id'], name: 'shared_name' }],
+            indexes: [{ columns: ['id'], name: 'shared_name', unique: false }],
             foreignKeys: [],
             checks: [
               new CheckConstraint({

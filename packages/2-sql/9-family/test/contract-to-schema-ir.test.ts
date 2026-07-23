@@ -543,7 +543,7 @@ describe('contractToSchemaIR', () => {
                 columns: {
                   email: col({ nativeType: 'text' }),
                 },
-                indexes: [{ columns: ['email'], name: 'T_email_idx' }],
+                indexes: [{ columns: ['email'], name: 'T_email_idx', unique: false }],
               }),
             },
           },
@@ -641,7 +641,9 @@ describe('contractToSchemaIR', () => {
                   workflowId: col({ nativeType: 'text' }),
                   teamId: col({ nativeType: 'text' }),
                 },
-                indexes: [{ columns: ['workflowId'], name: 'WorkflowState_workflowId_idx' }],
+                indexes: [
+                  { columns: ['workflowId'], name: 'WorkflowState_workflowId_idx', unique: false },
+                ],
                 foreignKeys: [
                   {
                     source: {
@@ -976,7 +978,7 @@ describe('contractToSchemaIR — FK referenced-namespace identity', () => {
                 columns: { id: col({ nativeType: 'text' }), slug: col({ nativeType: 'text' }) },
                 primaryKey: { columns: ['id'] },
                 uniques: [{ columns: ['slug'] }],
-                indexes: [{ columns: ['slug'] }],
+                indexes: [{ name: 'Widget_slug_idx', columns: ['slug'], unique: false }],
               }),
             },
           },

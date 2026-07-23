@@ -35,8 +35,24 @@ export function unique(...columns: readonly string[]): UniqueConstraint {
   return new UniqueConstraint({ columns });
 }
 
-export function index(...columns: readonly string[]): Index {
-  return new Index({ columns });
+export function index(
+  name: string,
+  columns: readonly string[],
+  opts?: {
+    readonly prefix?: string;
+    readonly unique?: boolean;
+    readonly type?: string;
+    readonly options?: Record<string, unknown>;
+  },
+): Index {
+  return new Index({
+    name,
+    columns,
+    unique: opts?.unique ?? false,
+    ...(opts?.prefix !== undefined && { prefix: opts.prefix }),
+    ...(opts?.type !== undefined && { type: opts.type }),
+    ...(opts?.options !== undefined && { options: opts.options }),
+  });
 }
 
 export function fk(

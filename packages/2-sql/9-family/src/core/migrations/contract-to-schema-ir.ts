@@ -277,8 +277,9 @@ function convertUnique(unique: UniqueConstraint, tableName: string): SqlUniqueIR
 }
 
 function convertIndex(index: Index, tableName: string): SqlIndexIRInput {
+  const columns = index.columns ?? [];
   return {
-    columns: index.columns,
+    columns,
     unique: false,
     partial: false,
     name: index.name,
@@ -287,7 +288,7 @@ function convertIndex(index: Index, tableName: string): SqlIndexIRInput {
     type: index.type,
     options: index.options,
     annotations: undefined,
-    dependsOn: flatColumnDependsOn(tableName, index.columns),
+    dependsOn: flatColumnDependsOn(tableName, columns),
   };
 }
 

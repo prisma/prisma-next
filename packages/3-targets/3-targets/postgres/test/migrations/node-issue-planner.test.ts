@@ -141,7 +141,7 @@ describe('buildPostgresPlanDiff + planNodeIssues (one-differ path)', () => {
           },
         ],
         uniques: [{ columns: ['slug'] }],
-        indexes: [{ columns: ['slug'] }],
+        indexes: [{ name: 'post_slug_idx', columns: ['slug'], unique: false }],
       },
     });
     const factoryNames = planFor(contract, emptyRoot()).map((c) => c.factoryName);
