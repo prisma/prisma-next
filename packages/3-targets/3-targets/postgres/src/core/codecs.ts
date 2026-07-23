@@ -212,17 +212,25 @@ export class PgEnumCodec extends CodecImpl<
   }
 }
 
-type PgEnumParams = { readonly typeName: string };
+export type PgEnumParams = { readonly typeName: string };
+
+/**
+ * Narrows codec `typeParams` to {@link PgEnumParams} — the shape that binds a
+ * column to a named database type (a native enum's `CREATE TYPE` name).
+ */
+export function isPgEnumParams(value: unknown): value is PgEnumParams {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    'typeName' in value &&
+    typeof value.typeName === 'string'
+  );
+}
 
 const pgEnumParamsSchema = arktype({
   typeName: 'string',
 }) satisfies StandardSchemaV1<PgEnumParams>;
-
-function isJsonObject(
-  value: JsonValue | undefined,
-): value is { readonly [key: string]: JsonValue } {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 export class PgEnumDescriptor extends CodecDescriptorImpl<PgEnumParams> {
   override readonly codecId = PG_ENUM_CODEC_ID;
@@ -234,10 +242,8 @@ export class PgEnumDescriptor extends CodecDescriptorImpl<PgEnumParams> {
     return renderTsLiteral(value);
   }
   override metaFor(typeParams: JsonValue | undefined): CodecMeta | undefined {
-    if (!isJsonObject(typeParams)) return this.meta;
-    const typeName = typeParams['typeName'];
-    return typeof typeName === 'string'
-      ? { db: { sql: { postgres: { nativeType: typeName } } } }
+    return isPgEnumParams(typeParams)
+      ? { db: { sql: { postgres: { nativeType: typeParams.typeName } } } }
       : this.meta;
   }
   override factory(_params: PgEnumParams): (ctx: CodecInstanceContext) => PgEnumCodec {

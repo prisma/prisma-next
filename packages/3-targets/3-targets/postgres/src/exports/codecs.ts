@@ -4,6 +4,7 @@ export type {
   PgCharDescriptor,
   PgEnumCodec,
   PgEnumDescriptor,
+  PgEnumParams,
   PgFloat4Descriptor,
   PgFloat8Descriptor,
   PgFloatDescriptor,
@@ -26,6 +27,7 @@ export type {
   PgVarcharDescriptor,
 } from '../core/codecs';
 export {
+  isPgEnumParams,
   pgBitColumn,
   pgBoolColumn,
   pgCharColumn,

@@ -32,6 +32,7 @@ import {
   type UpdateAst,
   type WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import { isPgEnumParams } from '@prisma-next/target-postgres/codecs';
 import {
   escapeLiteral,
   quoteIdentifier,
@@ -117,7 +118,7 @@ function renderTypedParam(
     // the DDL-side policy in `buildColumnTypeSql`. Builtin spellings
     // (`double precision`, `jsonb`, …) stay verbatim — quoting them would
     // turn them into (nonexistent) user-type lookups.
-    if (isRecord(typeParams) && typeof typeParams['typeName'] === 'string') {
+    if (isPgEnumParams(typeParams)) {
       return `$${index}::${quoteQualifiedName(nativeType)}${arraySuffix}`;
     }
     if (!POSTGRES_INFERRABLE_NATIVE_TYPES.has(nativeType)) {
