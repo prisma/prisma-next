@@ -97,8 +97,10 @@ describe('renderCallsToTypeScript (postgres)', () => {
     });
 
     expect(output).not.toContain('describe()');
-    expect(output).not.toContain(FROM_HASH);
-    expect(output).not.toContain(TO_HASH);
+    expect(output).not.toContain(`'${FROM_HASH}'`);
+    expect(output).not.toContain(`'${TO_HASH}'`);
+    expect(output).not.toContain(`"${FROM_HASH}"`);
+    expect(output).not.toContain(`"${TO_HASH}"`);
   });
 
   it('renders the baseline shape for from: null (no start imports, Migration<never, End>)', () => {

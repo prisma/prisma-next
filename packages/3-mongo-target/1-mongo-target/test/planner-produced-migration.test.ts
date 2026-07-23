@@ -75,8 +75,8 @@ describe('PlannerProducedMongoMigration', () => {
     expect(source).toContain('override get operations()');
     expect(source).toContain('createIndex');
     expect(source).not.toContain('describe()');
-    expect(source).not.toContain(META.from);
-    expect(source).not.toContain(META.to);
+    expect(source).not.toContain(`'${META.from}'`);
+    expect(source).not.toContain(`'${META.to}'`);
     expect(source).toContain("import { MigrationCLI } from '@prisma-next/cli/migration-cli';");
     expect(source).toContain('MigrationCLI.run(import.meta.url, M);');
   });

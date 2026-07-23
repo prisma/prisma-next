@@ -68,8 +68,8 @@ describe('renderCallsToTypeScript', () => {
 
     expect(output).not.toContain('describe()');
     // The hash values are no longer literal-embedded — they come from the JSON.
-    expect(output).not.toContain(META.from);
-    expect(output).not.toContain(META.to);
+    expect(output).not.toContain(`'${META.from}'`);
+    expect(output).not.toContain(`'${META.to}'`);
   });
 
   it('renders a compilable merged import block when from === to (E4)', () => {

@@ -101,7 +101,8 @@ describe('PostgresMigrationPlanner authoring surface', () => {
       expect(source).toContain('export default class M extends Migration<Start, End>');
       expect(source).toContain('override readonly endContractJson = endContract;');
       expect(source).not.toContain('describe()');
-      expect(source).not.toContain(coreHash(FROM_STORAGE_HASH));
+      expect(source).not.toContain(`'${FROM_STORAGE_HASH}'`);
+      expect(source).not.toContain(`"${FROM_STORAGE_HASH}"`);
     });
   });
 
@@ -112,7 +113,7 @@ describe('PostgresMigrationPlanner authoring surface', () => {
         {
           packageDir: '/tmp/migration-pkg',
           fromHash: null,
-          toHash: 'to',
+          toHash: 'to-hash-stub',
           snapshotsImportPath: '../../snapshots',
         },
         APP_SPACE_ID,

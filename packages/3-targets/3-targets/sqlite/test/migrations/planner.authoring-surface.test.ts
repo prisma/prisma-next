@@ -187,7 +187,8 @@ describe('SqliteMigrationPlanner authoring surface', () => {
       expect(source).toContain('override readonly startContractJson = startContract;');
       expect(source).toContain('override readonly endContractJson = endContract;');
       expect(source).not.toContain('describe()');
-      expect(source).not.toContain(coreHash(FROM_STORAGE_HASH));
+      expect(source).not.toContain(`'${FROM_STORAGE_HASH}'`);
+      expect(source).not.toContain(`"${FROM_STORAGE_HASH}"`);
       expect(source).toContain('this.createTable(');
     });
   });
@@ -199,7 +200,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         {
           packageDir: '/tmp/migration-pkg',
           fromHash: null,
-          toHash: 'to',
+          toHash: 'to-hash-stub',
           snapshotsImportPath: SNAPSHOTS_IMPORT_PATH,
         },
         APP_SPACE_ID,

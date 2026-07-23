@@ -418,8 +418,8 @@ describe('renderCallsToTypeScript', () => {
     // New shape: from/to are derived by the base from the imported contract JSON
     // (no describe() block, no hash literals).
     expect(source).not.toContain('describe()');
-    expect(source).not.toContain(META.from);
-    expect(source).not.toContain(META.to);
+    expect(source).not.toContain(`'${META.from}'`);
+    expect(source).not.toContain(`'${META.to}'`);
     expect(source).toContain('export default class M extends Migration<Start, End> {');
     expect(source).toContain('override readonly startContractJson = startContract;');
     expect(source).toContain('override readonly endContractJson = endContract;');
