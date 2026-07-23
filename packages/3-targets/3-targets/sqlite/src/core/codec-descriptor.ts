@@ -123,11 +123,10 @@ class SqliteCodecDescriptorAdapter<D extends AnyCodecDescriptor> extends SqliteC
     return this.descriptor.isParameterized;
   }
 
-  override factory(
+  override readonly factory = (
     params: DescriptorParams<D>,
-  ): (ctx: CodecInstanceContext) => Codec<string, readonly CodecTrait[], unknown, unknown> {
-    return this.descriptor.factory(params);
-  }
+  ): ((ctx: CodecInstanceContext) => Codec<string, readonly CodecTrait[], unknown, unknown>) =>
+    this.descriptor.factory(params);
 
   protected override jsonProjection(
     expression: ProjectionExpr,
