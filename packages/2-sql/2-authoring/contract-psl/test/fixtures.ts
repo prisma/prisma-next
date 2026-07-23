@@ -250,16 +250,106 @@ export const postgresScalarTypeDescriptors = new Map([
   ['Bytes', { codecId: 'pg/bytea@1', nativeType: 'bytea' }],
 ] as const);
 
-/** The postgres base scalars in unified-namespace form: top-level zero-arg type constructors. */
-export const postgresScalarAuthoringTypes: AuthoringTypeNamespace = Object.fromEntries(
-  [...postgresScalarTypeDescriptors].map(([name, { codecId, nativeType }]) => [
-    name,
-    {
-      kind: 'typeConstructor' as const,
-      output: { codecId, nativeType },
+export const postgresNativeScalarTypeDescriptors = new Map<
+  string,
+  { readonly codecId: string; readonly nativeType: string }
+>([
+  ...postgresScalarTypeDescriptors,
+  ['VarChar', { codecId: 'sql/varchar@1', nativeType: 'character varying' }] as const,
+  ['Char', { codecId: 'sql/char@1', nativeType: 'character' }],
+  ['Numeric', { codecId: 'pg/numeric@1', nativeType: 'numeric' }],
+  ['Timestamp', { codecId: 'pg/timestamp@1', nativeType: 'timestamp' }],
+  ['Timestamptz', { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' }],
+  ['Time', { codecId: 'pg/time@1', nativeType: 'time' }],
+  ['Timetz', { codecId: 'pg/timetz@1', nativeType: 'timetz' }],
+  ['Uuid', { codecId: 'pg/uuid@1', nativeType: 'uuid' }],
+  ['Inet', { codecId: 'pg/inet@1', nativeType: 'inet' }],
+  ['SmallInt', { codecId: 'pg/int2@1', nativeType: 'int2' }],
+  ['Real', { codecId: 'pg/float4@1', nativeType: 'float4' }],
+  ['Date', { codecId: 'pg/timestamptz@1', nativeType: 'date' }],
+] as const);
+
+/** The postgres scalar types in unified-namespace form: top-level zero-arg type constructors. */
+export const postgresScalarAuthoringTypes: AuthoringTypeNamespace = {
+  ...Object.fromEntries(
+    [...postgresNativeScalarTypeDescriptors].map(([name, { codecId, nativeType }]) => [
+      name,
+      {
+        kind: 'typeConstructor' as const,
+        output: { codecId, nativeType },
+      },
+    ]),
+  ),
+  VarChar: {
+    kind: 'typeConstructor',
+    args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, optional: true }],
+    output: {
+      codecId: 'sql/varchar@1',
+      nativeType: 'character varying',
+      typeParams: { length: { kind: 'arg', index: 0 } },
     },
-  ]),
-);
+  },
+  Char: {
+    kind: 'typeConstructor',
+    args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, optional: true }],
+    output: {
+      codecId: 'sql/char@1',
+      nativeType: 'character',
+      typeParams: { length: { kind: 'arg', index: 0 } },
+    },
+  },
+  Numeric: {
+    kind: 'typeConstructor',
+    args: [
+      { kind: 'number', name: 'precision', integer: true, minimum: 1, optional: true },
+      { kind: 'number', name: 'scale', integer: true, minimum: 0, optional: true },
+    ],
+    output: {
+      codecId: 'pg/numeric@1',
+      nativeType: 'numeric',
+      typeParams: {
+        precision: { kind: 'arg', index: 0 },
+        scale: { kind: 'arg', index: 1 },
+      },
+    },
+  },
+  Timestamp: {
+    kind: 'typeConstructor',
+    args: [{ kind: 'number', name: 'precision', integer: true, minimum: 0, optional: true }],
+    output: {
+      codecId: 'pg/timestamp@1',
+      nativeType: 'timestamp',
+      typeParams: { precision: { kind: 'arg', index: 0 } },
+    },
+  },
+  Timestamptz: {
+    kind: 'typeConstructor',
+    args: [{ kind: 'number', name: 'precision', integer: true, minimum: 0, optional: true }],
+    output: {
+      codecId: 'pg/timestamptz@1',
+      nativeType: 'timestamptz',
+      typeParams: { precision: { kind: 'arg', index: 0 } },
+    },
+  },
+  Time: {
+    kind: 'typeConstructor',
+    args: [{ kind: 'number', name: 'precision', integer: true, minimum: 0, optional: true }],
+    output: {
+      codecId: 'pg/time@1',
+      nativeType: 'time',
+      typeParams: { precision: { kind: 'arg', index: 0 } },
+    },
+  },
+  Timetz: {
+    kind: 'typeConstructor',
+    args: [{ kind: 'number', name: 'precision', integer: true, minimum: 0, optional: true }],
+    output: {
+      codecId: 'pg/timetz@1',
+      nativeType: 'timetz',
+      typeParams: { precision: { kind: 'arg', index: 0 } },
+    },
+  },
+};
 
 /**
  * Controlled test-only descriptor — intentionally uses pg/vector@1 with maximum: 2000 rather than importing the real pgvector pack, so interpreter unit tests stay layer-isolated. Real-pack parity is covered by `test/integration/test/authoring/parity/ts-psl-parity.real-packs.test.ts`.

@@ -203,10 +203,8 @@ export const postgresScalarAuthoringTypes = {
 } as const satisfies AuthoringTypeNamespace;
 
 /**
- * The former `@db.*` native types as first-class top-level type constructors
- * (TML-2986). Codec ids, native types, and typeParams key shapes mirror the
- * legacy `@db.*` attribute path (`NATIVE_TYPE_SPECS` in sql-contract-psl)
- * exactly; every argument is optional, so each name is also authorable bare
+ * Native storage types as first-class top-level type constructors
+ * (TML-2986). Every argument is optional, so each name is also authorable bare
  * (`VarChar` ≡ `VarChar()`), and omitted arguments omit their typeParams keys.
  */
 export const postgresNativeAuthoringTypes = {
@@ -280,6 +278,7 @@ export const postgresNativeAuthoringTypes = {
     },
   },
   Uuid: { kind: 'typeConstructor', output: { codecId: 'pg/uuid@1', nativeType: 'uuid' } },
+  Inet: { kind: 'typeConstructor', output: { codecId: 'pg/inet@1', nativeType: 'inet' } },
   SmallInt: { kind: 'typeConstructor', output: { codecId: 'pg/int2@1', nativeType: 'int2' } },
   Real: { kind: 'typeConstructor', output: { codecId: 'pg/float4@1', nativeType: 'float4' } },
   Date: { kind: 'typeConstructor', output: { codecId: 'pg/date@1', nativeType: 'date' } },
