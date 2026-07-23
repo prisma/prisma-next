@@ -84,9 +84,8 @@ describe('validateRefValue', () => {
   });
 
   it('rejects legacy algorithm-prefixed values', () => {
-    const legacyPrefix = ['sha256', ''].join(':');
-    expect(validateRefValue(`${legacyPrefix}${'a'.repeat(64)}`)).toBe(false);
-    expect(validateRefValue(`${legacyPrefix}empty`)).toBe(false);
+    expect(validateRefValue(`sha256:${'a'.repeat(64)}`)).toBe(false);
+    expect(validateRefValue('sha256:empty')).toBe(false);
   });
 
   it('rejects wrong length hex', () => {
