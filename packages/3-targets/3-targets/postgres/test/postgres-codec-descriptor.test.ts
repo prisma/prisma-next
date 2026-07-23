@@ -94,6 +94,11 @@ class GenericVectorDescriptor extends CodecDescriptorImpl<VectorParams> {
     db: { sql: { postgres: { nativeType: 'vector' } } },
   } satisfies CodecMeta;
   override readonly paramsSchema = vectorParamsSchema;
+  readonly extensionOnly = 'wrapped-only' as const;
+
+  extensionOnlyMethod(): 'wrapped-only' {
+    return this.extensionOnly;
+  }
 
   override metaFor(params: VectorParams): CodecMeta {
     return { db: { sql: { postgres: { nativeType: `vector(${params.length})` } } } };
@@ -296,6 +301,8 @@ describe('postgresCodec', () => {
       'ReadonlyArray<number> & { length: 6 }',
     );
     expect(descriptor.renderValueLiteral?.('value', 'input')).toBe('input:value');
+    expect('extensionOnly' in descriptor).toBe(false);
+    expect('extensionOnlyMethod' in descriptor).toBe(false);
 
     const codec = descriptor.factory({ length: 6 })({} as CodecInstanceContext);
     expect(codec).toBeInstanceOf(VectorCodec);
@@ -381,6 +388,24 @@ describe('Postgres codec descriptor registry', () => {
     ).toThrow(/demo\/direct-vector@1.*PostgreSQL codec descriptor/);
     expect(() =>
       buildPostgresCodecDescriptorRegistry([{ ...validShape, projectJson: undefined }]),
+    ).toThrow(/demo\/direct-vector@1.*PostgreSQL codec descriptor/);
+    expect(() =>
+      buildPostgresCodecDescriptorRegistry([
+        {
+          ...validShape,
+          paramsSchema: { '~standard': { version: 1, vendor: 'test' } },
+        },
+      ]),
+    ).toThrow(/demo\/direct-vector@1.*PostgreSQL codec descriptor/);
+    expect(() =>
+      buildPostgresCodecDescriptorRegistry([
+        {
+          ...validShape,
+          paramsSchema: {
+            '~standard': { version: 1, vendor: 'test', validate: 'not-callable' },
+          },
+        },
+      ]),
     ).toThrow(/demo\/direct-vector@1.*PostgreSQL codec descriptor/);
     expect(() => buildPostgresCodecDescriptorRegistry([validShape, validShape])).toThrow(
       /Duplicate PostgreSQL codec descriptor id.*demo\/direct-vector@1/,

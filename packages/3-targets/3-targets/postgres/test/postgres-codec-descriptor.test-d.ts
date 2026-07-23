@@ -63,6 +63,11 @@ class GenericVectorDescriptor extends CodecDescriptorImpl<VectorParams> {
   override readonly traits = ['equality'] as const;
   override readonly targetTypes = ['vector'] as const;
   override readonly paramsSchema = vectorParamsSchema;
+  readonly extensionOnly = 'wrapped-only' as const;
+
+  extensionOnlyMethod(): 'wrapped-only' {
+    return this.extensionOnly;
+  }
 
   override factory<N extends number>(params: {
     readonly length: N;
@@ -126,6 +131,11 @@ test('direct and adapted descriptors preserve codec and factory literals', () =>
   expectTypeOf(adaptedDescriptor.factory({ length: 3 })({} as CodecInstanceContext)).toEqualTypeOf<
     VectorCodec<3>
   >();
+
+  // @ts-expect-error -- the adapter does not expose wrapped-only fields
+  adaptedDescriptor.extensionOnly;
+  // @ts-expect-error -- the adapter does not expose wrapped-only methods
+  adaptedDescriptor.extensionOnlyMethod();
 });
 
 test('definePostgresCodecs preserves the readonly descriptor tuple', () => {
