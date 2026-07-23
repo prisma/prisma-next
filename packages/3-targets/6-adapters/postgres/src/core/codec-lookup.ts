@@ -1,34 +1,52 @@
-import type { CodecRegistry } from '@prisma-next/framework-components/codec';
 import type { ComponentMetadata } from '@prisma-next/framework-components/components';
 import { extractCodecLookup } from '@prisma-next/framework-components/control';
 import {
+  type AnyPostgresCodecDescriptor,
   buildPostgresCodecDescriptorRegistry,
-  type PostgresCodecDescriptorRegistry,
 } from '@prisma-next/target-postgres/codec-descriptor';
-import { postgresCodecRegistry } from '@prisma-next/target-postgres/codecs';
+import { postgresCodecDescriptorRegistry } from '@prisma-next/target-postgres/codecs';
+import type { PostgresCodecRegistry } from './types';
 
-export function assemblePostgresCodecDescriptorRegistry(
+function buildPostgresCodecRegistry(descriptors: ReadonlyArray<unknown>): PostgresCodecRegistry {
+  const descriptorRegistry = buildPostgresCodecDescriptorRegistry(descriptors);
+  const validatedDescriptors = Array.from(descriptorRegistry.values());
+  const codecRegistry = extractCodecLookup([
+    {
+      id: 'postgres-codecs',
+      types: { codecTypes: { codecDescriptors: validatedDescriptors } },
+    },
+  ]);
+  const registry: PostgresCodecRegistry = {
+    ...codecRegistry,
+    descriptorFor: (codecId) => descriptorRegistry.descriptorFor(codecId),
+    values: () => descriptorRegistry.values(),
+  };
+  return Object.freeze(registry);
+}
+
+export function assemblePostgresCodecRegistry(
   components: ReadonlyArray<Pick<ComponentMetadata, 'types'>>,
-): PostgresCodecDescriptorRegistry {
+): PostgresCodecRegistry {
   const descriptors = components.flatMap(
     (component) => component.types?.codecTypes?.codecDescriptors ?? [],
   );
-  return buildPostgresCodecDescriptorRegistry(descriptors);
+  return buildPostgresCodecRegistry(descriptors);
+}
+
+export function createPostgresCodecRegistryWithBuiltins(
+  codecDescriptors: readonly AnyPostgresCodecDescriptor[] = [],
+): PostgresCodecRegistry {
+  return buildPostgresCodecRegistry([
+    ...postgresCodecDescriptorRegistry.values(),
+    ...codecDescriptors,
+  ]);
 }
 
 /**
- * Build a {@link CodecRegistry} populated with the Postgres-builtin codec definitions only.
+ * Build a coherent PostgreSQL codec registry populated with built-in descriptors only.
  *
- * This is the default registry used by `createPostgresAdapter()` and `new PostgresControlAdapter()` when called without a stack-derived registry (e.g. from tests, or one-off scripts that don't compose a full stack).
- *
- * Extension codecs (e.g. `pg/vector@1` from `@prisma-next/extension-pgvector`) are intentionally NOT included here: a bare adapter cannot see extensions. Stack-composed paths (`SqlControlAdapterDescriptor.create(stack)` / `SqlRuntimeAdapterDescriptor.create(stack)`) supply the broader, extension-inclusive registry at construction time.
+ * The returned registry supports both ordinary codec materialization and PostgreSQL target behavior. Stack-composed paths build the same combined registry from their complete ordered descriptor contributions.
  */
-export function createPostgresBuiltinCodecLookup(): CodecRegistry {
-  const descriptors = Array.from(postgresCodecRegistry.values());
-  return extractCodecLookup([
-    {
-      id: 'postgres-builtin-codecs',
-      types: { codecTypes: { codecDescriptors: descriptors } },
-    },
-  ]);
+export function createPostgresBuiltinCodecLookup(): PostgresCodecRegistry {
+  return createPostgresCodecRegistryWithBuiltins();
 }
