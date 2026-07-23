@@ -247,12 +247,10 @@ describe('PostgreSQL built-in codec descriptors', () => {
     }
   });
 
-  it('preserves emitted-map order while intentionally omitting date and text-array', () => {
+  it('preserves emitted-map order while intentionally omitting text-array', () => {
     const emittedDescriptors = Object.values(codecDescriptorMap);
     const expectedEmittedDescriptors = codecDescriptors.filter(
-      (descriptor) =>
-        descriptor.codecId !== pgDateDescriptor.codecId &&
-        descriptor.codecId !== pgTextArrayDescriptor.codecId,
+      (descriptor) => descriptor.codecId !== pgTextArrayDescriptor.codecId,
     );
 
     expect(emittedDescriptors).toEqual(expectedEmittedDescriptors);
