@@ -2,7 +2,7 @@
 
 Prisma Next — the contract-first rewrite of Prisma — ships as **Prisma 8**. On **July 31** we publish **`prisma@8.0.0-rc.1`** from the `prisma/prisma` repository: the same repository and the same npm package Prisma users already know. The release candidate is published under a pre-release tag, so `npm install prisma` keeps installing Prisma 7 until 8.0.0 final ships. Prisma 8 carries **PostgreSQL to general availability** — and that is all: **MongoDB ships in early access**, and **SQLite is a proof of concept** at this stage. A release candidate freezes the public API; it does not promise Prisma 7 feature parity. Its promise is different: **everything it ships works and is proven by a test**, everything experimental is labeled, and everything absent is named rather than silently missing.
 
-**Updated July 21 · Health: on track · Ships July 31 · Tasks: 1 done / 12 in flight / 21 not started · [Scoreboard](https://github.com/prisma/prisma-next/pull/1000): ~450 proven / ~500 unproven / ~30 experimental / ~250 not in 8.0**
+**Updated July 21 · Health: on track · Ships July 31 · Tasks: 1 done / 12 in flight / 22 not started · [Scoreboard](https://github.com/prisma/prisma-next/pull/1000): ~450 proven / ~500 unproven / ~30 experimental / ~250 not in 8.0**
 
 ## What needs to happen to release v8-RC1
 
@@ -159,6 +159,21 @@ Several features are mid-flight; their scoreboard cells can't get final verdicts
 - **Polymorphism in the TypeScript authoring path** — schemas written in TypeScript (instead of PSL) can't declare inheritance yet; the PSL path can ([TML-2228](https://linear.app/prisma-company/issue/TML-2228), open). Until it lands, the scoreboard carries the asymmetry explicitly.
 
 Anything on this list that misses July 24 gets its cells stamped as they actually are — unproven, experimental, or not in 8.0 — rather than holding the freeze.
+</details>
+
+<details><summary>⬜ <b>Raw SQL query support — running an arbitrary SQL statement when the ORM and builder can't</b></summary>
+
+"Raw queries" is a headline row every Prisma 7 user will look for: hand a parameterized SQL string to the client and get rows back, or an affected-row count. Prisma 8 ships part of this today and has to settle the rest before the scoreboard freezes.
+
+What already works is a raw SQL *fragment* inside the typed builder — `` fns.raw`…` `` for a function or operator the operation registry doesn't expose (`array_agg`, `ts_rank`, a vendor extension), composing with the rest of a built query. It's proven by tests on Postgres and SQLite, and MongoDB has its own raw-command escape hatch. What's missing is the *statement-level* path — running a whole SQL string on its own — and that's the work:
+
+- **A public API for running an arbitrary SQL statement.** The `$queryRaw`/`$executeRaw` parity surface: one call that takes a parameterized SQL string and returns rows, another that returns an affected-row count, issued straight to the driver rather than through the query compiler. The substrate all exists — the driver already exposes a `query(sql, params)` method, there is a raw execution-plan shape, and the guardrail evaluator already runs on it — but nothing surfaces it to users. A real app built on Prisma 8 had to hand-assemble an internal execution plan just to run a `truncate`, and casting around the missing type then crashed a guardrail ([TML-2672](https://linear.app/prisma-company/issue/TML-2672)). The design is written down ([ADR 012](docs/architecture%20docs/adrs/ADR%20012%20-%20Raw%20SQL%20Escape%20Hatch.md)); the helper is not built.
+- **Safe by construction, with an explicit unsafe door.** Interpolated values always travel as bind parameters, never spliced into the SQL text. The rare case that genuinely needs a query string assembled at runtime gets a separate, clearly-named entry point — so the dangerous path is the one a user has to ask for by name.
+- **Read-versus-write intent the guardrails can see.** A raw statement declares whether it reads or writes (and whether it carries a `WHERE`/`LIMIT`), so the existing lint and budget guardrails — mutation-needs-a-filter, result-size limits — apply to raw SQL too, and the missing-metadata crash above is gone. Core does no SQL parsing here by design; the caller states the intent.
+- **A decided answer for result typing and the composition helpers.** Raw rows come back as the database sends them; a typed-results story (Prisma 7's TypedSQL) and the `Prisma.sql`/`Prisma.join`/`Prisma.raw`/`Prisma.empty` fragment-composition helpers are currently marked *not in 8.0*. Whichever way each lands, it gets named on the scoreboard rather than left ambiguous.
+- **One frozen-surface fix on the piece that already shipped.** The builder's `` fns.raw`…` `` infers a value's database type from its JavaScript runtime type — a guess baked into a public API — so it's replaced with an explicit codec before the surface freezes ([TML-2959](https://linear.app/prisma-company/issue/TML-2959)).
+
+The bar for July 24 is a verdict, not necessarily a finished feature: statement-level raw SQL either ships with a proving test or becomes a written-down "not in 8.0" absence — not a reachable-but-untested cell nobody can act on.
 </details>
 
 <details><summary>⬜ <b>The side-by-side proof: both versions, one database, migrating incrementally</b></summary>
