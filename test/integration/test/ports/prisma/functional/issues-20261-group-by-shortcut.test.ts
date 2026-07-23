@@ -14,9 +14,9 @@ import { timeouts, withPostgresPort } from '../../_harness/postgres';
 //   `groupBy({ by: 'teamName', _sum: { points: true }, orderBy: { teamName: 'asc' } })`
 //   → `.groupBy('teamName').aggregate(agg => ({ _sum: agg.sum('points') }))`
 //
-// GroupedCollection has no .orderBy(); results are sorted client-side for
-// deterministic assertion (the subject is the scalar `by` + _sum correctness,
-// not the ordering mechanism).
+// The scalar-`by` shorthand and _sum aggregation are expressible; ordering is not
+// (GroupedCollection has no .orderBy()). The assertion is order-independent: we check
+// length and use toContainEqual for each expected group.
 //
 // Non-ported tests:
 //   'works with a scalar in "by" and no other selection'
@@ -48,12 +48,9 @@ describe('ports/prisma/functional/issues-20261-group-by-shortcut', () => {
           _sum: agg.sum('points'),
         }));
 
-        const sorted = [...result].sort((a, b) => a.teamName.localeCompare(b.teamName));
-
-        expect(sorted).toEqual([
-          { _sum: 10, teamName: 'Blue' },
-          { _sum: 9, teamName: 'Red' },
-        ]);
+        expect(result).toHaveLength(2);
+        expect(result).toContainEqual({ _sum: 10, teamName: 'Blue' });
+        expect(result).toContainEqual({ _sum: 9, teamName: 'Red' });
 
         expectTypeOf(result).toMatchTypeOf<
           Array<{

@@ -39,7 +39,7 @@ import { timeouts, withPostgresPort } from '../../_harness/postgres';
 //                                             include('_count') (not a relation); prisma-next
 //                                             type-rejects but ignores it at runtime (no throw)
 
-function withCMaR(fn: Parameters<typeof withPostgresPort<Contract>>[1]) {
+function withCreateManyAndReturn(fn: Parameters<typeof withPostgresPort<Contract>>[1]) {
   return withPostgresPort<Contract>({ contractJson }, fn);
 }
 
@@ -47,7 +47,7 @@ describe('ports/prisma/functional/methods-createManyAndReturn-supported', () => 
   it(
     'should create one record',
     () =>
-      withCMaR(async ({ db }) => {
+      withCreateManyAndReturn(async ({ db }) => {
         const email = 'user1@cmar.example.com';
 
         const users = await db.public.User.createAll([{ email }]);
@@ -66,7 +66,7 @@ describe('ports/prisma/functional/methods-createManyAndReturn-supported', () => 
   it(
     'should create many records',
     () =>
-      withCMaR(async ({ db }) => {
+      withCreateManyAndReturn(async ({ db }) => {
         const email1 = 'cmar-bulk1@example.com';
         const email2 = 'cmar-bulk2@example.com';
         const email3 = 'cmar-bulk3@example.com';
@@ -92,7 +92,7 @@ describe('ports/prisma/functional/methods-createManyAndReturn-supported', () => 
   it(
     'should accept select',
     () =>
-      withCMaR(async ({ db }) => {
+      withCreateManyAndReturn(async ({ db }) => {
         const email = 'cmar-select@example.com';
 
         const users = await db.public.User.select('id').createAll([{ email }]);
@@ -105,7 +105,7 @@ describe('ports/prisma/functional/methods-createManyAndReturn-supported', () => 
   it(
     'should accept include on the post side',
     () =>
-      withCMaR(async ({ db }) => {
+      withCreateManyAndReturn(async ({ db }) => {
         const email = 'cmar-include-post-side@example.com';
 
         const users = await db.public.User.select('id').createAll([{ email }]);
@@ -133,7 +133,7 @@ describe('ports/prisma/functional/methods-createManyAndReturn-supported', () => 
   it(
     'select _count should fail',
     () =>
-      withCMaR(async ({ db }) => {
+      withCreateManyAndReturn(async ({ db }) => {
         await expect(
           // @ts-expect-error `_count` is not a scalar field
           db.public.User.select('_count').createAll([{ email: 'cmar-select-count@example.com' }]),
@@ -145,7 +145,7 @@ describe('ports/prisma/functional/methods-createManyAndReturn-supported', () => 
   it.fails(
     'include _count should fail',
     () =>
-      withCMaR(async ({ db }) => {
+      withCreateManyAndReturn(async ({ db }) => {
         await expect(
           // @ts-expect-error `_count` is not a relation
           db.public.User.include('_count').createAll([{ email: 'cmar-include-count@example.com' }]),

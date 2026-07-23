@@ -11,7 +11,14 @@ import { timeouts, withPostgresPort } from '../../_harness/postgres';
 // Upstream seeds three users with email, age, name and counts rows under
 // various conditions. Per-field count (count({ select: { _all, email, age, name } }))
 // is not expressible via the ORM aggregate builder — those two tests are
-// non-ported. "bad prop" is a type-check-only test — non-ported.
+// non-ported.
+//
+// "bad prop": upstream asserts `count({ select: { posts: true } })` is rejected
+// at compile time because `posts` (a relation) is not a valid count target.
+// Ported as an inline @ts-expect-error on `a.sum('posts')` — the aggregate
+// builder constrains sum/avg/min/max to NumericFieldNames, which excludes
+// relations, so the type-rejection is faithful. At runtime the invalid column
+// also causes the query to throw, so the test asserts rejects.toThrow().
 
 const SEED = [
   { email: 'user-1@email.com', age: 111, name: 'some-name-1' },
@@ -87,6 +94,24 @@ describe('ports/prisma/functional/methods-count', () => {
       withCount(async ({ db }) => {
         const { count } = await db.public.User.aggregate((agg) => ({ count: agg.count() }));
         expect(count).toBe(3);
+      }),
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'bad prop',
+    () =>
+      withCount(async ({ db }) => {
+        // Upstream: `count({ select: { posts: true } })` rejects at compile time
+        // because `posts` (a relation) is not a valid count target.
+        // Port: `a.sum('posts')` is type-rejected because `posts` is not in
+        // NumericFieldNames (relations are excluded from the aggregate field constraint).
+        // At runtime the invalid column also causes the query to throw.
+        const result = db.public.User.aggregate((agg) => ({
+          // @ts-expect-error `posts` is a relation, not a numeric field
+          _invalid: agg.sum('posts'),
+        }));
+        await expect(result).rejects.toThrow();
       }),
     timeouts.spinUpPpgDev,
   );

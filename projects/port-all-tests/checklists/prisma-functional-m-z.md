@@ -13,7 +13,7 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [x] `select all true` — `count({ select: true })` returns 3 [providers: all] → ports/prisma/functional/methods-count.test.ts
 - [x] `select all false` — `count({ select: false })` returns 3 (select:false is @ts-expect-error, known bug) [providers: all] → ports/prisma/functional/methods-count.test.ts
 - [x] `select mixed` — `count` with per-field select returns object of 3s [providers: all] → non-ported
-- [x] `bad prop` — count with unknown field `posts` in select rejects with validation error snapshot (Unknown field on UserCountAggregateOutputType) [providers: all] → non-ported
+- [x] `bad prop` — count with unknown field `posts` in select rejects with validation error snapshot (Unknown field on UserCountAggregateOutputType) [providers: all] → ports/prisma/functional/methods-count.test.ts (inline @ts-expect-error on agg.sum('posts'); `posts` is a relation excluded from NumericFieldNames)
 
 ### packages/client/tests/functional/methods/createMany/tests.ts
 - [x] `should create many records` — `createMany` with 4 rows returns `count` of 4 [providers: all] → ports/prisma/functional/methods-createMany.test.ts
@@ -40,14 +40,14 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [x] `finds existing record` — `findFirstOrThrow` returns seeded user by email, type not nullable [providers: all] → ports/prisma/functional/methods-findFirstOrThrow.test.ts
 - [x] `throws if record was not found` — rejects with PrismaClientKnownRequestError code P2025 [providers: all] → ports/prisma/functional/methods-findFirstOrThrow.test.ts
 - [x] `works with transactions` — batch `$transaction` with failing findFirstOrThrow rejects (snapshot) and rolls back create (skipTestIf js_d1) [providers: all] → non-ported
-- [x] `works with interactive transactions` — interactive `$transaction` with failing findFirstOrThrow rejects (snapshot) and rolls back create (skipTestIf js_d1) [providers: all] → non-ported
+- [x] `works with interactive transactions` — interactive `$transaction` with failing findFirstOrThrow rejects (snapshot) and rolls back create (skipTestIf js_d1) [providers: all] → ports/prisma/functional/methods-findFirstOrThrow.test.ts
 - [x] `reports correct method name in case of validation error` — invalid where field rejects with message containing `prisma.user.findFirstOrThrow()` invocation [providers: all] → non-ported
 
 ### packages/client/tests/functional/methods/findUniqueOrThrow/tests.ts
 - [x] `finds existing record` — `findUniqueOrThrow` returns seeded user by email, type not nullable [providers: all] → ports/prisma/functional/methods-findUniqueOrThrow.test.ts
 - [x] `throws if record was not found` — rejects with PrismaClientKnownRequestError code P2025 [providers: all] → ports/prisma/functional/methods-findUniqueOrThrow.test.ts
 - [x] `works with transactions` — batch `$transaction` with failing findUniqueOrThrow rejects (snapshot) and rolls back create (skipTestIf js_d1) [providers: all] → non-ported
-- [x] `works with interactive transactions` — interactive `$transaction` with failing findUniqueOrThrow rejects (snapshot) and rolls back create (skipTestIf js_d1) [providers: all] → non-ported
+- [x] `works with interactive transactions` — interactive `$transaction` with failing findUniqueOrThrow rejects (snapshot) and rolls back create (skipTestIf js_d1) [providers: all] → ports/prisma/functional/methods-findUniqueOrThrow.test.ts
 - [x] `reports correct method name in case of validation error` — invalid where field rejects with message containing `prisma.user.findUniqueOrThrow()` invocation [providers: all] → non-ported
 
 ### packages/client/tests/functional/methods/updateManyAndReturn-supported/tests.ts
@@ -426,24 +426,24 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [x] `throws on nested omit` — findFirst with nested `select.posts.omit.id: undefined` rejects with undefined-not-allowed error for `id` [providers: all] → non-ported
 
 ### packages/client/tests/functional/string-filters/tests.ts
-- [x] `startsWith matches prefix` — `value: { startsWith: 'foo' }` returns `['foo','foo bar baz']` [providers: all] → ports/prisma/functional/string-filters.test.ts
-- [x] `startsWith with no match` — `startsWith: 'xyz'` returns 0 rows [providers: all] → ports/prisma/functional/string-filters.test.ts
-- [x] `startsWith with empty string matches all` — `startsWith: ''` returns all 6 rows [providers: all] → ports/prisma/functional/string-filters.test.ts
-- [x] `endsWith matches suffix` — `endsWith: 'baz'` returns `['baz','foo bar baz']` [providers: all] → ports/prisma/functional/string-filters.test.ts
-- [x] `endsWith with no match` — `endsWith: 'xyz'` returns 0 rows [providers: all] → ports/prisma/functional/string-filters.test.ts
-- [x] `endsWith with empty string matches all` — `endsWith: ''` returns all 6 rows [providers: all] → ports/prisma/functional/string-filters.test.ts
-- [x] `contains matches substring` — `contains: 'bar'` returns `['bar','foo bar baz']` [providers: all] → ports/prisma/functional/string-filters.test.ts
-- [x] `contains with no match` — `contains: 'xyz'` returns 0 rows [providers: all] → ports/prisma/functional/string-filters.test.ts
-- [x] `contains with empty string matches all` — `contains: ''` returns all 6 rows [providers: all] → ports/prisma/functional/string-filters.test.ts
-- [x] `combined startsWith + endsWith` — `startsWith:'foo', endsWith:'baz'` returns only `'foo bar baz'` [providers: all] → ports/prisma/functional/string-filters.test.ts
-- [x] `combined startsWith + contains` — `startsWith:'foo', contains:'bar'` returns only `'foo bar baz'` [providers: all] → ports/prisma/functional/string-filters.test.ts
-- [x] `combined contains + endsWith` — `contains:'bar', endsWith:'baz'` returns only `'foo bar baz'` [providers: all] → ports/prisma/functional/string-filters.test.ts
-- [x] `NOT startsWith` — `NOT: { value: { startsWith:'foo' } }` returns `['','bar','baz','completely different']` [providers: all] → ports/prisma/functional/string-filters.test.ts
-- [x] `NOT contains` — `NOT: { value: { contains:'bar' } }` returns `['','baz','completely different','foo']` [providers: all] → ports/prisma/functional/string-filters.test.ts
-- [x] `NOT endsWith` — `NOT: { value: { endsWith:'baz' } }` returns `['','bar','completely different','foo']` [providers: all] → ports/prisma/functional/string-filters.test.ts
-- [x] `mode: insensitive > contains case-insensitive` — with extra `FOO BAR BAZ`/`Foo` rows, `contains:'bar', mode:'insensitive'` returns `['FOO BAR BAZ','bar','foo bar baz']` [providers: postgres,cockroach,mongodb (describeIf)] → ports/prisma/functional/string-filters.test.ts
-- [x] `mode: insensitive > startsWith case-insensitive` — `startsWith:'foo', mode:'insensitive'` returns `['FOO BAR BAZ','Foo','foo','foo bar baz']` [providers: postgres,cockroach,mongodb (describeIf)] → ports/prisma/functional/string-filters.test.ts
-- [x] `mode: insensitive > endsWith case-insensitive` — `endsWith:'baz', mode:'insensitive'` returns `['FOO BAR BAZ','baz','foo bar baz']` [providers: postgres,cockroach,mongodb (describeIf)] → ports/prisma/functional/string-filters.test.ts
+- [x] `startsWith matches prefix` — `value: { startsWith: 'foo' }` returns `['foo','foo bar baz']` [providers: all] → non-ported: prisma-next has no `startsWith`/`endsWith`/`contains`/`mode:insensitive` string operators; `.like()`/`.ilike()` are different operators (raw LIKE patterns), not faithful substitutes
+- [x] `startsWith with no match` — `startsWith: 'xyz'` returns 0 rows [providers: all] → non-ported: prisma-next has no `startsWith`/`endsWith`/`contains`/`mode:insensitive` string operators; `.like()`/`.ilike()` are different operators (raw LIKE patterns), not faithful substitutes
+- [x] `startsWith with empty string matches all` — `startsWith: ''` returns all 6 rows [providers: all] → non-ported: prisma-next has no `startsWith`/`endsWith`/`contains`/`mode:insensitive` string operators; `.like()`/`.ilike()` are different operators (raw LIKE patterns), not faithful substitutes
+- [x] `endsWith matches suffix` — `endsWith: 'baz'` returns `['baz','foo bar baz']` [providers: all] → non-ported: prisma-next has no `startsWith`/`endsWith`/`contains`/`mode:insensitive` string operators; `.like()`/`.ilike()` are different operators (raw LIKE patterns), not faithful substitutes
+- [x] `endsWith with no match` — `endsWith: 'xyz'` returns 0 rows [providers: all] → non-ported: prisma-next has no `startsWith`/`endsWith`/`contains`/`mode:insensitive` string operators; `.like()`/`.ilike()` are different operators (raw LIKE patterns), not faithful substitutes
+- [x] `endsWith with empty string matches all` — `endsWith: ''` returns all 6 rows [providers: all] → non-ported: prisma-next has no `startsWith`/`endsWith`/`contains`/`mode:insensitive` string operators; `.like()`/`.ilike()` are different operators (raw LIKE patterns), not faithful substitutes
+- [x] `contains matches substring` — `contains: 'bar'` returns `['bar','foo bar baz']` [providers: all] → non-ported: prisma-next has no `startsWith`/`endsWith`/`contains`/`mode:insensitive` string operators; `.like()`/`.ilike()` are different operators (raw LIKE patterns), not faithful substitutes
+- [x] `contains with no match` — `contains: 'xyz'` returns 0 rows [providers: all] → non-ported: prisma-next has no `startsWith`/`endsWith`/`contains`/`mode:insensitive` string operators; `.like()`/`.ilike()` are different operators (raw LIKE patterns), not faithful substitutes
+- [x] `contains with empty string matches all` — `contains: ''` returns all 6 rows [providers: all] → non-ported: prisma-next has no `startsWith`/`endsWith`/`contains`/`mode:insensitive` string operators; `.like()`/`.ilike()` are different operators (raw LIKE patterns), not faithful substitutes
+- [x] `combined startsWith + endsWith` — `startsWith:'foo', endsWith:'baz'` returns only `'foo bar baz'` [providers: all] → non-ported: prisma-next has no `startsWith`/`endsWith`/`contains`/`mode:insensitive` string operators; `.like()`/`.ilike()` are different operators (raw LIKE patterns), not faithful substitutes
+- [x] `combined startsWith + contains` — `startsWith:'foo', contains:'bar'` returns only `'foo bar baz'` [providers: all] → non-ported: prisma-next has no `startsWith`/`endsWith`/`contains`/`mode:insensitive` string operators; `.like()`/`.ilike()` are different operators (raw LIKE patterns), not faithful substitutes
+- [x] `combined contains + endsWith` — `contains:'bar', endsWith:'baz'` returns only `'foo bar baz'` [providers: all] → non-ported: prisma-next has no `startsWith`/`endsWith`/`contains`/`mode:insensitive` string operators; `.like()`/`.ilike()` are different operators (raw LIKE patterns), not faithful substitutes
+- [x] `NOT startsWith` — `NOT: { value: { startsWith:'foo' } }` returns `['','bar','baz','completely different']` [providers: all] → non-ported: prisma-next has no `startsWith`/`endsWith`/`contains`/`mode:insensitive` string operators; `.like()`/`.ilike()` are different operators (raw LIKE patterns), not faithful substitutes
+- [x] `NOT contains` — `NOT: { value: { contains:'bar' } }` returns `['','baz','completely different','foo']` [providers: all] → non-ported: prisma-next has no `startsWith`/`endsWith`/`contains`/`mode:insensitive` string operators; `.like()`/`.ilike()` are different operators (raw LIKE patterns), not faithful substitutes
+- [x] `NOT endsWith` — `NOT: { value: { endsWith:'baz' } }` returns `['','bar','completely different','foo']` [providers: all] → non-ported: prisma-next has no `startsWith`/`endsWith`/`contains`/`mode:insensitive` string operators; `.like()`/`.ilike()` are different operators (raw LIKE patterns), not faithful substitutes
+- [x] `mode: insensitive > contains case-insensitive` — with extra `FOO BAR BAZ`/`Foo` rows, `contains:'bar', mode:'insensitive'` returns `['FOO BAR BAZ','bar','foo bar baz']` [providers: postgres,cockroach,mongodb (describeIf)] → non-ported: prisma-next has no `startsWith`/`endsWith`/`contains`/`mode:insensitive` string operators; `.like()`/`.ilike()` are different operators (raw LIKE patterns), not faithful substitutes
+- [x] `mode: insensitive > startsWith case-insensitive` — `startsWith:'foo', mode:'insensitive'` returns `['FOO BAR BAZ','Foo','foo','foo bar baz']` [providers: postgres,cockroach,mongodb (describeIf)] → non-ported: prisma-next has no `startsWith`/`endsWith`/`contains`/`mode:insensitive` string operators; `.like()`/`.ilike()` are different operators (raw LIKE patterns), not faithful substitutes
+- [x] `mode: insensitive > endsWith case-insensitive` — `endsWith:'baz', mode:'insensitive'` returns `['FOO BAR BAZ','baz','foo bar baz']` [providers: postgres,cockroach,mongodb (describeIf)] → non-ported: prisma-next has no `startsWith`/`endsWith`/`contains`/`mode:insensitive` string operators; `.like()`/`.ilike()` are different operators (raw LIKE patterns), not faithful substitutes
 
 ### packages/client/tests/functional/too-many-instances-of-prisma-client/tests.ts
 - [ ] `should not console warn when spawning too many instances of PrismaClient` — spawns 15 clients and `$connect`s each; asserts no console.warn output (empty snapshot); 60s timeout [providers: all]

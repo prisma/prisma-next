@@ -223,7 +223,7 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/issues/18598-select-count-true/tests.ts
 
-- [x] `works with _count shorthand` — `select: { _count: true }` shorthand works [providers: all] → passing: test/ports/prisma/functional/issues-18598-select-count-true.test.ts
+- [x] `works with _count shorthand` — `select: { _count: true }` shorthand works [providers: all] → non-ported: `select: { _count: true }` returns a count of every relation; prisma-next has no all-relations `_count` selection surface
 
 ### packages/client/tests/functional/issues/18846-empty-array/tests.ts
 
@@ -239,8 +239,8 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/issues/19997-select-include-undefined/tests.ts
 
-- [x] `correctly infers selection when passing select: undefined` — `select: undefined` yields the default selection [providers: all] → passing: test/ports/prisma/functional/issues-19997-select-include-undefined.test.ts
-- [x] `correctly infers selection when passing include: undefined` — `include: undefined` yields the default selection [providers: all] → passing: test/ports/prisma/functional/issues-19997-select-include-undefined.test.ts
+- [x] `correctly infers selection when passing select: undefined` — `select: undefined` yields the default selection [providers: all] → non-ported: passing an explicit `undefined` to select/include has no prisma-next surface; omitting the call tests something different
+- [x] `correctly infers selection when passing include: undefined` — `include: undefined` yields the default selection [providers: all] → non-ported: passing an explicit `undefined` to select/include has no prisma-next surface; omitting the call tests something different
 
 ### packages/client/tests/functional/issues/20261-group-by-shortcut/tests.ts
 

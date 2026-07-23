@@ -38,7 +38,7 @@ import { timeouts, withPostgresPort } from '../../_harness/postgres';
 //                                             include('_count'); prisma-next type-rejects but ignores
 //                                             the unknown relation at runtime (no throw)
 
-function withUMaR(fn: Parameters<typeof withPostgresPort<Contract>>[1]) {
+function withUpdateManyAndReturn(fn: Parameters<typeof withPostgresPort<Contract>>[1]) {
   return withPostgresPort<Contract>({ contractJson }, fn);
 }
 
@@ -46,7 +46,7 @@ describe('ports/prisma/functional/methods-updateManyAndReturn-supported', () => 
   it(
     'should update and return many records',
     () =>
-      withUMaR(async ({ db }) => {
+      withUpdateManyAndReturn(async ({ db }) => {
         const email1 = 'umar-m1@example.com';
         const email2 = 'umar-m2@example.com';
         const email3 = 'umar-m3@example.com';
@@ -75,7 +75,7 @@ describe('ports/prisma/functional/methods-updateManyAndReturn-supported', () => 
   it(
     'should update and return one record',
     () =>
-      withUMaR(async ({ db }) => {
+      withUpdateManyAndReturn(async ({ db }) => {
         const email1 = 'umar-one-before@example.com';
         const email2 = 'umar-one-after@example.com';
 
@@ -97,7 +97,7 @@ describe('ports/prisma/functional/methods-updateManyAndReturn-supported', () => 
   it(
     'should update and return records satisfying the where clause',
     () =>
-      withUMaR(async ({ db }) => {
+      withUpdateManyAndReturn(async ({ db }) => {
         const email1 = 'umar-where1@example.com';
         const email2 = 'umar-where2@example.com';
         const email3 = 'umar-where3@example.com';
@@ -126,7 +126,7 @@ describe('ports/prisma/functional/methods-updateManyAndReturn-supported', () => 
   it(
     'should accept select',
     () =>
-      withUMaR(async ({ db }) => {
+      withUpdateManyAndReturn(async ({ db }) => {
         const email1 = 'umar-select@example.com';
         const updatedName = 'Select Updated Name';
 
@@ -144,7 +144,7 @@ describe('ports/prisma/functional/methods-updateManyAndReturn-supported', () => 
   it(
     'should accept include on the post side',
     () =>
-      withUMaR(async ({ db }) => {
+      withUpdateManyAndReturn(async ({ db }) => {
         const email1 = 'umar-include-post@example.com';
 
         const users = await db.public.User.createAll([{ email: email1 }]);
@@ -175,7 +175,7 @@ describe('ports/prisma/functional/methods-updateManyAndReturn-supported', () => 
   it(
     'select _count should fail',
     () =>
-      withUMaR(async ({ db }) => {
+      withUpdateManyAndReturn(async ({ db }) => {
         await db.public.User.create({ email: 'umar-select-count@example.com' });
         await expect(
           // @ts-expect-error `_count` is not a scalar field
@@ -188,7 +188,7 @@ describe('ports/prisma/functional/methods-updateManyAndReturn-supported', () => 
   it.fails(
     'include _count should fail',
     () =>
-      withUMaR(async ({ db }) => {
+      withUpdateManyAndReturn(async ({ db }) => {
         await db.public.User.create({ email: 'umar-include-count@example.com' });
         await expect(
           // @ts-expect-error `_count` is not a relation
