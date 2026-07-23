@@ -3,9 +3,9 @@ import type { SqlDescribedContractSpace } from '@prisma-next/family-sql/control'
 import type {
   DefaultMappingOptions,
   EnumInfo,
-  PslNativeTypeAttribute,
   PslPrinterOptions,
   PslTypeMap,
+  PslTypeReference,
   RelationField,
 } from '@prisma-next/family-sql/psl-infer';
 import {
@@ -78,8 +78,7 @@ type TableColumnFieldNameMap = ReadonlyMap<string, ResolvedColumnFieldName>;
 
 type NamedTypeRegistryEntry = {
   readonly name: string;
-  readonly baseType: string;
-  readonly nativeTypeAttribute: PslNativeTypeAttribute;
+  readonly pslType: PslTypeReference;
 };
 
 type NamedTypeRegistry = {
@@ -859,7 +858,7 @@ function buildScalarField(
   // the Phase-1 authoring form a `native_enum` ref field takes — not a bare
   // name substitution. The printer renders `typeConstructor` when present and
   // composes `?`/`[]` exactly like any other field type.
-  let typeName = resolution.pslType;
+  let typeName = resolution.pslType.name;
   let typeConstructor: PslTypeConstructorCall | undefined;
   const enumPslName = enumNameMap.get(column.nativeType);
   if (enumPslName) {
@@ -871,7 +870,7 @@ function buildScalarField(
       span: SYNTHETIC_SPAN,
     };
   }
-  if (resolution.nativeTypeAttribute && !enumPslName) {
+  if (resolution.useNamedType && !enumPslName) {
     typeName = resolveNamedTypeName(namedTypes, resolution);
   }
 
@@ -1074,16 +1073,20 @@ function namedArg(name: string, value: string): PslAttributeArgument {
 }
 
 function buildNamedTypeDeclaration(entry: NamedTypeRegistryEntry): PslNamedTypeDeclaration {
-  const attribute = buildAttribute(
-    'namedType',
-    entry.nativeTypeAttribute.name,
-    (entry.nativeTypeAttribute.args ?? []).map(positionalArg),
-  );
   return {
     kind: 'namedType',
     name: entry.name,
-    baseType: entry.baseType,
-    attributes: [attribute],
+    ...(entry.pslType.args
+      ? {
+          typeConstructor: {
+            kind: 'typeConstructor' as const,
+            path: [entry.pslType.name],
+            args: entry.pslType.args.map(positionalArg),
+            span: SYNTHETIC_SPAN,
+          },
+        }
+      : { baseType: entry.pslType.name }),
+    attributes: [],
     span: SYNTHETIC_SPAN,
   };
 }
@@ -1265,9 +1268,8 @@ function seedNamedTypeRegistry(
   reservedNames: ReadonlySet<string>,
 ): NamedTypeRegistry {
   type Seed = {
-    readonly baseType: string;
+    readonly pslType: PslTypeReference;
     readonly desiredName: string;
-    readonly nativeTypeAttribute: PslNativeTypeAttribute;
   };
 
   const seeds = new Map<string, Seed>();
@@ -1288,7 +1290,7 @@ function seedNamedTypeRegistry(
       if (
         'unsupported' in resolution ||
         enumNameMap.has(column.nativeType) ||
-        !resolution.nativeTypeAttribute
+        !resolution.useNamedType
       ) {
         continue;
       }
@@ -1296,9 +1298,8 @@ function seedNamedTypeRegistry(
       const signatureKey = createNamedTypeSignatureKey(resolution);
       if (!seeds.has(signatureKey)) {
         seeds.set(signatureKey, {
-          baseType: resolution.pslType,
+          pslType: resolution.pslType,
           desiredName: toNamedTypeName(column.name),
-          nativeTypeAttribute: resolution.nativeTypeAttribute,
         });
       }
     }
@@ -1321,8 +1322,7 @@ function seedNamedTypeRegistry(
     const name = createUniqueFieldName(seed.desiredName, registry.usedNames);
     registry.entriesByKey.set(signatureKey, {
       name,
-      baseType: seed.baseType,
-      nativeTypeAttribute: seed.nativeTypeAttribute,
+      pslType: seed.pslType,
     });
     registry.usedNames.add(name);
   }
@@ -1333,10 +1333,8 @@ function seedNamedTypeRegistry(
 function resolveNamedTypeName(
   registry: NamedTypeRegistry,
   resolution: {
-    readonly pslType: string;
+    readonly pslType: PslTypeReference;
     readonly nativeType: string;
-    readonly typeParams?: Record<string, unknown>;
-    readonly nativeTypeAttribute?: PslNativeTypeAttribute;
   },
 ): string {
   const key = createNamedTypeSignatureKey(resolution);
@@ -1351,20 +1349,10 @@ function resolveNamedTypeName(
 }
 
 function createNamedTypeSignatureKey(resolution: {
-  readonly pslType: string;
+  readonly pslType: PslTypeReference;
   readonly nativeType: string;
-  readonly typeParams?: Record<string, unknown>;
-  readonly nativeTypeAttribute?: PslNativeTypeAttribute;
 }): string {
-  return JSON.stringify({
-    baseType: resolution.pslType,
-    nativeTypeAttribute: resolution.nativeTypeAttribute
-      ? {
-          name: resolution.nativeTypeAttribute.name,
-          args: resolution.nativeTypeAttribute.args ?? null,
-        }
-      : null,
-  });
+  return JSON.stringify(resolution.pslType);
 }
 
 function topologicalSort(
