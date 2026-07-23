@@ -32,7 +32,11 @@ import {
   type UpdateAst,
   type WindowFuncExpr,
 } from '@prisma-next/sql-relational-core/ast';
-import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
+import {
+  escapeLiteral,
+  quoteIdentifier,
+  quoteQualifiedName,
+} from '@prisma-next/target-postgres/sql-utils';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresContract } from './types';
 
@@ -107,6 +111,15 @@ function renderTypedParam(
   const nativeType = isRecord(dialectBlock) ? dialectBlock['nativeType'] : undefined;
   if (typeof nativeType === 'string') {
     const arraySuffix = many ? '[]' : '';
+    // A `typeParams.typeName` marks a named database type (e.g. a native
+    // enum): cast to its quoted, schema-qualified identifier so Postgres does
+    // not case-fold it (`$1::HoldType` would resolve as `holdtype`). Mirrors
+    // the DDL-side policy in `buildColumnTypeSql`. Builtin spellings
+    // (`double precision`, `jsonb`, …) stay verbatim — quoting them would
+    // turn them into (nonexistent) user-type lookups.
+    if (isRecord(typeParams) && typeof typeParams['typeName'] === 'string') {
+      return `$${index}::${quoteQualifiedName(nativeType)}${arraySuffix}`;
+    }
     if (!POSTGRES_INFERRABLE_NATIVE_TYPES.has(nativeType)) {
       return `$${index}::${nativeType}${arraySuffix}`;
     }
