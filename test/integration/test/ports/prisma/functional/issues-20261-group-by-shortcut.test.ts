@@ -1,0 +1,67 @@
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import type { Contract } from '../../_fixtures/issues-20261-group-by-shortcut/generated/contract';
+import contractJson from '../../_fixtures/issues-20261-group-by-shortcut/generated/contract.json' with {
+  type: 'json',
+};
+import { timeouts, withPostgresPort } from '../../_harness/postgres';
+
+// Port of prisma/prisma@a6d0155 packages/client/tests/functional/issues/20261-group-by-shortcut
+// (postgres matrix entry).
+//
+// Subject: Prisma `groupBy` accepts a scalar string in `by` (not just an array).
+//
+// API-shape translation:
+//   `groupBy({ by: 'teamName', _sum: { points: true }, orderBy: { teamName: 'asc' } })`
+//   → `.groupBy('teamName').aggregate(agg => ({ _sum: agg.sum('points') }))`
+//
+// GroupedCollection has no .orderBy(); results are sorted client-side for
+// deterministic assertion (the subject is the scalar `by` + _sum correctness,
+// not the ordering mechanism).
+//
+// Non-ported tests:
+//   'works with a scalar in "by" and no other selection'
+//     — groupBy with no aggregation cannot be expressed in prisma-next's
+//       public API: groupBy().aggregate() requires at least one selector.
+//   'works with extended client'
+//     — `prisma.$extends({})` has no equivalent in prisma-next.
+
+const SEED = [
+  { teamName: 'Red', points: 5 },
+  { teamName: 'Blue', points: 7 },
+  { teamName: 'Red', points: 4 },
+  { teamName: 'Blue', points: 3 },
+];
+
+function withIssue20261(fn: Parameters<typeof withPostgresPort<Contract>>[1]) {
+  return withPostgresPort<Contract>({ contractJson }, async (ctx) => {
+    await ctx.db.public.Round.createAll(SEED);
+    await fn(ctx);
+  });
+}
+
+describe('ports/prisma/functional/issues-20261-group-by-shortcut', () => {
+  it(
+    'works with a scalar in "by"',
+    () =>
+      withIssue20261(async ({ db }) => {
+        const result = await db.public.Round.groupBy('teamName').aggregate((agg) => ({
+          _sum: agg.sum('points'),
+        }));
+
+        const sorted = [...result].sort((a, b) => a.teamName.localeCompare(b.teamName));
+
+        expect(sorted).toEqual([
+          { _sum: 10, teamName: 'Blue' },
+          { _sum: 9, teamName: 'Red' },
+        ]);
+
+        expectTypeOf(result).toMatchTypeOf<
+          Array<{
+            _sum: number | null;
+            teamName: string;
+          }>
+        >();
+      }),
+    timeouts.spinUpPpgDev,
+  );
+});

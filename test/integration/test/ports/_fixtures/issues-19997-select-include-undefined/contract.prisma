@@ -1,0 +1,21 @@
+// Faithful translation of prisma/prisma@a6d0155
+// packages/client/tests/functional/issues/19997-select-include-undefined (postgres matrix entry).
+//
+// Upstream schema:
+//   model User { id String @id; email String; profile Profile? }
+//   model Profile { id String @id; userId String @unique; user User @relation(fields: [userId], references: [id]) }
+//
+// idForProvider(postgresql) = String @id
+// foreignKeyForProvider(postgresql) = String
+
+model User {
+  id      String   @id @default(cuid(2))
+  email   String
+  profile Profile?
+}
+
+model Profile {
+  id     String @id @default(cuid(2))
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+}

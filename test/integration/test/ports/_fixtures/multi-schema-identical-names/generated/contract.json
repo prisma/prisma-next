@@ -1,0 +1,298 @@
+{
+  "schemaVersion": "1",
+  "targetFamily": "sql",
+  "target": "postgres",
+  "profileHash": "sha256:9c8aa3114e84ed3b7ea2bd57526d9c2e1bf7c5292be694e9d3801f566fda7ccb",
+  "roots": {
+    "base.some_table": {
+      "model": "User",
+      "namespace": "base"
+    },
+    "transactional.some_table": {
+      "model": "Post",
+      "namespace": "transactional"
+    }
+  },
+  "domain": {
+    "namespaces": {
+      "base": {
+        "models": {
+          "User": {
+            "fields": {
+              "email": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 24
+                  }
+                }
+              }
+            },
+            "relations": {
+              "posts": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "authorId"
+                  ]
+                },
+                "to": {
+                  "model": "Post",
+                  "namespace": "transactional"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "email": {
+                  "column": "email"
+                },
+                "id": {
+                  "column": "id"
+                }
+              },
+              "namespaceId": "base",
+              "table": "some_table"
+            }
+          }
+        }
+      },
+      "transactional": {
+        "models": {
+          "Post": {
+            "fields": {
+              "authorId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "sql/char@1",
+                  "kind": "scalar",
+                  "typeParams": {
+                    "length": 24
+                  }
+                }
+              },
+              "title": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "author": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "authorId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "base"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "authorId": {
+                  "column": "authorId"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "title": {
+                  "column": "title"
+                }
+              },
+              "namespaceId": "transactional",
+              "table": "some_table"
+            }
+          }
+        }
+      }
+    }
+  },
+  "storage": {
+    "namespaces": {
+      "base": {
+        "entries": {
+          "table": {
+            "some_table": {
+              "columns": {
+                "email": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 24
+                  }
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            }
+          }
+        },
+        "id": "base",
+        "kind": "postgres-schema"
+      },
+      "public": {
+        "entries": {
+          "table": {}
+        },
+        "id": "public",
+        "kind": "postgres-schema"
+      },
+      "transactional": {
+        "entries": {
+          "table": {
+            "some_table": {
+              "columns": {
+                "authorId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "sql/char@1",
+                  "nativeType": "character",
+                  "nullable": false,
+                  "typeParams": {
+                    "length": 24
+                  }
+                },
+                "title": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "source": {
+                    "columns": [
+                      "authorId"
+                    ],
+                    "namespaceId": "transactional",
+                    "tableName": "some_table"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "base",
+                    "tableName": "some_table"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "authorId"
+                  ],
+                  "name": "some_table_authorId_idx"
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            }
+          }
+        },
+        "id": "transactional",
+        "kind": "postgres-schema"
+      }
+    },
+    "storageHash": "sha256:b00ee871df781762a9f4a50b908cfe6d309ba66c5776a194782954eceb3e8b48"
+  },
+  "execution": {
+    "executionHash": "sha256:f70d6f83ae4711fab697f353e88ba78a3e431a57d22476ca399302dc7d6f574e",
+    "mutations": {
+      "defaults": [
+        {
+          "onCreate": {
+            "id": "cuid2",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "base",
+            "table": "some_table"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "cuid2",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "transactional",
+            "table": "some_table"
+          }
+        }
+      ]
+    }
+  },
+  "capabilities": {
+    "postgres": {
+      "distinctOn": true,
+      "jsonAgg": true,
+      "lateral": true,
+      "limit": true,
+      "orderBy": true,
+      "returning": true
+    },
+    "sql": {
+      "defaultInInsert": true,
+      "enums": true,
+      "lateral": true,
+      "returning": true,
+      "scalarList": true
+    }
+  },
+  "extensionPacks": {},
+  "meta": {},
+  "_generated": {
+    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+    "message": "This file is automatically generated by \"prisma-next contract emit\".",
+    "regenerate": "To regenerate, run: prisma-next contract emit"
+  }
+}

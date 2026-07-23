@@ -21,20 +21,20 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [x] `should create a single record with many nested create` — `create` with nested `posts.createMany` (4) creates user + all 4 posts found by title [providers: all] → ports/prisma/functional/methods-createMany.test.ts
 
 ### packages/client/tests/functional/methods/createManyAndReturn-supported/tests.ts
-- [ ] `should create one record` — `createManyAndReturn` with single object returns array of 1 matching email/id/name:null [providers: postgres,cockroach,sqlite]
-- [ ] `should create many records` — `createManyAndReturn` with 4 rows returns all 4 in order [providers: postgres,cockroach,sqlite]
-- [ ] `should accept select` — `createManyAndReturn({ select: { id: true } })` returns only id [providers: postgres,cockroach,sqlite]
-- [ ] `should accept include on the post side` — `post.createManyAndReturn({ include: { user: true } })` returns post with nested user [providers: postgres,cockroach,sqlite]
-- [ ] `should fail include on the user side` — `user.createManyAndReturn({ include: { posts: true } })` rejects (Unknown field posts for include on CreateManyUserAndReturnOutputType) [providers: postgres,cockroach,sqlite]
-- [ ] `take should fail` — `createManyAndReturn({ take: 1 })` rejects (Unknown argument take) [providers: postgres,cockroach,sqlite]
-- [ ] `orderBy should fail` — `createManyAndReturn({ orderBy })` rejects (Unknown argument orderBy) [providers: postgres,cockroach,sqlite]
-- [ ] `distinct should fail` — `createManyAndReturn({ distinct })` rejects (Unknown argument distinct) [providers: postgres,cockroach,sqlite]
-- [ ] `select _count should fail` — select `_count` rejects (Unknown field _count for select) [providers: postgres,cockroach,sqlite]
-- [ ] `include _count should fail` — include `_count` rejects (Unknown field _count for include) [providers: postgres,cockroach,sqlite]
+- [x] `should create one record` — `createManyAndReturn` with single object returns array of 1 matching email/id/name:null [providers: postgres,cockroach,sqlite] → passing: test/ports/prisma/functional/methods-createManyAndReturn.test.ts
+- [x] `should create many records` — `createManyAndReturn` with 4 rows returns all 4 in order [providers: postgres,cockroach,sqlite] → passing: test/ports/prisma/functional/methods-createManyAndReturn.test.ts
+- [x] `should accept select` — `createManyAndReturn({ select: { id: true } })` returns only id [providers: postgres,cockroach,sqlite] → passing: test/ports/prisma/functional/methods-createManyAndReturn.test.ts
+- [x] `should accept include on the post side` — `post.createManyAndReturn({ include: { user: true } })` returns post with nested user [providers: postgres,cockroach,sqlite] → passing: test/ports/prisma/functional/methods-createManyAndReturn.test.ts
+- [x] `should fail include on the user side` — `user.createManyAndReturn({ include: { posts: true } })` rejects (Unknown field posts for include on CreateManyUserAndReturnOutputType) [providers: postgres,cockroach,sqlite] → non-ported
+- [x] `take should fail` — `createManyAndReturn({ take: 1 })` rejects (Unknown argument take) [providers: postgres,cockroach,sqlite] → non-ported
+- [x] `orderBy should fail` — `createManyAndReturn({ orderBy })` rejects (Unknown argument orderBy) [providers: postgres,cockroach,sqlite] → non-ported
+- [x] `distinct should fail` — `createManyAndReturn({ distinct })` rejects (Unknown argument distinct) [providers: postgres,cockroach,sqlite] → non-ported
+- [x] `select _count should fail` — select `_count` rejects (Unknown field _count for select) [providers: postgres,cockroach,sqlite] → passing: test/ports/prisma/functional/methods-createManyAndReturn.test.ts
+- [x] `include _count should fail` — include `_count` rejects (Unknown field _count for include) [providers: postgres,cockroach,sqlite] → test.fails: test/ports/prisma/functional/methods-createManyAndReturn.test.ts
 
 ### packages/client/tests/functional/methods/createManyAndReturn-unsupported/tests.ts
-- [ ] `should work as createMany is supported` — `prisma.user` has `createMany` property (runs it, type-checks presence) [providers: sqlserver,mongodb,mysql]
-- [ ] `should fail as createManyAndReturn is not supported on tested providers` — `prisma.user` lacks `createManyAndReturn` (@ts-expect-error + expectTypeOf not.toHaveProperty) [providers: sqlserver,mongodb,mysql]
+- [x] `should work as createMany is supported` — `prisma.user` has `createMany` property (runs it, type-checks presence) [providers: sqlserver,mongodb,mysql] → non-ported
+- [x] `should fail as createManyAndReturn is not supported on tested providers` — `prisma.user` lacks `createManyAndReturn` (@ts-expect-error + expectTypeOf not.toHaveProperty) [providers: sqlserver,mongodb,mysql] → non-ported
 
 ### packages/client/tests/functional/methods/findFirstOrThrow/tests.ts
 - [x] `finds existing record` — `findFirstOrThrow` returns seeded user by email, type not nullable [providers: all] → ports/prisma/functional/methods-findFirstOrThrow.test.ts
@@ -51,20 +51,20 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [x] `reports correct method name in case of validation error` — invalid where field rejects with message containing `prisma.user.findUniqueOrThrow()` invocation [providers: all] → non-ported
 
 ### packages/client/tests/functional/methods/updateManyAndReturn-supported/tests.ts
-- [ ] `should update and return many records` — `updateManyAndReturn` with empty where updates name on all 4 and returns them [providers: postgres,cockroach,sqlite]
-- [ ] `should update and return one record` — updates email by where, returns the single updated record [providers: postgres,cockroach,sqlite]
-- [ ] `should update and return records satisfying the where clause` — where `email in [...]` returns only the 2 matched updated records [providers: postgres,cockroach,sqlite]
-- [ ] `should accept select` — `updateManyAndReturn({ select: { id: true } })` returns only id [providers: postgres,cockroach,sqlite]
-- [ ] `should accept include on the post side` — `post.updateManyAndReturn({ include: { user: true } })` returns post with nested user [providers: postgres,cockroach,sqlite]
-- [ ] `should fail include on the user side` — include `posts` rejects (Unknown field posts for include on UpdateManyUserAndReturnOutputType) [providers: postgres,cockroach,sqlite]
-- [ ] `take should fail` — `updateManyAndReturn({ take: 1 })` rejects (Unknown argument take) [providers: postgres,cockroach,sqlite]
-- [ ] `orderBy should fail` — `updateManyAndReturn({ orderBy })` rejects (Unknown argument orderBy) [providers: postgres,cockroach,sqlite]
-- [ ] `distinct should fail` — `updateManyAndReturn({ distinct })` rejects (Unknown argument distinct) [providers: postgres,cockroach,sqlite]
-- [ ] `select _count should fail` — select `_count` rejects (Unknown field _count for select) [providers: postgres,cockroach,sqlite]
-- [ ] `include _count should fail` — include `_count` rejects (Unknown field _count for include) [providers: postgres,cockroach,sqlite]
+- [x] `should update and return many records` — `updateManyAndReturn` with empty where updates name on all 4 and returns them [providers: postgres,cockroach,sqlite] → passing: test/ports/prisma/functional/methods-updateManyAndReturn.test.ts
+- [x] `should update and return one record` — updates email by where, returns the single updated record [providers: postgres,cockroach,sqlite] → passing: test/ports/prisma/functional/methods-updateManyAndReturn.test.ts
+- [x] `should update and return records satisfying the where clause` — where `email in [...]` returns only the 2 matched updated records [providers: postgres,cockroach,sqlite] → passing: test/ports/prisma/functional/methods-updateManyAndReturn.test.ts
+- [x] `should accept select` — `updateManyAndReturn({ select: { id: true } })` returns only id [providers: postgres,cockroach,sqlite] → passing: test/ports/prisma/functional/methods-updateManyAndReturn.test.ts
+- [x] `should accept include on the post side` — `post.updateManyAndReturn({ include: { user: true } })` returns post with nested user [providers: postgres,cockroach,sqlite] → passing: test/ports/prisma/functional/methods-updateManyAndReturn.test.ts
+- [x] `should fail include on the user side` — include `posts` rejects (Unknown field posts for include on UpdateManyUserAndReturnOutputType) [providers: postgres,cockroach,sqlite] → non-ported
+- [x] `take should fail` — `updateManyAndReturn({ take: 1 })` rejects (Unknown argument take) [providers: postgres,cockroach,sqlite] → non-ported
+- [x] `orderBy should fail` — `updateManyAndReturn({ orderBy })` rejects (Unknown argument orderBy) [providers: postgres,cockroach,sqlite] → non-ported
+- [x] `distinct should fail` — `updateManyAndReturn({ distinct })` rejects (Unknown argument distinct) [providers: postgres,cockroach,sqlite] → non-ported
+- [x] `select _count should fail` — select `_count` rejects (Unknown field _count for select) [providers: postgres,cockroach,sqlite] → passing: test/ports/prisma/functional/methods-updateManyAndReturn.test.ts
+- [x] `include _count should fail` — include `_count` rejects (Unknown field _count for include) [providers: postgres,cockroach,sqlite] → test.fails: test/ports/prisma/functional/methods-updateManyAndReturn.test.ts
 
 ### packages/client/tests/functional/methods/updateManyAndReturn-unsupported/tests.ts
-- [ ] `should fail as updateManyAndReturn is not supported on tested providers` — `prisma.user` lacks `updateManyAndReturn` (@ts-expect-error + expectTypeOf not.toHaveProperty) [providers: sqlserver,mongodb,mysql]
+- [x] `should fail as updateManyAndReturn is not supported on tested providers` — `prisma.user` lacks `updateManyAndReturn` (@ts-expect-error + expectTypeOf not.toHaveProperty) [providers: sqlserver,mongodb,mysql] → non-ported
 
 ### packages/client/tests/functional/methods/upsert/native-atomic/tests.ts
 - [x] `should only use ON CONFLICT when update arguments do not have any nested queries` — verifies upsert avoids ON CONFLICT for nested upsert/create/update/delete in update, but uses it with no nested mutation (via query-log checker) [providers: sqlite,postgres,cockroach] → non-ported
@@ -89,10 +89,10 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [x] `create with a string, date and uuid` — creates all permutations of [string, date, uuid] array, asserts each permutation round-trips unchanged [providers: postgres,cockroach,mongodb] → ports/prisma/functional/mixed-string-uuid-datetime-list-inputs.test.ts
 
 ### packages/client/tests/functional/multi-schema/tests.ts
-- [ ] `multischema > create` — creates a User with nested post, asserts result matches email + posts [providers: postgres,sqlserver] (mapTable axis: IDENTICAL_NAMES/DIFFERENT_NAMES/false)
-- [ ] `multischema > read` — findMany User by email and nested post title, asserts match [providers: postgres,sqlserver]
-- [ ] `multischema > update` — updateMany post and user, then findMany with new values asserts match [providers: postgres,sqlserver]
-- [ ] `multischema > delete` — deleteMany post and user, asserts both findMany return length 0 [providers: postgres,sqlserver]
+- [x] `multischema > create` — creates a User with nested post, asserts result matches email + posts [providers: postgres,sqlserver] (mapTable axis: IDENTICAL_NAMES/DIFFERENT_NAMES/false) → ported: test/ports/prisma/functional/multi-schema.test.ts (postgres passing; IDENTICAL_NAMES read/update are test.fails; sqlserver non-ported — see ledgers)
+- [x] `multischema > read` — findMany User by email and nested post title, asserts match [providers: postgres,sqlserver] → ported: test/ports/prisma/functional/multi-schema.test.ts (postgres passing; IDENTICAL_NAMES read/update are test.fails; sqlserver non-ported — see ledgers)
+- [x] `multischema > update` — updateMany post and user, then findMany with new values asserts match [providers: postgres,sqlserver] → ported: test/ports/prisma/functional/multi-schema.test.ts (postgres passing; IDENTICAL_NAMES read/update are test.fails; sqlserver non-ported — see ledgers)
+- [x] `multischema > delete` — deleteMany post and user, asserts both findMany return length 0 [providers: postgres,sqlserver] → ported: test/ports/prisma/functional/multi-schema.test.ts (postgres passing; IDENTICAL_NAMES read/update are test.fails; sqlserver non-ported — see ledgers)
 
 ### packages/client/tests/functional/multiple-types/tests.ts
 - [x] `Bool field: true or false should succeed` — creates bool true/false rows, asserts $queryRaw result equals findMany (all-null other fields); skipped on D1/MySQL [providers: exclude:mongodb (skipTestIf D1||mysql)] → ports/prisma/functional/multiple-types.test.ts
@@ -120,25 +120,25 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [x] `allows to use models of conflicting names` — creates model with nested `other`, findFirstOrThrow with include asserts other row {id,name} and non-any type [providers: all] (conflictingModel axis: ModelUpdate…ModelGroupBy) → non-ported (whole conflictingModel axis, 12 cases; per-case entries in non-ported.md)
 
 ### packages/client/tests/functional/omit/test.ts
-- [ ] `non-existing true field in omit throw validation error` — findFirstOrThrow with unknown omit field `true` rejects with inline-snapshot validation error [providers: all]
-- [ ] `non-existing false field in omit throw validation error` — findFirstOrThrow with unknown omit field `false` rejects with inline-snapshot validation error [providers: all]
-- [ ] `omit + select throws validation error` — findFirstOrThrow with both select and omit rejects "use omit or select, not both" [providers: all]
-- [ ] `deeply nested omit + select throws validation error` — nested posts select+omit rejects "use omit or select, not both" [providers: all]
-- [ ] `excluding all fields of a model throws validation error` — omit all scalar fields rejects "at least one field must be included" [providers: all]
-- [ ] `create` — create User with omit password, asserts no password property, type lacks password [providers: all]
-- [ ] `createManyAndReturn` — createManyAndReturn with omit password, asserts row has no password and type lacks it; skipped on sqlserver/mongodb/mysql [providers: sqlite,postgres,cockroach (skipTestIf sqlserver,mongodb,mysql)]
-- [ ] `findUnique` — findUnique with omit password, asserts no password [providers: all]
-- [ ] `findFirst` — findFirst with omit password, asserts no password [providers: all]
-- [ ] `findFirstOrThrow` — findFirstOrThrow with omit password, asserts no password [providers: all]
-- [ ] `findUniqueOrThrow` — findUniqueOrThrow with omit password, asserts no password [providers: all]
-- [ ] `update` — update email with omit password, asserts no password [providers: all]
-- [ ] `upsert` — upsert with omit password, asserts no password [providers: all]
-- [ ] `false value` — omit password:false returns password value ('cheese') [providers: all]
-- [ ] `omit combined with include` — findFirstOrThrow include posts + omit password, asserts posts present and no password [providers: all]
-- [ ] `omit nested in select` — select author with nested omit password, asserts author has no password [providers: all]
-- [ ] `omit nested in include` — include author with nested omit password, asserts author has no password [providers: all]
-- [ ] `excluding computed fields` — $extends result computed field, omit it, asserts absent while other fields present [providers: all]
-- [ ] `excluding dependency of a computed field` — omit password (a computed field's `needs` dependency), asserts password absent but computed sanitizedPassword still resolves [providers: all]
+- [x] `non-existing true field in omit throw validation error` — findFirstOrThrow with unknown omit field `true` rejects with inline-snapshot validation error [providers: all] → non-ported
+- [x] `non-existing false field in omit throw validation error` — findFirstOrThrow with unknown omit field `false` rejects with inline-snapshot validation error [providers: all] → non-ported
+- [x] `omit + select throws validation error` — findFirstOrThrow with both select and omit rejects "use omit or select, not both" [providers: all] → non-ported
+- [x] `deeply nested omit + select throws validation error` — nested posts select+omit rejects "use omit or select, not both" [providers: all] → non-ported
+- [x] `excluding all fields of a model throws validation error` — omit all scalar fields rejects "at least one field must be included" [providers: all] → non-ported
+- [x] `create` — create User with omit password, asserts no password property, type lacks password [providers: all] → non-ported
+- [x] `createManyAndReturn` — createManyAndReturn with omit password, asserts row has no password and type lacks it; skipped on sqlserver/mongodb/mysql [providers: sqlite,postgres,cockroach (skipTestIf sqlserver,mongodb,mysql)] → non-ported
+- [x] `findUnique` — findUnique with omit password, asserts no password [providers: all] → non-ported
+- [x] `findFirst` — findFirst with omit password, asserts no password [providers: all] → non-ported
+- [x] `findFirstOrThrow` — findFirstOrThrow with omit password, asserts no password [providers: all] → non-ported
+- [x] `findUniqueOrThrow` — findUniqueOrThrow with omit password, asserts no password [providers: all] → non-ported
+- [x] `update` — update email with omit password, asserts no password [providers: all] → non-ported
+- [x] `upsert` — upsert with omit password, asserts no password [providers: all] → non-ported
+- [x] `false value` — omit password:false returns password value ('cheese') [providers: all] → non-ported
+- [x] `omit combined with include` — findFirstOrThrow include posts + omit password, asserts posts present and no password [providers: all] → non-ported
+- [x] `omit nested in select` — select author with nested omit password, asserts author has no password [providers: all] → non-ported
+- [x] `omit nested in include` — include author with nested omit password, asserts author has no password [providers: all] → non-ported
+- [x] `excluding computed fields` — $extends result computed field, omit it, asserts absent while other fields present [providers: all] → non-ported
+- [x] `excluding dependency of a computed field` — omit password (a computed field's `needs` dependency), asserts password absent but computed sanitizedPassword still resolves [providers: all] → non-ported
 
 ### packages/client/tests/functional/optimistic-concurrency-control/tests.ts
 - [x] `updateMany` — 5 parallel OCC updateMany on occStamp, asserts final occStamp is 1 (documents non-atomic behavior); skipped on relationMode=prisma [providers: all (skipTestIf relationMode=prisma)] → non-ported
@@ -148,10 +148,10 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [x] `update with upsert relation` — 5 parallel update with nested child upsert, asserts occStamp 1 and child count 1 [providers: all] → non-ported
 
 ### packages/client/tests/functional/order-by-null/tests.ts
-- [ ] `should return records sorted by name asc and null first` — findMany orderBy name asc nulls first, asserts nulls precede 'a','b' [providers: exclude:mongodb]
-- [ ] `should return records sorted by name asc and null last` — findMany orderBy name asc nulls last, asserts 'a','b' precede nulls [providers: exclude:mongodb]
-- [ ] `should return records sorted by name desc and null first` — findMany orderBy name desc nulls first, asserts nulls precede 'b','a' [providers: exclude:mongodb]
-- [ ] `should return records sorted by name desc and null last` — findMany orderBy name desc nulls last, asserts 'b','a' precede nulls [providers: exclude:mongodb]
+- [x] `should return records sorted by name asc and null first` — findMany orderBy name asc nulls first, asserts nulls precede 'a','b' [providers: exclude:mongodb] → non-ported
+- [x] `should return records sorted by name asc and null last` — findMany orderBy name asc nulls last, asserts 'a','b' precede nulls [providers: exclude:mongodb] → non-ported
+- [x] `should return records sorted by name desc and null first` — findMany orderBy name desc nulls first, asserts nulls precede 'b','a' [providers: exclude:mongodb] → non-ported
+- [x] `should return records sorted by name desc and null last` — findMany orderBy name desc nulls last, asserts 'b','a' precede nulls [providers: exclude:mongodb] → non-ported
 
 ### packages/client/tests/functional/postgres_raw_query_parameter_types/test.ts
 - [ ] `$queryRaw works with different parameter types` — issues two identical-text $queryRaw with int vs decimal param, verifies prepared-statement cache respects param types (no type-mismatch error) [providers: postgres-only]
@@ -222,22 +222,22 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [ ] `can disconnect and reconnect` — findMany, `$disconnect()`, `$connect()`, findMany again all succeed (skipDriverAdapter js_pg_cockroachdb) [providers: all]
 
 ### packages/client/tests/functional/referentialActions-setDefault/tests_1-to-1.ts
-- [ ] `1:n mandatory (explicit) > [create] > [create] creating a table with SetDefault is accepted` — createTemplate (users 1 & default, profile userId=1); findMany include profile matches user1→profile, defaultUser→null [providers: postgres,cockroach,sqlserver,sqlite,mysql (optOut mongodb; skip js_planetscale)]
-- [ ] `1:n mandatory (explicit) > [update] > with mysql > [update] changing existing user id to a new one triggers NoAction under the hood` — [describeIf mysql] user.update id 1→2 rejects FK constraint on (userId) [providers: mysql-only]
-- [ ] `1:n mandatory (explicit) > [update] > without mysql > [update] changing existing user id to a new one triggers SetDefault` — [describeIf !mysql] user.update id 1→2 succeeds; profile.userId set to defaultUserId [providers: postgres,cockroach,sqlserver,sqlite]
-- [ ] `1:n mandatory (explicit) > [update] > [update] removing user with default id and changing existing user id to a new one triggers SetDefault in profile, which throws` — delete defaultUser then update id 1→2 rejects with provider/adapter-specific FK constraint error [providers: postgres,cockroach,sqlserver,sqlite,mysql]
-- [ ] `1:n mandatory (explicit) > [delete] > with mysql > [delete] changing existing user id to a new one triggers NoAction under the hood` — [describeIf mysql] user.delete id 1 rejects FK constraint on (userId) [providers: mysql-only]
-- [ ] `1:n mandatory (explicit) > [delete] > without mysql > [delete] deleting existing user one triggers SetDefault` — [describeIf !mysql] delete user 1 succeeds; profile.userId set to defaultUserId [providers: postgres,cockroach,sqlserver,sqlite]
-- [ ] `1:n mandatory (explicit) > [delete] > [delete] removing user with default id and changing existing user id to a new one triggers SetDefault in profile, which throws` — delete defaultUser then delete user 1 rejects with provider/adapter-specific FK constraint error [providers: postgres,cockroach,sqlserver,sqlite,mysql]
+- [x] `1:n mandatory (explicit) > [create] > [create] creating a table with SetDefault is accepted` — createTemplate (users 1 & default, profile userId=1); findMany include profile matches user1→profile, defaultUser→null [providers: postgres,cockroach,sqlserver,sqlite,mysql (optOut mongodb; skip js_planetscale)] → passing: test/ports/prisma/functional/referential-actions-set-default-1to1.test.ts
+- [x] `1:n mandatory (explicit) > [update] > with mysql > [update] changing existing user id to a new one triggers NoAction under the hood` — [describeIf mysql] user.update id 1→2 rejects FK constraint on (userId) [providers: mysql-only] → non-ported (mysql-only)
+- [x] `1:n mandatory (explicit) > [update] > without mysql > [update] changing existing user id to a new one triggers SetDefault` — [describeIf !mysql] user.update id 1→2 succeeds; profile.userId set to defaultUserId [providers: postgres,cockroach,sqlserver,sqlite] → passing: test/ports/prisma/functional/referential-actions-set-default-1to1.test.ts
+- [x] `1:n mandatory (explicit) > [update] > [update] removing user with default id and changing existing user id to a new one triggers SetDefault in profile, which throws` — delete defaultUser then update id 1→2 rejects with provider/adapter-specific FK constraint error [providers: postgres,cockroach,sqlserver,sqlite,mysql] → passing: test/ports/prisma/functional/referential-actions-set-default-1to1.test.ts
+- [x] `1:n mandatory (explicit) > [delete] > with mysql > [delete] changing existing user id to a new one triggers NoAction under the hood` — [describeIf mysql] user.delete id 1 rejects FK constraint on (userId) [providers: mysql-only] → non-ported (mysql-only)
+- [x] `1:n mandatory (explicit) > [delete] > without mysql > [delete] deleting existing user one triggers SetDefault` — [describeIf !mysql] delete user 1 succeeds; profile.userId set to defaultUserId [providers: postgres,cockroach,sqlserver,sqlite] → passing: test/ports/prisma/functional/referential-actions-set-default-1to1.test.ts
+- [x] `1:n mandatory (explicit) > [delete] > [delete] removing user with default id and changing existing user id to a new one triggers SetDefault in profile, which throws` — delete defaultUser then delete user 1 rejects with provider/adapter-specific FK constraint error [providers: postgres,cockroach,sqlserver,sqlite,mysql] → passing: test/ports/prisma/functional/referential-actions-set-default-1to1.test.ts
 
 ### packages/client/tests/functional/referentialActions-setDefault/tests_1-to-n.ts
-- [ ] `1:n mandatory (explicit) > [create] > [create] creating a table with SetDefault is accepted` — createTemplate (users 1 & default, post userId=1); findMany include posts matches user1→[post], defaultUser→[] [providers: postgres,cockroach,sqlserver,sqlite,mysql (optOut mongodb; skip js_planetscale)]
-- [ ] `1:n mandatory (explicit) > [update] > with mysql > [update] changing existing user id to a new one triggers NoAction under the hood` — [describeIf mysql] user.update id 1→2 rejects FK constraint on (userId) [providers: mysql-only]
-- [ ] `1:n mandatory (explicit) > [update] > without mysql > [update] changing existing user id to a new one triggers SetDefault` — [describeIf !mysql] user.update id 1→2 succeeds; post.userId set to defaultUserId [providers: postgres,cockroach,sqlserver,sqlite]
-- [ ] `1:n mandatory (explicit) > [update] > [update] removing user with default id and changing existing user id to a new one triggers SetDefault in post, which throws` — delete defaultUser then update id 1→2 rejects with provider/adapter-specific FK constraint error [providers: postgres,cockroach,sqlserver,sqlite,mysql]
-- [ ] `1:n mandatory (explicit) > [delete] > with mysql > [delete] changing existing user id to a new one triggers NoAction under the hood` — [describeIf mysql] user.delete id 1 rejects FK constraint on (userId) [providers: mysql-only]
-- [ ] `1:n mandatory (explicit) > [delete] > without mysql > [delete] deleting existing user one triggers SetDefault` — [describeIf !mysql] delete user 1 succeeds; post.userId set to defaultUserId [providers: postgres,cockroach,sqlserver,sqlite]
-- [ ] `1:n mandatory (explicit) > [delete] > [delete] removing user with default id and changing existing user id to a new one triggers SetDefault in post, which throws` — delete defaultUser then delete user 1 rejects with provider/adapter-specific FK constraint error [providers: postgres,cockroach,sqlserver,sqlite,mysql]
+- [x] `1:n mandatory (explicit) > [create] > [create] creating a table with SetDefault is accepted` — createTemplate (users 1 & default, post userId=1); findMany include posts matches user1→[post], defaultUser→[] [providers: postgres,cockroach,sqlserver,sqlite,mysql (optOut mongodb; skip js_planetscale)] → passing: test/ports/prisma/functional/referential-actions-set-default-1ton.test.ts
+- [x] `1:n mandatory (explicit) > [update] > with mysql > [update] changing existing user id to a new one triggers NoAction under the hood` — [describeIf mysql] user.update id 1→2 rejects FK constraint on (userId) [providers: mysql-only] → non-ported (mysql-only)
+- [x] `1:n mandatory (explicit) > [update] > without mysql > [update] changing existing user id to a new one triggers SetDefault` — [describeIf !mysql] user.update id 1→2 succeeds; post.userId set to defaultUserId [providers: postgres,cockroach,sqlserver,sqlite] → passing: test/ports/prisma/functional/referential-actions-set-default-1ton.test.ts
+- [x] `1:n mandatory (explicit) > [update] > [update] removing user with default id and changing existing user id to a new one triggers SetDefault in post, which throws` — delete defaultUser then update id 1→2 rejects with provider/adapter-specific FK constraint error [providers: postgres,cockroach,sqlserver,sqlite,mysql] → passing: test/ports/prisma/functional/referential-actions-set-default-1ton.test.ts
+- [x] `1:n mandatory (explicit) > [delete] > with mysql > [delete] changing existing user id to a new one triggers NoAction under the hood` — [describeIf mysql] user.delete id 1 rejects FK constraint on (userId) [providers: mysql-only] → non-ported (mysql-only)
+- [x] `1:n mandatory (explicit) > [delete] > without mysql > [delete] deleting existing user one triggers SetDefault` — [describeIf !mysql] delete user 1 succeeds; post.userId set to defaultUserId [providers: postgres,cockroach,sqlserver,sqlite] → passing: test/ports/prisma/functional/referential-actions-set-default-1ton.test.ts
+- [x] `1:n mandatory (explicit) > [delete] > [delete] removing user with default id and changing existing user id to a new one triggers SetDefault in post, which throws` — delete defaultUser then delete user 1 rejects with provider/adapter-specific FK constraint error [providers: postgres,cockroach,sqlserver,sqlite,mysql] → passing: test/ports/prisma/functional/referential-actions-set-default-1ton.test.ts
 
 ### packages/client/tests/functional/referentialIntegrity-property-deprecated/tests.ts
 - [ ] `relationMode with deprecated referentialIntegrity datasource property > [create] and [delete] should succeed` — create user with nested profile; findMany returns user {id:'1',enabled:null} and profile {id:'1',userId:'1',enabled:null}; deleteMany users cascades to delete profiles (both empty) [providers: sqlite-only (skip js_libsql)]
@@ -398,32 +398,32 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [ ] `runtime bundles in JS client > imported files have the expected annotations` — asserts generated client contains the Prisma "Do not edit" banner, `/* eslint-disable */`, and `// biome-ignore-all lint: generated file` [providers: all; describeIf generatorType==='prisma-client-js']
 
 ### packages/client/tests/functional/skip/test.ts
-- [ ] `skips arguments` — findMany with `where: Prisma.skip` returns all users (matches inline snapshot of both seeded users) [providers: all]
-- [ ] `skips input fields` — findMany with `where: { name: Prisma.skip }` returns all users [providers: all]
-- [ ] `skips relations in include` — findFirstOrThrow with `include: { posts: Prisma.skip }` returns result without `posts` property (runtime + type) [providers: all]
-- [ ] `skips relations in select` — findFirstOrThrow with `select: { id, posts: Prisma.skip }` returns result without `posts` (runtime + type) [providers: all]
-- [ ] `skips fields in omit` — findFirstOrThrow with `omit: { email: Prisma.skip }` keeps `email` on result (runtime + type) [providers: all]
-- [ ] `skips fields in create` — post.create with `content: Prisma.skip` yields `content === null` [providers: all]
-- [ ] `skips fields in nested create` — user.update with nested post create using `content: Prisma.skip` yields created post with `content === null` [providers: all]
-- [ ] `skips fields in create with non-nullable field with default` — user.create with `name: Prisma.skip` falls back to default `'Test User'` [providers: all]
-- [ ] `after extension > skips relations in include` — same as include skip but through `$extends({})` client [providers: all]
-- [ ] `after extension > skips relations in select` — same as select skip but through `$extends({})` client [providers: all]
-- [ ] `after extension > skips fields in omit` — omit skip keeps `email` through `$extends({})` client (runtime + type) [providers: all]
-- [ ] `after query extension > skips fields in create with query extension` — create with `name: Prisma.skip` through `$allOperations` query extension falls back to default `'Test User'` [providers: all]
-- [ ] `after query extension > skips input fields in findMany with query extension` — findMany with `where: { name: Prisma.skip }` through query extension returns >=2 users [providers: all]
-- [ ] `after query extension > skips arguments in findMany with query extension` — findMany with `where: Prisma.skip` through query extension returns >=2 users [providers: all]
-- [ ] `after query extension > skips relations in include with query extension` — findFirstOrThrow with `include: { posts: Prisma.skip }` through query extension has no `posts` property (runtime only) [providers: all]
-- [ ] `after query extension > skips relations in select with query extension` — findFirstOrThrow with `select: { id, posts: Prisma.skip }` through query extension has no `posts` property (runtime only) [providers: all]
+- [x] `skips arguments` — findMany with `where: Prisma.skip` returns all users (matches inline snapshot of both seeded users) [providers: all] → non-ported
+- [x] `skips input fields` — findMany with `where: { name: Prisma.skip }` returns all users [providers: all] → non-ported
+- [x] `skips relations in include` — findFirstOrThrow with `include: { posts: Prisma.skip }` returns result without `posts` property (runtime + type) [providers: all] → non-ported
+- [x] `skips relations in select` — findFirstOrThrow with `select: { id, posts: Prisma.skip }` returns result without `posts` (runtime + type) [providers: all] → non-ported
+- [x] `skips fields in omit` — findFirstOrThrow with `omit: { email: Prisma.skip }` keeps `email` on result (runtime + type) [providers: all] → non-ported
+- [x] `skips fields in create` — post.create with `content: Prisma.skip` yields `content === null` [providers: all] → non-ported
+- [x] `skips fields in nested create` — user.update with nested post create using `content: Prisma.skip` yields created post with `content === null` [providers: all] → non-ported
+- [x] `skips fields in create with non-nullable field with default` — user.create with `name: Prisma.skip` falls back to default `'Test User'` [providers: all] → non-ported
+- [x] `after extension > skips relations in include` — same as include skip but through `$extends({})` client [providers: all] → non-ported
+- [x] `after extension > skips relations in select` — same as select skip but through `$extends({})` client [providers: all] → non-ported
+- [x] `after extension > skips fields in omit` — omit skip keeps `email` through `$extends({})` client (runtime + type) [providers: all] → non-ported
+- [x] `after query extension > skips fields in create with query extension` — create with `name: Prisma.skip` through `$allOperations` query extension falls back to default `'Test User'` [providers: all] → non-ported
+- [x] `after query extension > skips input fields in findMany with query extension` — findMany with `where: { name: Prisma.skip }` through query extension returns >=2 users [providers: all] → non-ported
+- [x] `after query extension > skips arguments in findMany with query extension` — findMany with `where: Prisma.skip` through query extension returns >=2 users [providers: all] → non-ported
+- [x] `after query extension > skips relations in include with query extension` — findFirstOrThrow with `include: { posts: Prisma.skip }` through query extension has no `posts` property (runtime only) [providers: all] → non-ported
+- [x] `after query extension > skips relations in select with query extension` — findFirstOrThrow with `select: { id, posts: Prisma.skip }` through query extension has no `posts` property (runtime only) [providers: all] → non-ported
 
 ### packages/client/tests/functional/strictUndefinedChecks/test.ts
-- [ ] `throws on undefined argument` — findMany with `where: undefined` rejects with "explicitly `undefined` values are not allowed" error (inline snapshot) [providers: all]
-- [ ] `throws on undefined input field` — findMany with `where: { email: undefined }` rejects with undefined-not-allowed error for `where` [providers: all]
-- [ ] `throws on undefined select field` — findFirst with `select: { id: true, posts: undefined }` rejects with undefined-not-allowed error for selection field `posts` [providers: all]
-- [ ] `throws on undefined include field` — findFirst with `include: { posts: undefined }` rejects with undefined-not-allowed error for `posts` [providers: all]
-- [ ] `throws on undefined omit field` — findFirst with `omit: { id: undefined }` rejects with undefined-not-allowed error for `id` [providers: all]
-- [ ] `throws on nested include` — findFirst with nested `include.posts.include.author: undefined` rejects with undefined-not-allowed error for `author` [providers: all]
-- [ ] `throws on nested select` — findFirst with nested `select.posts.select.author: undefined` rejects with undefined-not-allowed error for `author` [providers: all]
-- [ ] `throws on nested omit` — findFirst with nested `select.posts.omit.id: undefined` rejects with undefined-not-allowed error for `id` [providers: all]
+- [x] `throws on undefined argument` — findMany with `where: undefined` rejects with "explicitly `undefined` values are not allowed" error (inline snapshot) [providers: all] → non-ported
+- [x] `throws on undefined input field` — findMany with `where: { email: undefined }` rejects with undefined-not-allowed error for `where` [providers: all] → non-ported
+- [x] `throws on undefined select field` — findFirst with `select: { id: true, posts: undefined }` rejects with undefined-not-allowed error for selection field `posts` [providers: all] → non-ported
+- [x] `throws on undefined include field` — findFirst with `include: { posts: undefined }` rejects with undefined-not-allowed error for `posts` [providers: all] → non-ported
+- [x] `throws on undefined omit field` — findFirst with `omit: { id: undefined }` rejects with undefined-not-allowed error for `id` [providers: all] → non-ported
+- [x] `throws on nested include` — findFirst with nested `include.posts.include.author: undefined` rejects with undefined-not-allowed error for `author` [providers: all] → non-ported
+- [x] `throws on nested select` — findFirst with nested `select.posts.select.author: undefined` rejects with undefined-not-allowed error for `author` [providers: all] → non-ported
+- [x] `throws on nested omit` — findFirst with nested `select.posts.omit.id: undefined` rejects with undefined-not-allowed error for `id` [providers: all] → non-ported
 
 ### packages/client/tests/functional/string-filters/tests.ts
 - [x] `startsWith matches prefix` — `value: { startsWith: 'foo' }` returns `['foo','foo bar baz']` [providers: all] → ports/prisma/functional/string-filters.test.ts
@@ -653,15 +653,15 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [ ] `typescript > %s` `[each]` — for each generated `.generated/**/*.ts` suite file, runs the TS compiler semantic diagnostics and `assert.fail`s if any type error's path falls within that suite's directory [providers: n/a]
 
 ### packages/client/tests/functional/unixepoch-ms-datetime/tests.ts
-- [ ] `can retrieve a unixepoch-ms date time with a find unique query` — creates an event, then findUnique by compound uuid_createdAt; found matches created (createdAt is a Date) [providers: sqlite-only]
-- [ ] `can retrieve a unixepoch-ms date time with a find unique query when it was stored directly as a millis number` — inserts a raw row with createdAt as millis number, findUnique by uuid+Date returns that createdAt [providers: sqlite-only]
-- [ ] `can retrieve a unixepoch-ms date time with a raw query` — creates an event, then `$queryRaw` selecting by createdAt Date returns the created row [providers: sqlite-only]
-- [ ] `can retrieve a unixepoch-ms date time with a raw query by a millis number` — creates an event, then `$queryRaw` selecting by createdAt.getTime() millis returns the created row [providers: sqlite-only]
-- [ ] `can retrieve a unixepoch-ms date time with a find many query` — creates an event, findMany by uuid+createdAt returns exactly `[created]` [providers: sqlite-only]
-- [ ] `can retrieve a unixepoch-ms date time with compactable find unique queries` — two identical findUnique calls run concurrently (compacted into one) both resolve to created [providers: sqlite-only]
-- [ ] `findUnique() returns valid Date when createdAt is stored as unix millis directly` — raw-inserts millis, findFirst returns createdAt that is a Date instance and not NaN [providers: sqlite-only]
-- [ ] `aggregate() returns valid Date when unix millis are stored directly` — raw-inserts millis, aggregate _min/_max createdAt are valid non-NaN Date instances [providers: sqlite-only]
-- [ ] `manually created INTEGER DateTime column returns valid Date values` — drops/recreates Event with INTEGER createdAt default `unixepoch('now')*1000`, then create/findUnique/aggregate all return valid non-NaN Date values [providers: sqlite-only]
+- [x] `can retrieve a unixepoch-ms date time with a find unique query` — creates an event, then findUnique by compound uuid_createdAt; found matches created (createdAt is a Date) [providers: sqlite-only] → non-ported
+- [x] `can retrieve a unixepoch-ms date time with a find unique query when it was stored directly as a millis number` — inserts a raw row with createdAt as millis number, findUnique by uuid+Date returns that createdAt [providers: sqlite-only] → non-ported
+- [x] `can retrieve a unixepoch-ms date time with a raw query` — creates an event, then `$queryRaw` selecting by createdAt Date returns the created row [providers: sqlite-only] → non-ported
+- [x] `can retrieve a unixepoch-ms date time with a raw query by a millis number` — creates an event, then `$queryRaw` selecting by createdAt.getTime() millis returns the created row [providers: sqlite-only] → non-ported
+- [x] `can retrieve a unixepoch-ms date time with a find many query` — creates an event, findMany by uuid+createdAt returns exactly `[created]` [providers: sqlite-only] → non-ported
+- [x] `can retrieve a unixepoch-ms date time with compactable find unique queries` — two identical findUnique calls run concurrently (compacted into one) both resolve to created [providers: sqlite-only] → non-ported
+- [x] `findUnique() returns valid Date when createdAt is stored as unix millis directly` — raw-inserts millis, findFirst returns createdAt that is a Date instance and not NaN [providers: sqlite-only] → non-ported
+- [x] `aggregate() returns valid Date when unix millis are stored directly` — raw-inserts millis, aggregate _min/_max createdAt are valid non-NaN Date instances [providers: sqlite-only] → non-ported
+- [x] `manually created INTEGER DateTime column returns valid Date values` — drops/recreates Event with INTEGER createdAt default `unixepoch('now')*1000`, then create/findUnique/aggregate all return valid non-NaN Date values [providers: sqlite-only] → non-ported
 
 ### packages/client/tests/functional/unsupported-action/tests.ts
 - [ ] `unsupported method` — calling `prisma.user.aggregateRaw()` on a SQL provider rejects with an inline-snapshotted "does not match any query" Prisma error [providers: exclude:mongodb]
@@ -670,16 +670,16 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 - [ ] `calling upsert two times in a row does nothing` — runs upsert twice with same where/create/update; both times returns node with identifier 1 and value 5 (idempotent under relationMode=prisma) [providers: all]
 
 ### packages/client/tests/functional/validator/tests.ts
-- [ ] `validation via non-extended client` — `testIf(generatorType==='prisma-client-js')`; asserts `Prisma.validator` (with type param and with client/model/action/field forms) returns correctly-typed passthrough objects and rejects wrong keys via `@ts-expect-error`; runtime `expect(...).toEqual` on returned values [providers: postgres-only]
-- [ ] `validation via extended client` — `testIf(generatorType==='prisma-client-js')`; same validator assertions against a `$extends` result-extended client (computed `prop`), verifying select/data/create forms and type/runtime equality [providers: postgres-only]
+- [x] `validation via non-extended client` — `testIf(generatorType==='prisma-client-js')`; asserts `Prisma.validator` (with type param and with client/model/action/field forms) returns correctly-typed passthrough objects and rejects wrong keys via `@ts-expect-error`; runtime `expect(...).toEqual` on returned values [providers: postgres-only] → non-ported
+- [x] `validation via extended client` — `testIf(generatorType==='prisma-client-js')`; same validator assertions against a `$extends` result-extended client (computed `prop`), verifying select/data/create forms and type/runtime equality [providers: postgres-only] → non-ported
 
 ### packages/client/tests/functional/views/tests.ts
-- [ ] `should simple query a view` — findFirst on the UserInfo view returns a row whose id equals the seeded user id [providers: all]
-- [ ] `should query a view with where` — findMany on view filtered by email returns the seeded user [providers: all]
-- [ ] `should query views with a related column` — findFirst selecting the related `bio` column returns the seeded profile bio [providers: all]
-- [ ] `should require orderBy when take is provided in non-aggregation method` — findMany with `take:1` but no orderBy rejects with inline-snapshotted "orderBy is required because take was provided" error [providers: all]
-- [ ] `should require orderBy when skip is provided in non-aggregation method` — findMany with `skip:1` but no orderBy rejects with inline-snapshotted "orderBy required because skip" error [providers: all]
-- [ ] `should require orderBy when take is provided in groupBy` — groupBy with `take:1` no orderBy rejects with inline-snapshotted orderBy-required error [providers: all]
-- [ ] `should require orderBy when skip is provided in groupBy` — groupBy with `skip:1` no orderBy rejects with inline-snapshotted orderBy-required error [providers: all]
+- [x] `should simple query a view` — findFirst on the UserInfo view returns a row whose id equals the seeded user id [providers: all] → non-ported
+- [x] `should query a view with where` — findMany on view filtered by email returns the seeded user [providers: all] → non-ported
+- [x] `should query views with a related column` — findFirst selecting the related `bio` column returns the seeded profile bio [providers: all] → non-ported
+- [x] `should require orderBy when take is provided in non-aggregation method` — findMany with `take:1` but no orderBy rejects with inline-snapshotted "orderBy is required because take was provided" error [providers: all] → non-ported
+- [x] `should require orderBy when skip is provided in non-aggregation method` — findMany with `skip:1` but no orderBy rejects with inline-snapshotted "orderBy required because skip" error [providers: all] → non-ported
+- [x] `should require orderBy when take is provided in groupBy` — groupBy with `take:1` no orderBy rejects with inline-snapshotted orderBy-required error [providers: all] → non-ported
+- [x] `should require orderBy when skip is provided in groupBy` — groupBy with `skip:1` no orderBy rejects with inline-snapshotted orderBy-required error [providers: all] → non-ported
 
 **Total: 540 tests**

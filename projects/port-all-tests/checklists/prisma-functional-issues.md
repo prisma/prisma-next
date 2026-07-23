@@ -106,8 +106,8 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/issues/13097-group-by-enum/tests.ts
 
-- [ ] `groupBy on enumValue field` — groupBy on an enum-scalar field works [providers: postgres, mysql, cockroachdb, mongodb]
-- [ ] `groupBy on enumArray field` — groupBy on an enum-array field works (excludes mysql) [providers: postgres, cockroachdb, mongodb]
+- [x] `groupBy on enumValue field` — groupBy on an enum-scalar field works [providers: postgres, mysql, cockroachdb, mongodb] → non-ported
+- [x] `groupBy on enumArray field` — groupBy on an enum-array field works (excludes mysql) [providers: postgres, cockroachdb, mongodb] → non-ported
 
 ### packages/client/tests/functional/issues/13405-mongo-raw-itx/tests.ts
 
@@ -129,7 +129,7 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/issues/13913-integer-overflow/tests.ts
 
-- [ ] `int overflow` — integer overflow handling (test.skip, pending fix decision) [providers: all] [skip]
+- [x] `int overflow` — integer overflow handling (test.skip, pending fix decision) [providers: all] [skip] → non-ported
 
 ### packages/client/tests/functional/issues/14001-mongo-order-by-conflict/tests.ts
 
@@ -223,11 +223,11 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/issues/18598-select-count-true/tests.ts
 
-- [ ] `works with _count shorthand` — `select: { _count: true }` shorthand works [providers: all]
+- [x] `works with _count shorthand` — `select: { _count: true }` shorthand works [providers: all] → passing: test/ports/prisma/functional/issues-18598-select-count-true.test.ts
 
 ### packages/client/tests/functional/issues/18846-empty-array/tests.ts
 
-- [ ] `correctly rejects empty arrays in places where empty objects are allowed` — empty arrays are rejected where empty objects are valid inputs [providers: all]
+- [x] `correctly rejects empty arrays in places where empty objects are allowed` — empty arrays are rejected where empty objects are valid inputs [providers: all] → non-ported
 
 ### packages/client/tests/functional/issues/18854-extensions-db-null/tests.ts
 
@@ -235,18 +235,18 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/issues/18970-invalid-date/tests.ts
 
-- [ ] `throws on invalid date (json)` — an invalid Date passed into a JSON field throws [providers: all]
+- [x] `throws on invalid date (json)` — an invalid Date passed into a JSON field throws [providers: all] → passing: test/ports/prisma/functional/issues-18970-invalid-date.test.ts
 
 ### packages/client/tests/functional/issues/19997-select-include-undefined/tests.ts
 
-- [ ] `correctly infers selection when passing select: undefined` — `select: undefined` yields the default selection [providers: all]
-- [ ] `correctly infers selection when passing include: undefined` — `include: undefined` yields the default selection [providers: all]
+- [x] `correctly infers selection when passing select: undefined` — `select: undefined` yields the default selection [providers: all] → passing: test/ports/prisma/functional/issues-19997-select-include-undefined.test.ts
+- [x] `correctly infers selection when passing include: undefined` — `include: undefined` yields the default selection [providers: all] → passing: test/ports/prisma/functional/issues-19997-select-include-undefined.test.ts
 
 ### packages/client/tests/functional/issues/20261-group-by-shortcut/tests.ts
 
-- [ ] `works with a scalar in "by"` — groupBy accepts a scalar (string) shorthand for `by` [providers: all]
-- [ ] `works with a scalar in "by" and no other selection` — groupBy with only a scalar `by` and no extra selection [providers: all]
-- [ ] `works with extended client` — groupBy scalar `by` shorthand works on an extended client [providers: all]
+- [x] `works with a scalar in "by"` — groupBy accepts a scalar (string) shorthand for `by` [providers: all] → passing: test/ports/prisma/functional/issues-20261-group-by-shortcut.test.ts
+- [x] `works with a scalar in "by" and no other selection` — groupBy with only a scalar `by` and no extra selection [providers: all] → non-ported
+- [x] `works with extended client` — groupBy scalar `by` shorthand works on an extended client [providers: all] → non-ported
 
 ### packages/client/tests/functional/issues/20422-cannot-assign-type-to-itself/tests.ts
 
@@ -280,7 +280,7 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/issues/21369-select-null/tests.ts
 
-- [ ] `SELECT NULL works` — a raw `SELECT NULL` returns null correctly [providers: sql]
+- [x] `SELECT NULL works` — a raw `SELECT NULL` returns null correctly [providers: sql] → non-ported
 
 ### packages/client/tests/functional/issues/21454-$type-in-json/tests.ts
 
@@ -289,8 +289,8 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/issues/21592-char-truncation/tests.ts
 
-- [ ] `does not truncate the input` — char/varchar input is not silently truncated [providers: postgres, mysql, cockroachdb, sqlserver]
-- [ ] `upsert` — upsert does not truncate char input [providers: postgres, mysql, cockroachdb, sqlserver]
+- [x] `does not truncate the input` — char/varchar input is not silently truncated [providers: postgres, mysql, cockroachdb, sqlserver] → non-ported
+- [x] `upsert` — upsert does not truncate char input [providers: postgres, mysql, cockroachdb, sqlserver] → non-ported
 
 ### packages/client/tests/functional/issues/21631-batching-in-transaction/tests.ts
 
@@ -399,8 +399,8 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/issues/29215-case-insensitive-in/tests.ts
 
-- [ ] `correctly handles a case insensitive IN filter` — `in` filter with `mode: insensitive` matches case-insensitively [providers: postgres, cockroachdb, mongodb]
-- [ ] `correctly handles a case insensitive NOT IN filter` — `notIn` filter with `mode: insensitive` matches case-insensitively [providers: postgres, cockroachdb, mongodb]
+- [x] `correctly handles a case insensitive IN filter` — `in` filter with `mode: insensitive` matches case-insensitively [providers: postgres, cockroachdb, mongodb] → non-ported
+- [x] `correctly handles a case insensitive NOT IN filter` — `notIn` filter with `mode: insensitive` matches case-insensitively [providers: postgres, cockroachdb, mongodb] → non-ported
 
 ### packages/client/tests/functional/issues/29254-query-plan-cache-mutation/tests.ts
 

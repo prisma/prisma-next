@@ -727,12 +727,12 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/field-reference/json/tests.ts
 
-- [ ] `simple equality` — findMany where JSON properties1 equals field reference to properties2 [providers: postgres,sqlite,mysql,mongodb,cockroachdb]
-- [ ] `does not conflict with {_ref: "something"} json value` — literal {_ref} JSON value is not treated as a field reference [providers: postgres,sqlite,mysql,mongodb,cockroachdb]
-- [ ] `string filter` — testIf(postgres||cockroach): JSON path string_ends_with against a field reference [providers: postgres,sqlite,mysql,mongodb,cockroachdb]
-- [ ] `array filter` — testIf(postgres||cockroach): JSON path array_contains against a field reference [providers: postgres,sqlite,mysql,mongodb,cockroachdb]
-- [ ] `wrong field type` — referencing a String field for a JSON filter rejects with error snapshot [providers: postgres,sqlite,mysql,mongodb,cockroachdb]
-- [ ] `via extended client` — JSON field-reference equality through $extends client [providers: postgres,sqlite,mysql,mongodb,cockroachdb]
+- [x] `simple equality` — findMany where JSON properties1 equals field reference to properties2 [providers: postgres,sqlite,mysql,mongodb,cockroachdb] → non-ported
+- [x] `does not conflict with {_ref: "something"} json value` — literal {_ref} JSON value is not treated as a field reference [providers: postgres,sqlite,mysql,mongodb,cockroachdb] → non-ported
+- [x] `string filter` — testIf(postgres||cockroach): JSON path string_ends_with against a field reference [providers: postgres,sqlite,mysql,mongodb,cockroachdb] → non-ported
+- [x] `array filter` — testIf(postgres||cockroach): JSON path array_contains against a field reference [providers: postgres,sqlite,mysql,mongodb,cockroachdb] → non-ported
+- [x] `wrong field type` — referencing a String field for a JSON filter rejects with error snapshot [providers: postgres,sqlite,mysql,mongodb,cockroachdb] → non-ported
+- [x] `via extended client` — JSON field-reference equality through $extends client [providers: postgres,sqlite,mysql,mongodb,cockroachdb] → non-ported
 
 ### packages/client/tests/functional/field-reference/list/tests.ts
 
@@ -759,14 +759,14 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/filter-count-relations/tests.ts
 
-- [ ] `without condition` — _count select of posts relation with no filter [providers: all]
-- [ ] `one-to-many > with simple equality condition` — _count posts filtered by published true [providers: all]
-- [ ] `one-to-many > with > condition` — _count posts filtered by upvotes gt 100 [providers: all]
-- [ ] `one-to-many > with multiple conditions` — _count posts filtered by published and upvotes gt [providers: all]
-- [ ] `many-to-many > with simple equality condition` — _count users filtered by blocked true [providers: all]
-- [ ] `many-to-many > with > condition` — _count users filtered by balance gt 20 [providers: all]
-- [ ] `many-to-many > with multiple conditions` — _count users filtered by balance gt and blocked false [providers: all]
-- [ ] `nested relation` — testIf(!dataProxy||provider!==mongodb): nested users select with filtered _count posts [providers: all]
+- [x] `without condition` — _count select of posts relation with no filter [providers: all] → passing: test/ports/prisma/functional/filter-count-relations.test.ts
+- [x] `one-to-many > with simple equality condition` — _count posts filtered by published true [providers: all] → passing: test/ports/prisma/functional/filter-count-relations.test.ts
+- [x] `one-to-many > with > condition` — _count posts filtered by upvotes gt 100 [providers: all] → passing: test/ports/prisma/functional/filter-count-relations.test.ts
+- [x] `one-to-many > with multiple conditions` — _count posts filtered by published and upvotes gt [providers: all] → passing: test/ports/prisma/functional/filter-count-relations.test.ts
+- [x] `many-to-many > with simple equality condition` — _count users filtered by blocked true [providers: all] → test.fails: test/ports/prisma/functional/filter-count-relations.test.ts
+- [x] `many-to-many > with > condition` — _count users filtered by balance gt 20 [providers: all] → test.fails: test/ports/prisma/functional/filter-count-relations.test.ts
+- [x] `many-to-many > with multiple conditions` — _count users filtered by balance gt and blocked false [providers: all] → test.fails: test/ports/prisma/functional/filter-count-relations.test.ts
+- [x] `nested relation` — testIf(!dataProxy||provider!==mongodb): nested users select with filtered _count posts [providers: all] → passing: test/ports/prisma/functional/filter-count-relations.test.ts
 
 ### packages/client/tests/functional/find-unique-or-throw-batching/tests.ts
 
@@ -775,104 +775,104 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/fluent-api/tests.ts
 
-- [ ] `regular client > lower-cased relations` — chained lower-cased fluent relations return null with correct types (describeIf !shouldSkip) [providers: all]
-- [ ] `regular client > upper-cased relations` — chained upper-cased Banking relation returns null with correct types [providers: all]
-- [ ] `regular client > findFirst` — findFirst then .posts() returns related posts [providers: all]
-- [ ] `regular client > findFirstOrThrow` — findFirstOrThrow then .posts() returns non-nullable posts [providers: all]
-- [ ] `regular client > findFirstOrThrow where nested entity is not found` — fluent .property() resolves null when relation absent [providers: all]
-- [ ] `regular client > findUniqueOrThrow` — findUniqueOrThrow then .posts() returns non-nullable posts [providers: all]
-- [ ] `regular client > findUniqueOrThrow where nested entity is not found` — fluent .property() resolves null when relation absent [providers: all]
-- [ ] `regular client > create` — create then .posts() returns empty array [providers: all]
-- [ ] `regular client > update` — update then .posts() returns related posts [providers: all]
-- [ ] `regular client > upsert` — upsert then .posts() returns related posts [providers: all]
-- [ ] `regular client > delete` — delete then .posts() returns related posts [providers: all]
-- [ ] `regular client > chaining and selecting` — fluent .posts() with select narrows type [providers: all]
-- [ ] `regular client > chaining and selecting twice` — fluent .property().house() with select at each step [providers: all]
-- [ ] `extended client > lower-cased relations` — chained lower-cased fluent relations via $extends (describeIf !shouldSkip) [providers: all]
-- [ ] `extended client > upper-cased relations` — chained upper-cased Banking relation via $extends [providers: all]
-- [ ] `extended client > findFirst` — findFirst then .posts() via $extends [providers: all]
-- [ ] `extended client > findFirstOrThrow` — findFirstOrThrow then .posts() via $extends [providers: all]
-- [ ] `extended client > findFirstOrThrow where nested entity is not found` — fluent .property() resolves null via $extends [providers: all]
-- [ ] `extended client > findUniqueOrThrow` — findUniqueOrThrow then .posts() via $extends [providers: all]
-- [ ] `extended client > findUniqueOrThrow where nested entity is not found` — fluent .property() resolves null via $extends [providers: all]
-- [ ] `extended client > create` — create then .posts() empty array via $extends [providers: all]
-- [ ] `extended client > update` — update then .posts() via $extends [providers: all]
-- [ ] `extended client > upsert` — upsert then .posts() via $extends [providers: all]
-- [ ] `extended client > delete` — delete then .posts() via $extends [providers: all]
-- [ ] `extended client > chaining and selecting` — fluent .posts() with select via $extends [providers: all]
-- [ ] `extended client > chaining and selecting twice` — fluent .property().house() with select via $extends [providers: all]
-- [ ] `extended client > findUniqueOrThrow with required to-one relation` — type-only: fluent .house() resolves House [providers: all]
-- [ ] `extended client > findFirstOrThrow with required to-one relation` — type-only: fluent .house() resolves House [providers: all]
-- [ ] `extended client > findUniqueOrThrow with required to-one relation circling back to optional relation` — type-only: long fluent chain resolves Property|null [providers: all]
-- [ ] `extended client > findFirstOrThrow with required to-one relation circling back to optional relation` — type-only: long fluent chain resolves Property|null [providers: all]
-- [ ] `findUniqueOrThrow with required to-one relation` — top-level type-only: $extends property.house() resolves House [providers: all]
-- [ ] `findFirstOrThrow with required to-one relation` — top-level type-only: $extends property.house() resolves House [providers: all]
-- [ ] `findUniqueOrThrow with required to-one relation circling back to optional relation` — top-level type-only: long fluent chain resolves Property|null [providers: all]
-- [ ] `findFirstOrThrow with required to-one relation circling back to optional relation` — top-level type-only: long fluent chain resolves Property|null [providers: all]
+- [x] `regular client > lower-cased relations` — chained lower-cased fluent relations return null with correct types (describeIf !shouldSkip) [providers: all] → non-ported
+- [x] `regular client > upper-cased relations` — chained upper-cased Banking relation returns null with correct types [providers: all] → non-ported
+- [x] `regular client > findFirst` — findFirst then .posts() returns related posts [providers: all] → non-ported
+- [x] `regular client > findFirstOrThrow` — findFirstOrThrow then .posts() returns non-nullable posts [providers: all] → non-ported
+- [x] `regular client > findFirstOrThrow where nested entity is not found` — fluent .property() resolves null when relation absent [providers: all] → non-ported
+- [x] `regular client > findUniqueOrThrow` — findUniqueOrThrow then .posts() returns non-nullable posts [providers: all] → non-ported
+- [x] `regular client > findUniqueOrThrow where nested entity is not found` — fluent .property() resolves null when relation absent [providers: all] → non-ported
+- [x] `regular client > create` — create then .posts() returns empty array [providers: all] → non-ported
+- [x] `regular client > update` — update then .posts() returns related posts [providers: all] → non-ported
+- [x] `regular client > upsert` — upsert then .posts() returns related posts [providers: all] → non-ported
+- [x] `regular client > delete` — delete then .posts() returns related posts [providers: all] → non-ported
+- [x] `regular client > chaining and selecting` — fluent .posts() with select narrows type [providers: all] → non-ported
+- [x] `regular client > chaining and selecting twice` — fluent .property().house() with select at each step [providers: all] → non-ported
+- [x] `extended client > lower-cased relations` — chained lower-cased fluent relations via $extends (describeIf !shouldSkip) [providers: all] → non-ported
+- [x] `extended client > upper-cased relations` — chained upper-cased Banking relation via $extends [providers: all] → non-ported
+- [x] `extended client > findFirst` — findFirst then .posts() via $extends [providers: all] → non-ported
+- [x] `extended client > findFirstOrThrow` — findFirstOrThrow then .posts() via $extends [providers: all] → non-ported
+- [x] `extended client > findFirstOrThrow where nested entity is not found` — fluent .property() resolves null via $extends [providers: all] → non-ported
+- [x] `extended client > findUniqueOrThrow` — findUniqueOrThrow then .posts() via $extends [providers: all] → non-ported
+- [x] `extended client > findUniqueOrThrow where nested entity is not found` — fluent .property() resolves null via $extends [providers: all] → non-ported
+- [x] `extended client > create` — create then .posts() empty array via $extends [providers: all] → non-ported
+- [x] `extended client > update` — update then .posts() via $extends [providers: all] → non-ported
+- [x] `extended client > upsert` — upsert then .posts() via $extends [providers: all] → non-ported
+- [x] `extended client > delete` — delete then .posts() via $extends [providers: all] → non-ported
+- [x] `extended client > chaining and selecting` — fluent .posts() with select via $extends [providers: all] → non-ported
+- [x] `extended client > chaining and selecting twice` — fluent .property().house() with select via $extends [providers: all] → non-ported
+- [x] `extended client > findUniqueOrThrow with required to-one relation` — type-only: fluent .house() resolves House [providers: all] → non-ported
+- [x] `extended client > findFirstOrThrow with required to-one relation` — type-only: fluent .house() resolves House [providers: all] → non-ported
+- [x] `extended client > findUniqueOrThrow with required to-one relation circling back to optional relation` — type-only: long fluent chain resolves Property|null [providers: all] → non-ported
+- [x] `extended client > findFirstOrThrow with required to-one relation circling back to optional relation` — type-only: long fluent chain resolves Property|null [providers: all] → non-ported
+- [x] `findUniqueOrThrow with required to-one relation` — top-level type-only: $extends property.house() resolves House [providers: all] → non-ported
+- [x] `findFirstOrThrow with required to-one relation` — top-level type-only: $extends property.house() resolves House [providers: all] → non-ported
+- [x] `findUniqueOrThrow with required to-one relation circling back to optional relation` — top-level type-only: long fluent chain resolves Property|null [providers: all] → non-ported
+- [x] `findFirstOrThrow with required to-one relation circling back to optional relation` — top-level type-only: long fluent chain resolves Property|null [providers: all] → non-ported
 
 ### packages/client/tests/functional/fluent-api-null/tests.ts
 
-- [ ] `regular client > findFirst` — fluent .children() after findFirst returns null and nullable type [providers: all]
-- [ ] `regular client > findUnique` — fluent .children() after findUnique returns null and nullable type [providers: all]
-- [ ] `regular client > findFirstOrThrow` — fluent .children() after findFirstOrThrow rejects, non-nullable type [providers: all]
-- [ ] `regular client > findUniqueOrThrow` — fluent .children() after findUniqueOrThrow rejects, non-nullable type [providers: all]
-- [ ] `regular client > create` — fluent .children() after create returns empty array [providers: all]
-- [ ] `regular client > update` — fluent .children() after update on missing id rejects [providers: all]
-- [ ] `regular client > upsert` — fluent .children() after upsert returns empty array [providers: all]
-- [ ] `regular client > findFirst with select` — fluent .children({select}) after findFirst returns null [providers: all]
-- [ ] `regular client > findUnique with select` — fluent .children({select}) after findUnique returns null [providers: all]
-- [ ] `regular client > findFirstOrThrow with select` — fluent .children({select}) after findFirstOrThrow rejects [providers: all]
-- [ ] `regular client > findUniqueOrThrow with select` — fluent .children({select}) after findUniqueOrThrow rejects [providers: all]
-- [ ] `regular client > create with select` — fluent .children({select}) after create returns empty array [providers: all]
-- [ ] `regular client > update with select` — fluent .children({select}) after update rejects [providers: all]
-- [ ] `regular client > upsert with select` — fluent .children({select}) after upsert returns empty array [providers: all]
-- [ ] `regular client > findFirst with include` — fluent .children({include}) after findFirst returns null [providers: all]
-- [ ] `regular client > findUnique with include` — fluent .children({include}) after findUnique returns null [providers: all]
-- [ ] `regular client > findFirstOrThrow with include` — fluent .children({include}) after findFirstOrThrow rejects [providers: all]
-- [ ] `regular client > findUniqueOrThrow with include` — fluent .children({include}) after findUniqueOrThrow rejects [providers: all]
-- [ ] `regular client > create with include` — fluent .children({include}) after create returns empty array [providers: all]
-- [ ] `regular client > update with include` — fluent .children({include}) after update rejects [providers: all]
-- [ ] `regular client > upsert with include` — fluent .children({include}) after upsert returns empty array [providers: all]
-- [ ] `regular client > findUniqueOrThrow with optional to-one relation` — type-only: .parent() resolves Resource|null [providers: all]
-- [ ] `regular client > findFirstOrThrow with optional to-one relation` — type-only: .parent() resolves Resource|null [providers: all]
-- [ ] `regular client > findUniqueOrThrow with optional to-one relation circling back to to-many relation` — type-only: .parent().children() resolves Child[]|null [providers: all]
-- [ ] `regular client > findFirstOrThrow with optional to-one relation circling back to to-many relation` — type-only: .parent().children() resolves Child[]|null [providers: all]
-- [ ] `extended client > findFirst` — fluent .children() after findFirst via $extends returns null [providers: all]
-- [ ] `extended client > findUnique` — fluent .children() after findUnique via $extends returns null [providers: all]
-- [ ] `extended client > findFirstOrThrow` — fluent .children() after findFirstOrThrow via $extends rejects [providers: all]
-- [ ] `extended client > findUniqueOrThrow` — fluent .children() after findUniqueOrThrow via $extends rejects [providers: all]
-- [ ] `extended client > create` — fluent .children() after create via $extends returns empty array [providers: all]
-- [ ] `extended client > update` — fluent .children() after update via $extends rejects [providers: all]
-- [ ] `extended client > upsert` — fluent .children() after upsert via $extends returns empty array [providers: all]
-- [ ] `extended client > findFirst with select` — fluent .children({select}) after findFirst via $extends returns null [providers: all]
-- [ ] `extended client > findUnique with select` — fluent .children({select}) after findUnique via $extends returns null [providers: all]
-- [ ] `extended client > findFirstOrThrow with select` — fluent .children({select}) after findFirstOrThrow via $extends rejects [providers: all]
-- [ ] `extended client > findUniqueOrThrow with select` — fluent .children({select}) after findUniqueOrThrow via $extends rejects [providers: all]
-- [ ] `extended client > create with select` — fluent .children({select}) after create via $extends returns empty array [providers: all]
-- [ ] `extended client > update with select` — fluent .children({select}) after update via $extends rejects [providers: all]
-- [ ] `extended client > upsert with select` — fluent .children({select}) after upsert via $extends returns empty array [providers: all]
-- [ ] `extended client > findFirst with include` — fluent .children({include}) after findFirst via $extends returns null [providers: all]
-- [ ] `extended client > findUnique with include` — fluent .children({include}) after findUnique via $extends returns null [providers: all]
-- [ ] `extended client > findFirstOrThrow with include` — fluent .children({include}) after findFirstOrThrow via $extends rejects [providers: all]
-- [ ] `extended client > findUniqueOrThrow with include` — fluent .children({include}) after findUniqueOrThrow via $extends rejects [providers: all]
-- [ ] `extended client > create with include` — fluent .children({include}) after create via $extends returns empty array [providers: all]
-- [ ] `extended client > update with include` — fluent .children({include}) after update via $extends rejects [providers: all]
-- [ ] `extended client > upsert with include` — fluent .children({include}) after upsert via $extends returns empty array [providers: all]
-- [ ] `findUniqueOrThrow with optional to-one relation` — top-level type-only: $extends child.parent() resolves Resource|null [providers: all]
-- [ ] `findFirstOrThrow with optional to-one relation` — top-level type-only: $extends child.parent() resolves Resource|null [providers: all]
-- [ ] `findUniqueOrThrow with optional to-one relation circling back to to-many relation` — top-level type-only: .parent().children() resolves Child[]|null [providers: all]
-- [ ] `findFirstOrThrow with optional to-one relation circling back to to-many relation` — top-level type-only: .parent().children() resolves Child[]|null [providers: all]
+- [x] `regular client > findFirst` — fluent .children() after findFirst returns null and nullable type [providers: all] → non-ported
+- [x] `regular client > findUnique` — fluent .children() after findUnique returns null and nullable type [providers: all] → non-ported
+- [x] `regular client > findFirstOrThrow` — fluent .children() after findFirstOrThrow rejects, non-nullable type [providers: all] → non-ported
+- [x] `regular client > findUniqueOrThrow` — fluent .children() after findUniqueOrThrow rejects, non-nullable type [providers: all] → non-ported
+- [x] `regular client > create` — fluent .children() after create returns empty array [providers: all] → non-ported
+- [x] `regular client > update` — fluent .children() after update on missing id rejects [providers: all] → non-ported
+- [x] `regular client > upsert` — fluent .children() after upsert returns empty array [providers: all] → non-ported
+- [x] `regular client > findFirst with select` — fluent .children({select}) after findFirst returns null [providers: all] → non-ported
+- [x] `regular client > findUnique with select` — fluent .children({select}) after findUnique returns null [providers: all] → non-ported
+- [x] `regular client > findFirstOrThrow with select` — fluent .children({select}) after findFirstOrThrow rejects [providers: all] → non-ported
+- [x] `regular client > findUniqueOrThrow with select` — fluent .children({select}) after findUniqueOrThrow rejects [providers: all] → non-ported
+- [x] `regular client > create with select` — fluent .children({select}) after create returns empty array [providers: all] → non-ported
+- [x] `regular client > update with select` — fluent .children({select}) after update rejects [providers: all] → non-ported
+- [x] `regular client > upsert with select` — fluent .children({select}) after upsert returns empty array [providers: all] → non-ported
+- [x] `regular client > findFirst with include` — fluent .children({include}) after findFirst returns null [providers: all] → non-ported
+- [x] `regular client > findUnique with include` — fluent .children({include}) after findUnique returns null [providers: all] → non-ported
+- [x] `regular client > findFirstOrThrow with include` — fluent .children({include}) after findFirstOrThrow rejects [providers: all] → non-ported
+- [x] `regular client > findUniqueOrThrow with include` — fluent .children({include}) after findUniqueOrThrow rejects [providers: all] → non-ported
+- [x] `regular client > create with include` — fluent .children({include}) after create returns empty array [providers: all] → non-ported
+- [x] `regular client > update with include` — fluent .children({include}) after update rejects [providers: all] → non-ported
+- [x] `regular client > upsert with include` — fluent .children({include}) after upsert returns empty array [providers: all] → non-ported
+- [x] `regular client > findUniqueOrThrow with optional to-one relation` — type-only: .parent() resolves Resource|null [providers: all] → non-ported
+- [x] `regular client > findFirstOrThrow with optional to-one relation` — type-only: .parent() resolves Resource|null [providers: all] → non-ported
+- [x] `regular client > findUniqueOrThrow with optional to-one relation circling back to to-many relation` — type-only: .parent().children() resolves Child[]|null [providers: all] → non-ported
+- [x] `regular client > findFirstOrThrow with optional to-one relation circling back to to-many relation` — type-only: .parent().children() resolves Child[]|null [providers: all] → non-ported
+- [x] `extended client > findFirst` — fluent .children() after findFirst via $extends returns null [providers: all] → non-ported
+- [x] `extended client > findUnique` — fluent .children() after findUnique via $extends returns null [providers: all] → non-ported
+- [x] `extended client > findFirstOrThrow` — fluent .children() after findFirstOrThrow via $extends rejects [providers: all] → non-ported
+- [x] `extended client > findUniqueOrThrow` — fluent .children() after findUniqueOrThrow via $extends rejects [providers: all] → non-ported
+- [x] `extended client > create` — fluent .children() after create via $extends returns empty array [providers: all] → non-ported
+- [x] `extended client > update` — fluent .children() after update via $extends rejects [providers: all] → non-ported
+- [x] `extended client > upsert` — fluent .children() after upsert via $extends returns empty array [providers: all] → non-ported
+- [x] `extended client > findFirst with select` — fluent .children({select}) after findFirst via $extends returns null [providers: all] → non-ported
+- [x] `extended client > findUnique with select` — fluent .children({select}) after findUnique via $extends returns null [providers: all] → non-ported
+- [x] `extended client > findFirstOrThrow with select` — fluent .children({select}) after findFirstOrThrow via $extends rejects [providers: all] → non-ported
+- [x] `extended client > findUniqueOrThrow with select` — fluent .children({select}) after findUniqueOrThrow via $extends rejects [providers: all] → non-ported
+- [x] `extended client > create with select` — fluent .children({select}) after create via $extends returns empty array [providers: all] → non-ported
+- [x] `extended client > update with select` — fluent .children({select}) after update via $extends rejects [providers: all] → non-ported
+- [x] `extended client > upsert with select` — fluent .children({select}) after upsert via $extends returns empty array [providers: all] → non-ported
+- [x] `extended client > findFirst with include` — fluent .children({include}) after findFirst via $extends returns null [providers: all] → non-ported
+- [x] `extended client > findUnique with include` — fluent .children({include}) after findUnique via $extends returns null [providers: all] → non-ported
+- [x] `extended client > findFirstOrThrow with include` — fluent .children({include}) after findFirstOrThrow via $extends rejects [providers: all] → non-ported
+- [x] `extended client > findUniqueOrThrow with include` — fluent .children({include}) after findUniqueOrThrow via $extends rejects [providers: all] → non-ported
+- [x] `extended client > create with include` — fluent .children({include}) after create via $extends returns empty array [providers: all] → non-ported
+- [x] `extended client > update with include` — fluent .children({include}) after update via $extends rejects [providers: all] → non-ported
+- [x] `extended client > upsert with include` — fluent .children({include}) after upsert via $extends returns empty array [providers: all] → non-ported
+- [x] `findUniqueOrThrow with optional to-one relation` — top-level type-only: $extends child.parent() resolves Resource|null [providers: all] → non-ported
+- [x] `findFirstOrThrow with optional to-one relation` — top-level type-only: $extends child.parent() resolves Resource|null [providers: all] → non-ported
+- [x] `findUniqueOrThrow with optional to-one relation circling back to to-many relation` — top-level type-only: .parent().children() resolves Child[]|null [providers: all] → non-ported
+- [x] `findFirstOrThrow with optional to-one relation circling back to to-many relation` — top-level type-only: .parent().children() resolves Child[]|null [providers: all] → non-ported
 
 ### packages/client/tests/functional/fulltext-search/tests.ts
 
-- [ ] `AND query` — fulltext search AND query returns single matching user [providers: postgres,mysql]
-- [ ] `OR query` — fulltext search OR query returns all three users [providers: postgres,mysql]
-- [ ] `NOT query` — fulltext search NOT query excludes matched term [providers: postgres,mysql]
-- [ ] `no results` — fulltext search query with no matches returns empty [providers: postgres,mysql]
-- [ ] `bad query` — testIf(platform!==win32): malformed fulltext query rejects with error snapshot [providers: postgres,mysql]
-- [ ] `order by relevance on a single field` — orderBy _relevance on name field, desc [providers: postgres,mysql]
-- [ ] `order by relevance on multiple fields` — orderBy _relevance on name and email, asc [providers: postgres,mysql]
-- [ ] `order by relevance: multiple orderBy statements` — orderBy _relevance on name field, desc ordering [providers: postgres,mysql]
+- [x] `AND query` — fulltext search AND query returns single matching user [providers: postgres,mysql] → non-ported
+- [x] `OR query` — fulltext search OR query returns all three users [providers: postgres,mysql] → non-ported
+- [x] `NOT query` — fulltext search NOT query excludes matched term [providers: postgres,mysql] → non-ported
+- [x] `no results` — fulltext search query with no matches returns empty [providers: postgres,mysql] → non-ported
+- [x] `bad query` — testIf(platform!==win32): malformed fulltext query rejects with error snapshot [providers: postgres,mysql] → non-ported
+- [x] `order by relevance on a single field` — orderBy _relevance on name field, desc [providers: postgres,mysql] → non-ported
+- [x] `order by relevance on multiple fields` — orderBy _relevance on name and email, asc [providers: postgres,mysql] → non-ported
+- [x] `order by relevance: multiple orderBy statements` — orderBy _relevance on name field, desc ordering [providers: postgres,mysql] → non-ported
 
 ### packages/client/tests/functional/globalOmit/test.ts
 
@@ -946,8 +946,8 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/handle-int-overflow/tests.ts
 
-- [ ] `integer overflow` — creating with 1e20 int throws 64-bit signed integer overflow error [providers: all]
-- [ ] `big float in exponent notation` — creating with Number.MAX_VALUE throws 64-bit signed integer overflow error [providers: all]
+- [x] `integer overflow` — creating with 1e20 int throws 64-bit signed integer overflow error [providers: all] → passing: test/ports/prisma/functional/handle-int-overflow.test.ts
+- [x] `big float in exponent notation` — creating with Number.MAX_VALUE throws 64-bit signed integer overflow error [providers: all] → passing: test/ports/prisma/functional/handle-int-overflow.test.ts
 
 ### packages/client/tests/functional/interactive-transactions/tests.ts
 
@@ -1006,28 +1006,28 @@ Protocol: each line is one source test. `[ ]` = not yet dispositioned. The Opus 
 
 ### packages/client/tests/functional/json-fields/tests.ts
 
-- [ ] `simple object` — storing/reading a simple JSON object [providers: exclude:sqlserver]
-- [ ] `empty object` — storing/reading an empty JSON object [providers: exclude:sqlserver]
-- [ ] `object with no prototype` — JSON object created with no prototype (regression #14274/#14342) [providers: exclude:sqlserver]
-- [ ] `object with .toJSON method` — JSON serialization honors toJSON and URL (regression #20192) [providers: exclude:sqlserver]
+- [x] `simple object` — storing/reading a simple JSON object [providers: exclude:sqlserver] → passing: test/ports/prisma/functional/json-fields.test.ts
+- [x] `empty object` — storing/reading an empty JSON object [providers: exclude:sqlserver] → passing: test/ports/prisma/functional/json-fields.test.ts
+- [x] `object with no prototype` — JSON object created with no prototype (regression #14274/#14342) [providers: exclude:sqlserver] → passing: test/ports/prisma/functional/json-fields.test.ts
+- [x] `object with .toJSON method` — JSON serialization honors toJSON and URL (regression #20192) [providers: exclude:sqlserver] → passing: test/ports/prisma/functional/json-fields.test.ts
 
 ### packages/client/tests/functional/json-list-push/tests.ts
 
-- [ ] `push with single element` — push a single element onto a JSON list [providers: postgres-only]
-- [ ] `push with array value` — push an array value onto a JSON list [providers: postgres-only]
+- [x] `push with single element` — push a single element onto a JSON list [providers: postgres-only] → non-ported
+- [x] `push with array value` — push an array value onto a JSON list [providers: postgres-only] → non-ported
 
 ### packages/client/tests/functional/json-null-types/tests.ts
 
-- [ ] `nullableJsonField > JsonNull` — JsonNull stored as null in nullable JSON field [providers: exclude:mongodb,sqlserver]
-- [ ] `nullableJsonField > DbNull` — DbNull stored as null in nullable JSON field [providers: exclude:mongodb,sqlserver]
-- [ ] `requiredJsonField > JsonNull` — JsonNull accepted for required JSON field [providers: exclude:mongodb,sqlserver]
-- [ ] `requiredJsonField > DbNull` — DbNull rejected for required JSON field with validation error [providers: exclude:mongodb,sqlserver]
-- [ ] `properties of DbNull/JsonNull/AnyNull > instanceof checks pass` — DbNull/JsonNull/AnyNull instanceof their NullTypes classes [providers: exclude:mongodb,sqlserver]
-- [ ] `properties of DbNull/JsonNull/AnyNull > custom instances are accepted for cross-bundle compatibility` — custom NullTypes instances accepted for cross-bundle compat [providers: exclude:mongodb,sqlserver]
+- [x] `nullableJsonField > JsonNull` — JsonNull stored as null in nullable JSON field [providers: exclude:mongodb,sqlserver] → non-ported
+- [x] `nullableJsonField > DbNull` — DbNull stored as null in nullable JSON field [providers: exclude:mongodb,sqlserver] → non-ported
+- [x] `requiredJsonField > JsonNull` — JsonNull accepted for required JSON field [providers: exclude:mongodb,sqlserver] → non-ported
+- [x] `requiredJsonField > DbNull` — DbNull rejected for required JSON field with validation error [providers: exclude:mongodb,sqlserver] → non-ported
+- [x] `properties of DbNull/JsonNull/AnyNull > instanceof checks pass` — DbNull/JsonNull/AnyNull instanceof their NullTypes classes [providers: exclude:mongodb,sqlserver] → non-ported
+- [x] `properties of DbNull/JsonNull/AnyNull > custom instances are accepted for cross-bundle compatibility` — custom NullTypes instances accepted for cross-bundle compat [providers: exclude:mongodb,sqlserver] → non-ported
 
 ### packages/client/tests/functional/large-floats/tests.ts
 
-- [ ] `floats` — large/negative floats and safe-integer bounds round-trip correctly [providers: all]
+- [x] `floats` — large/negative floats and safe-integer bounds round-trip correctly [providers: all] → passing: test/ports/prisma/functional/large-floats.test.ts
 
 ### packages/client/tests/functional/logging/tests.ts
 
