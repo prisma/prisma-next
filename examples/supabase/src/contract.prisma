@@ -1,7 +1,3 @@
-types {
-  Uuid = Uuid
-}
-
 namespace public {
   model Profile {
     id       Uuid   @id @default(uuid())
