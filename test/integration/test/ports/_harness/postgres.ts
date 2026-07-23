@@ -109,6 +109,9 @@ async function pushContract(connectionString: string, contractJson: unknown): Pr
       fromContract: null,
       frameworkComponents,
       spaceId: APP_SPACE_ID,
+      // Execute-only push (no TypeScript scaffold rendered), so this is cosmetic;
+      // kept to match the canonical planner call shape.
+      snapshotsImportPath: '../../snapshots',
     });
     if (planResult.kind !== 'success') {
       throw new Error(`Contract push planning failed: ${JSON.stringify(planResult)}`);
