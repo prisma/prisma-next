@@ -30,7 +30,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'697e82031d9646f8ad3f84dccdfc6fa7786d9d9de6fdf540132b15a832151e75'>;
+  StorageHashBase<'575237c8f346d182719b83fe1b29b4e1634fd130be638bc8e78472a6139bdaef'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
@@ -2500,13 +2500,7 @@ type ContractBase = Omit<
                   readonly name: 'oauth_authorizations_authorization_code_key';
                 },
               ];
-              indexes: readonly [
-                {
-                  readonly name: 'oauth_auth_pending_exp_idx';
-                  readonly columns: readonly ['expires_at'];
-                  readonly unique: false;
-                },
-              ];
+              indexes: readonly [];
               foreignKeys: readonly [
                 {
                   readonly source: {
@@ -2713,16 +2707,6 @@ type ContractBase = Omit<
                 },
               ];
               indexes: readonly [
-                {
-                  readonly name: 'oauth_consents_active_client_idx';
-                  readonly columns: readonly ['client_id'];
-                  readonly unique: false;
-                },
-                {
-                  readonly name: 'oauth_consents_active_user_client_idx';
-                  readonly columns: readonly ['user_id', 'client_id'];
-                  readonly unique: false;
-                },
                 {
                   readonly name: 'oauth_consents_user_order_idx';
                   readonly columns: readonly ['user_id', 'granted_at'];
@@ -4336,6 +4320,11 @@ type ContractBase = Omit<
               primaryKey: { readonly columns: readonly ['id']; readonly name: 'objects_pkey' };
               uniques: readonly [];
               indexes: readonly [
+                {
+                  readonly name: 'idx_objects_bucket_id_name';
+                  readonly columns: readonly ['bucket_id', 'name'];
+                  readonly unique: false;
+                },
                 {
                   readonly name: 'name_prefix_search';
                   readonly columns: readonly ['name'];

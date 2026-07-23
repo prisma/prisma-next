@@ -5787,15 +5787,7 @@
                   }
                 }
               ],
-              "indexes": [
-                {
-                  "columns": [
-                    "expires_at"
-                  ],
-                  "name": "oauth_auth_pending_exp_idx",
-                  "unique": false
-                }
-              ],
+              "indexes": [],
               "primaryKey": {
                 "columns": [
                   "id"
@@ -6055,21 +6047,6 @@
                 }
               ],
               "indexes": [
-                {
-                  "columns": [
-                    "client_id"
-                  ],
-                  "name": "oauth_consents_active_client_idx",
-                  "unique": false
-                },
-                {
-                  "columns": [
-                    "user_id",
-                    "client_id"
-                  ],
-                  "name": "oauth_consents_active_user_client_idx",
-                  "unique": false
-                },
                 {
                   "columns": [
                     "user_id",
@@ -8056,6 +8033,14 @@
               "indexes": [
                 {
                   "columns": [
+                    "bucket_id",
+                    "name"
+                  ],
+                  "name": "idx_objects_bucket_id_name",
+                  "unique": false
+                },
+                {
+                  "columns": [
                     "name"
                   ],
                   "name": "name_prefix_search",
@@ -8385,7 +8370,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "697e82031d9646f8ad3f84dccdfc6fa7786d9d9de6fdf540132b15a832151e75",
+    "storageHash": "575237c8f346d182719b83fe1b29b4e1634fd130be638bc8e78472a6139bdaef",
     "types": {
       "CreatedAt": {
         "codecId": "pg/timestamp@1",
