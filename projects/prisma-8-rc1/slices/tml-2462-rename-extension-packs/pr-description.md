@@ -42,6 +42,8 @@ Contract canonicalization always emits the extensions key (empty object when unp
 
 ADR 004 claimed both hashes "intentionally exclude" this key; the implementation has always included it. The ADR is corrected rather than the code changed — excluding the key now would be a second, independent hash break for zero user value.
 
+This branch is merged up to current main, so the emitted hashes here are the prefix-free digests from #1033 (drop the `sha256:` prefix) — the key-rename churn and the prefix drop are composed, not stacked as two format changes. The merge also carries #1022 (PSL scalar-type unification) through `interpreter.ts`, and applies the rename to the ported prisma test corpus (#1035): its 43 `_fixture` configs move off the sugar `outputPath`, and its generated contract fixtures are regenerated through the `extensions` emitter.
+
 Regenerating with changed hashes exposed a latent bug in `scripts/regen-extension-migrations.mjs` (it threw on migrations that import their end contract from the snapshot store): fixed here, with an assertion that the re-emitted `migration.json.to` matches the new hash.
 
 ## What deliberately does not change
@@ -58,7 +60,7 @@ Regenerating with changed hashes exposed a latent bug in `scripts/regen-extensio
 
 ## Verification
 
-Full gate set green: build 68/68, typecheck 143/143, all 15 lint steps, `fixtures:check` (idempotent re-emit), `check:upgrade-coverage`, test:packages (13,346), test:integration (1,170), test:e2e (20/20). Guard inversion is test-first (old key rejected with the pointed message; new key accepted and validated).
+Full gate set green after the merge: build 68/68, typecheck 143/143, all lint steps, `fixtures:check` (idempotent re-emit), `check:upgrade-coverage`, test:packages (13,501), test:integration (1,172), test:e2e (20/20, 109 tests). Guard inversion is test-first (old key rejected with the pointed message; new key accepted and validated).
 
 Refs TML-2462.
 

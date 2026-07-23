@@ -40,3 +40,15 @@ Verdict: **approve-with-fixes**; no correctness defects.
 - Finding 3/5 (nits): regen-script guard message could misfire in an inconsistent state (unreachable today); pre-existing `(AC5)` transient ID in a touched test description. Both routed to a final fix round.
 - Mild scope stretch noted, accepted: generic type param `ExtensionPacks` → `Extensions` in builder signatures (concept types like `ExtensionPackRef` correctly preserved).
 - Intent validation: Scope-In fully delivered; DoD met modulo the ratified deviation above.
+
+### Round 2 — merge-resolution re-review (Opus), 2026-07-23
+
+Scope: only merge commit `9b996604b` (integrating origin/main up to `418dcb381`). Verdict: **approve**. All 8 hand-resolved points correctly combine both intents (interpreter.ts: our `composedExtensions` + main's `scalarColumnDescriptors`; control-stack.ts: our message + main's `InternalError`; pinned hashes repinned prefix-free and re-run green; both 0.16-to-0.17 upgrade files keep all 8 entries; README stale-side correctly taken from main; both main-new-file bug-fixes type-correct; no `sha256:` reintroduced; all 9 origin/main commits survived). Only LOW note = the TML-3082/3083 frozen-snapshot residue, pre-existing, not merge-introduced.
+
+### CI result on `9b996604b` — main moved again
+
+CI dispatched (the conflict-block is cleared) but Type Check + Integration Tests failed against the merge ref. Cause: main advanced two more commits past our merge parent — #1035 (ports the 488-case prisma test corpus, whose ~43 sugar configs use old `outputPath` + the corpus carries old `extensionPacks` across its fixtures) and #1038 (TML-3086, a **breaking** date-column emission change that re-churns date contract hashes and adds sibling 0.16-to-0.17 upgrade entries). Not a defect in our work — the rename is racing a fast-moving main. Escalated to operator for merge-sequencing decision.
+
+### Second sync (`7f990cb49` + `60b643047`) — green vs current main
+
+Operator approved babysit-to-merge. Merged origin/main (#1035 corpus + #1038 date change): zero textual conflicts. Corpus fixes: 43 `test/integration/test/ports/**/_fixture` configs `outputPath`→`output`; 87 `extensionPacks` files (43 generated `contract.json` + 43 `.d.ts` + 1 real harness call) regenerated via the corpus's own documented `contract emit` (not covered by `fixtures:emit`); one latent bug fixed — `legacy-json` fixture predated #1022's `Json`→native rebind and was never regenerated, corrected to `Jsonb` per the recorded upgrade guidance. #1038's date change touched nothing of ours (no `@db.Date` in tree or corpus). Full gate set green: typecheck 143/143, test:packages 13508, test:integration 245/245 (after 2 known load-flake retries), test:e2e 109, lint + fixtures:check + check:upgrade-coverage. One straggler caught in orchestrator verification and fixed: `.agents/rules/namespace-diagnostic-wording.mdc` named the old config key (a rule-doc category D4's enumeration missed). Verified clean-merge against current main (#1031, docs-only).
