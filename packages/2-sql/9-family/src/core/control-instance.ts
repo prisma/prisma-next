@@ -1112,7 +1112,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
           }
 
           for (const index of table.indexes) {
-            const name = index.name ?? defaultIndexName(tableName, index.columns);
+            const name = index.name ?? defaultIndexName(tableName, index.columns ?? []);
             const label = index.unique ? `unique index ${name}` : `index ${name}`;
             children.push(
               new SchemaTreeNode({

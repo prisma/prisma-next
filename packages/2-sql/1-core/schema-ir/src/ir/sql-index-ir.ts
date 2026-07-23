@@ -1,5 +1,6 @@
 import type { DiffableNode, SchemaNodeRef } from '@prisma-next/framework-components/control';
 import { freezeNode } from '@prisma-next/framework-components/ir';
+import { isArrayEqual } from '@prisma-next/utils/array-equal';
 import { blindCast } from '@prisma-next/utils/casts';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
 import type { SqlAnnotations } from './sql-column-ir';
@@ -7,22 +8,35 @@ import { assertNode, defineNonEnumerable, SqlSchemaIRNode } from './sql-schema-i
 
 /**
  * Every field is a required key. Values that may legitimately be absent
- * (an unnamed `@@index`, the btree→undefined type normalization) are typed
- * `| undefined` instead of optional, so each construction site states the
- * absence explicitly rather than omitting the key silently. Undefined values
- * still produce an instance without the property.
+ * (an exact-named index's prefix, the btree→undefined type normalization)
+ * are typed `| undefined` instead of optional, so each construction site
+ * states the absence explicitly rather than omitting the key silently.
+ * Undefined values still produce an instance without the property.
  */
 export interface SqlIndexIRInput {
-  readonly columns: readonly string[];
+  /** Full physical name — the node's identity. */
+  readonly name: string;
+  /** Wire-name prefix. Present ⇔ managed; absent ⇔ exact-named. */
+  readonly prefix: string | undefined;
+  /** Column-tuple elements. Exactly one of `columns` / `expression` is set. */
+  readonly columns: readonly string[] | undefined;
+  /**
+   * Opaque SQL: the entire element list between the parens of CREATE INDEX —
+   * one string, never parsed.
+   */
+  readonly expression: string | undefined;
+  /** Opaque SQL: partial-index predicate (WHERE body, without the keyword). */
+  readonly where: string | undefined;
   readonly unique: boolean;
-  readonly name: string | undefined;
   readonly type: string | undefined;
   readonly options: Record<string, unknown> | undefined;
   readonly annotations: SqlAnnotations | undefined;
   /**
    * The index's own column nodes, as root-anchored chains. The derivation
    * stamps them so an index is dropped before the columns it is built on
-   * (Postgres auto-drops the index when a covered column goes). Never
+   * (Postgres auto-drops the index when a covered column goes). An expression
+   * index stamps chains to every column of its table — a deterministic
+   * over-approximation, since the opaque expression is never parsed. Never
    * compared by `isEqualTo`.
    */
   readonly dependsOn: readonly SchemaNodeRef[] | undefined;
@@ -31,8 +45,7 @@ export interface SqlIndexIRInput {
    * producer must assert partiality explicitly, because a partial unique
    * index does not guarantee at-most-one row per key and so cannot back a
    * 1:1 relation — "unknown" must not silently default to "total". Never
-   * compared by `isEqualTo` and never serialized: differ/verify semantics
-   * are unchanged, and surfacing partial-index drift is out of scope.
+   * compared by `isEqualTo` and never serialized.
    */
   readonly partial: boolean;
 }
@@ -45,30 +58,30 @@ export interface SqlIndexIRInput {
  * verifier needs to distinguish them when comparing to the Contract.
  *
  * Implements `DiffableNode` so an index is directly a table's diff-tree
- * child. Indexes are frequently unnamed, so `id` is derived from the column
- * tuple — the same tuple that makes two indexes the same index, so it
- * doubles as the pairing key. `isEqualTo` is symmetric structural equality
- * on the remaining attributes: `unique`, `type`, and `options`. A unique
- * index and a non-unique index on the same columns are different objects
- * and are not equal — there is no "stronger satisfies weaker".
+ * child. Indexes are name-identified: every index — contract-derived or
+ * introspected — carries its full physical name, and `id` is that name.
+ * Names are catalog-unique per schema, so two indexes legitimately sharing
+ * one column tuple (a unique index beside a redundant plain index) are two
+ * distinct siblings, and expression indexes need no column tuple at all.
  *
- * Deliberately column-tuple-only (not `unique`): a contract `@@index`
- * (non-unique) must still pair against a live unique index of the same
- * columns so the differ can report the mismatch as an incompatible index
- * change rather than a spurious missing+extra pair — see
- * `planner.unique-index-structural.test.ts`. The corollary is that two
- * indexes legitimately coexisting on one table with the *same* column tuple
- * (e.g. a unique index and a redundant plain index Postgres has no problem
- * hosting side by side) collide on this id; the postgres control adapter's
- * introspection keeps only one such index per table+column-tuple rather
- * than handing the differ two same-tree siblings it cannot represent.
+ * `isEqualTo` is selected by the receiver (the differ always calls
+ * `expected.isEqualTo(actual)`): both modes compare `unique` strict, `type`
+ * strict, `options` loosely, and `columns` ordered-strict when both sides
+ * carry them; an exact-named receiver (`prefix === undefined`) additionally
+ * byte-compares `expression`/`where` (both sides are reprints in the
+ * supported flow — normalizing would only mask real drift); a managed
+ * receiver never compares bodies (the wire-name hash already commits to
+ * them).
  */
 export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = RelationalSchemaNodeKind.index;
 
-  readonly columns: readonly string[];
+  readonly name: string;
   readonly unique: boolean;
-  declare readonly name?: string;
+  declare readonly prefix?: string;
+  declare readonly columns?: readonly string[];
+  declare readonly expression?: string;
+  declare readonly where?: string;
   declare readonly type?: string;
   declare readonly options?: Record<string, unknown>;
   declare readonly annotations?: SqlAnnotations;
@@ -79,9 +92,17 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
 
   constructor(input: SqlIndexIRInput) {
     super();
-    this.columns = input.columns;
+    if ((input.columns === undefined) === (input.expression === undefined)) {
+      throw new Error(
+        `SqlIndexIR "${input.name}": exactly one of columns or expression must be set.`,
+      );
+    }
+    this.name = input.name;
     this.unique = input.unique;
-    if (input.name !== undefined) this.name = input.name;
+    if (input.prefix !== undefined) this.prefix = input.prefix;
+    if (input.columns !== undefined) this.columns = input.columns;
+    if (input.expression !== undefined) this.expression = input.expression;
+    if (input.where !== undefined) this.where = input.where;
     if (input.type !== undefined) this.type = input.type;
     if (input.options !== undefined) this.options = input.options;
     if (input.annotations !== undefined) this.annotations = input.annotations;
@@ -91,7 +112,7 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
   }
 
   get id(): string {
-    return `index:${this.columns.join(',')}`;
+    return `index:${this.name}`;
   }
 
   children(): readonly DiffableNode[] {
@@ -103,12 +124,12 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
   }
 
   /**
-   * Symmetric structural equality: two paired index nodes are equal iff their
-   * `unique` flag, `type`, and (loosely-compared) `options` all match. There
-   * is no satisfaction — a unique index does not equal a non-unique index.
-   * `options` compares loosely (introspection stringifies reloptions); `type`
-   * compares strictly after the introspection-side btree→undefined
-   * normalization done at construction.
+   * Mode-selected structural equality — see the class doc. `unique` and
+   * `type` compare strictly (`type` after the introspection-side
+   * btree→undefined normalization done at construction), `options` loosely
+   * (introspection stringifies reloptions), `columns` ordered-strict when
+   * both sides carry them. An exact receiver also byte-compares
+   * `expression ?? ''` and `where ?? ''`; a managed receiver never does.
    */
   isEqualTo(other: DiffableNode): boolean {
     const node = blindCast<
@@ -116,10 +137,18 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
       'every diff-tree node the differ pairs is a SqlSchemaIRNode'
     >(other);
     assertNode(node, 'SqlIndexIR', SqlIndexIR.is);
-    return (
+    const structurallyEqual =
       this.unique === node.unique &&
       this.type === node.type &&
-      indexOptionsLooselyEqual(this.options, node.options)
+      indexOptionsLooselyEqual(this.options, node.options) &&
+      (this.columns === undefined ||
+        node.columns === undefined ||
+        isArrayEqual(this.columns, node.columns));
+    if (!structurallyEqual) return false;
+    if (this.prefix !== undefined) return true;
+    return (
+      (this.expression ?? '') === (node.expression ?? '') &&
+      (this.where ?? '') === (node.where ?? '')
     );
   }
 }

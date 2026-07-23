@@ -276,19 +276,28 @@ function convertUnique(unique: UniqueConstraint, tableName: string): SqlUniqueIR
   };
 }
 
-function convertIndex(index: Index, tableName: string): SqlIndexIRInput {
-  const columns = index.columns ?? [];
+function convertIndex(
+  index: Index,
+  tableName: string,
+  tableColumns: readonly string[],
+): SqlIndexIRInput {
   return {
-    columns,
-    unique: false,
-    partial: false,
     name: index.name,
+    prefix: index.prefix,
+    columns: index.columns,
+    expression: index.expression,
+    where: index.where,
+    unique: index.unique,
+    partial: index.where !== undefined,
     // Carried so the derived index node compares type/options against the
     // introspected side (the legacy walk read them from the contract).
     type: index.type,
     options: index.options,
     annotations: undefined,
-    dependsOn: flatColumnDependsOn(tableName, columns),
+    // An expression index's chains cover every column of its table — the
+    // opaque expression is never parsed, so this deterministic
+    // over-approximation keeps drops ordered without a SQL parser.
+    dependsOn: flatColumnDependsOn(tableName, index.columns ?? tableColumns),
   };
 }
 
@@ -402,7 +411,7 @@ function convertTable(
     // the object→own-column `dependsOn` edge like any other index.
     foreignKeys: table.foreignKeys.map((fk) => convertForeignKey(fk, storage)),
     uniques: table.uniques.map((u) => convertUnique(u, name)),
-    indexes: table.indexes.map((i) => convertIndex(i, name)),
+    indexes: table.indexes.map((i) => convertIndex(i, name, Object.keys(table.columns))),
     ...ifDefined('checks', checks),
   });
 }

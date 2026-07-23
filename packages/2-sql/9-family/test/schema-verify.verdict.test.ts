@@ -658,7 +658,7 @@ describe('differ verdict — uniques and indexes (structural equality)', () => {
       user: createSchemaTable(
         'user',
         { email: { nativeType: 'text', nullable: false } },
-        { indexes: [{ columns: ['email'], unique: true }] },
+        { indexes: [{ name: 'user_email_key_idx', columns: ['email'], unique: true }] },
       ),
     });
     const { strict, lenient } = runBothModes({ contract, schema });
@@ -675,7 +675,7 @@ describe('differ verdict — uniques and indexes (structural equality)', () => {
       user: createSchemaTable(
         'user',
         { email: { nativeType: 'text', nullable: false } },
-        { indexes: [{ columns: ['email'], unique: false }] },
+        { indexes: [{ name: 'user_email_idx', columns: ['email'], unique: false }] },
       ),
     });
     const runs = runBothModes({ contract, schema });
@@ -731,7 +731,16 @@ describe('differ verdict — uniques and indexes (structural equality)', () => {
       user: createSchemaTable(
         'user',
         { email: { nativeType: 'text', nullable: false } },
-        { indexes: [{ columns: ['email'], unique: false, options: { fillfactor: '70' } }] },
+        {
+          indexes: [
+            {
+              name: 'user_email_idx',
+              columns: ['email'],
+              unique: false,
+              options: { fillfactor: '70' },
+            },
+          ],
+        },
       ),
     });
     const { strict } = runBothModes({ contract, schema });
@@ -903,7 +912,7 @@ describe('differ verdict — control policies', () => {
       user: createSchemaTable(
         'user',
         { id: { nativeType: 'int4', nullable: false } },
-        { indexes: [{ columns: ['id'], unique: false }] },
+        { indexes: [{ name: 'user_id_idx', columns: ['id'], unique: false }] },
       ),
     });
     const indexRuns = runBothModes({ contract, schema: extraIndex });

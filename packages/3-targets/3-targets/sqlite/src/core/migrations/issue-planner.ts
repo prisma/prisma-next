@@ -218,8 +218,8 @@ function buildCreateTableCalls(table: SqlTableIR): SqliteOpFactoryCall[] {
     new CreateTableCall(table.name, columns, constraints.length > 0 ? constraints : undefined),
   ];
   for (const index of table.indexes) {
-    const indexName = index.name ?? defaultIndexName(table.name, index.columns);
-    calls.push(new CreateIndexCall(table.name, indexName, index.columns));
+    const indexName = index.name ?? defaultIndexName(table.name, index.columns ?? []);
+    calls.push(new CreateIndexCall(table.name, indexName, index.columns ?? []));
   }
   return calls;
 }
@@ -319,15 +319,15 @@ function mapIndexIssue(
       SqlIndexIR,
       'a not-found index issue always carries the expected index node'
     >(issue.expected);
-    const indexName = index.name ?? defaultIndexName(tableName, index.columns);
-    return ok([new CreateIndexCall(tableName, indexName, index.columns)]);
+    const indexName = index.name ?? defaultIndexName(tableName, index.columns ?? []);
+    return ok([new CreateIndexCall(tableName, indexName, index.columns ?? [])]);
   }
   if (issueOutcome(issue) === 'not-expected') {
     const index = blindCast<
       SqlIndexIR,
       'a not-expected index issue always carries the actual index node'
     >(issue.actual);
-    const indexName = index.name ?? defaultIndexName(tableName, index.columns);
+    const indexName = index.name ?? defaultIndexName(tableName, index.columns ?? []);
     return ok([new DropIndexCall(tableName, indexName)]);
   }
   // not-equal: index type/options/uniqueness drift. SQLite can't ALTER an

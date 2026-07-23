@@ -150,8 +150,8 @@ export const recreateTableStrategy: CallMigrationStrategy = (issues, ctx) => {
     // Indexes (declared + FK-backing) are already merged and deduped by
     // column-set at derivation (`contractToSchemaIR`'s `convertTable`).
     const indexes: SqliteIndexSpec[] = expectedTable.indexes.map((idx) => ({
-      name: idx.name ?? defaultIndexName(tableName, idx.columns),
-      columns: idx.columns,
+      name: idx.name ?? defaultIndexName(tableName, idx.columns ?? []),
+      columns: idx.columns ?? [],
     }));
 
     calls.push(

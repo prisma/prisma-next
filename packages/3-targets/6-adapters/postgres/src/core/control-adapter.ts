@@ -870,8 +870,9 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       tablename: string;
       indexname: string;
       indisunique: boolean;
-      indpartial: boolean;
+      where_predicate: string | null;
       attname: string | null;
+      element_def: string | null;
       index_position: number;
       amname: string | null;
       reloptions: string[] | null;
@@ -885,12 +886,19 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       // the table order — verification compares against the contract
       // with order-sensitive equality and reports a spurious
       // `index_mismatch`.
+      //
+      // `element_def` is the per-position element text as Postgres reprints
+      // it (`pg_get_indexdef` with pretty-printing); an expression element
+      // has attnum 0 so its `attname` is null and the element text is the
+      // only faithful capture. `where_predicate` is the reprinted partial-
+      // index predicate, null for total indexes.
       `SELECT
            i.tablename,
            i.indexname,
            ix.indisunique,
-           ix.indpred IS NOT NULL AS indpartial,
+           pg_get_expr(ix.indpred, ix.indrelid) AS where_predicate,
            a.attname,
+           pg_get_indexdef(ix.indexrelid, k.ord::int, true) AS element_def,
            k.ord AS index_position,
            am.amname,
            ic.reloptions
@@ -1128,39 +1136,24 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         dependsOn: postgresColumnDependsOn(schema, tableName, uq.columns),
       }));
 
-      // Process indexes
+      // Process indexes — keyed by catalog-unique index name, so two same-
+      // tuple siblings (a unique index beside a redundant plain index) and
+      // expression indexes all enter the tree at full fidelity.
       const indexesMap = new Map<
         string,
         {
-          columns: string[];
           name: string;
+          elements: { attname: string | null; elementDef: string | null }[];
           unique: boolean;
-          partial: boolean;
+          where: string | null;
           type: string | undefined;
           options: Record<string, string> | undefined;
         }
       >();
-      // An index with an expression key (e.g. `lower(email)`) reports that
-      // key's row with `attname = null` (Postgres attribute numbers are
-      // <= 0 for expressions, which the LEFT JOIN above can't resolve to a
-      // real column). Every row for that index name is skipped below
-      // rather than only the expression row, so the index never enters
-      // `indexesMap` with a collapsed, misleading column list — a
-      // two-column expression index silently reduced to its one real
-      // column can coincide with an unrelated real single-column index,
-      // and the schema differ's diff-tree node id is derived from the
-      // column tuple (`sql-index/index:<columns>`), so two indexes
-      // colliding on that tuple abort the diff with "duplicate id among
-      // siblings" instead of a normal drift report.
-      const indexNamesWithExpressionKey = new Set<string>();
       for (const idxRow of indexesByTable.get(tableName) ?? []) {
-        if (!idxRow.attname) {
-          indexNamesWithExpressionKey.add(idxRow.indexname);
-          continue;
-        }
         const existing = indexesMap.get(idxRow.indexname);
         if (existing) {
-          existing.columns.push(idxRow.attname);
+          existing.elements.push({ attname: idxRow.attname, elementDef: idxRow.element_def });
         } else {
           // Drop btree (the Postgres default) so a contract index without an
           // explicit type matches a default-method introspected index without
@@ -1168,52 +1161,47 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
           const indexType = idxRow.amname && idxRow.amname !== 'btree' ? idxRow.amname : undefined;
           const indexOptions = parsePgReloptions(idxRow.reloptions, idxRow.indexname);
           indexesMap.set(idxRow.indexname, {
-            columns: [idxRow.attname],
             name: idxRow.indexname,
+            elements: [{ attname: idxRow.attname, elementDef: idxRow.element_def }],
             unique: idxRow.indisunique,
-            partial: idxRow.indpartial,
+            where: idxRow.where_predicate,
             type: indexType,
             options: indexOptions,
           });
         }
       }
-      // Two real indexes can legitimately share the exact same column tuple
-      // on one table (e.g. a unique index and a redundant plain index) —
-      // valid in Postgres, but the schema differ's diff-tree node id for an
-      // index is the column tuple alone (`SqlIndexIR#id`, deliberately —
-      // see its doc comment), so two same-tuple siblings from one
-      // introspection abort the diff with "duplicate id among siblings"
-      // rather than a normal drift report. Keep only one per column tuple:
-      // the unique one when there is a unique/non-unique pair (a unique
-      // index is a strict superset of what a plain index on the same
-      // columns would add), otherwise the first by name for determinism.
-      const survivingIndexes = Array.from(indexesMap.values()).filter(
-        (idx) => !indexNamesWithExpressionKey.has(idx.name),
-      );
-      const bestByColumnTuple = new Map<string, (typeof survivingIndexes)[number]>();
-      for (const idx of survivingIndexes) {
-        const tupleKey = idx.columns.join(',');
-        const existing = bestByColumnTuple.get(tupleKey);
-        if (
-          !existing ||
-          (idx.unique && !existing.unique) ||
-          (idx.unique === existing.unique && idx.name < existing.name)
-        ) {
-          bestByColumnTuple.set(tupleKey, idx);
-        }
-      }
-      const indexes: readonly SqlIndexIRInput[] = Array.from(bestByColumnTuple.values()).map(
-        (idx) => ({
-          columns: Object.freeze([...idx.columns]),
+      const indexes: readonly SqlIndexIRInput[] = Array.from(indexesMap.values()).map((idx) => {
+        // An expression element has attnum 0, which the attribute LEFT JOIN
+        // cannot resolve — its attname is null. Any such element makes the
+        // whole index an expression node: the entire element list (real
+        // columns included) is carried as one opaque reprinted string.
+        const isExpression = idx.elements.some((el) => el.attname === null);
+        const columnNames = idx.elements.flatMap((el) => (el.attname !== null ? [el.attname] : []));
+        return {
           name: idx.name,
+          // Rename-pass grouping only, like policy introspection: undefined
+          // when the live name does not follow the wire-name shape.
+          prefix: parseWireName(idx.name)?.prefix,
+          columns: isExpression ? undefined : Object.freeze([...columnNames]),
+          expression: isExpression
+            ? idx.elements.map((el) => el.elementDef ?? '').join(', ')
+            : undefined,
+          where: idx.where ?? undefined,
           unique: idx.unique,
-          partial: idx.partial,
+          partial: idx.where !== null,
           type: idx.type,
           options: idx.options,
           annotations: undefined,
-          dependsOn: postgresColumnDependsOn(schema, tableName, idx.columns),
-        }),
-      );
+          // Expression indexes stamp chains to every column of the table —
+          // the opaque expression is never parsed, so the deterministic
+          // over-approximation keeps drops ordered.
+          dependsOn: postgresColumnDependsOn(
+            schema,
+            tableName,
+            isExpression ? Object.keys(columns) : columnNames,
+          ),
+        };
+      });
 
       // Process check constraints — parse each predicate into column + value set.
       // Only the two shapes emitted by this slice are recognised; free-form

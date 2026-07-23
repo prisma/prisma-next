@@ -51,7 +51,7 @@ function buildWidgetContract(): Contract<SqlStorage> {
                 },
                 primaryKey: { columns: ['id'] },
                 uniques: [{ columns: ['name'] }],
-                indexes: [{ name: 'child_parent_id_idx', columns: ['parent_id'], unique: false }],
+                indexes: [{ name: 'widget_parent_id_idx', columns: ['parent_id'], unique: false }],
                 foreignKeys: [
                   {
                     source: {

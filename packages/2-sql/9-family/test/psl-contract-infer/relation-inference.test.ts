@@ -108,10 +108,13 @@ describe('inferRelations', () => {
         uniques: [],
         indexes: [
           {
+            name: 'profile_user_id_idx',
+            prefix: undefined,
             columns: ['user_id'],
+            expression: undefined,
+            where: undefined,
             unique: true,
             partial: false,
-            name: 'profile_user_id_idx',
             type: undefined,
             options: undefined,
             annotations: undefined,
@@ -155,9 +158,12 @@ describe('inferRelations', () => {
         uniques: [],
         indexes: [
           {
-            columns: ['user_id'],
-            unique: true,
             name: 'draft_active_user_idx',
+            prefix: undefined,
+            columns: ['user_id'],
+            expression: undefined,
+            where: undefined,
+            unique: true,
             partial: true,
             type: undefined,
             options: undefined,
@@ -206,10 +212,13 @@ describe('inferRelations', () => {
         uniques: [],
         indexes: [
           {
+            name: 'handle_user_name_idx',
+            prefix: undefined,
             columns: ['user_id', 'name'],
+            expression: undefined,
+            where: undefined,
             unique: true,
             partial: false,
-            name: 'handle_user_name_idx',
             type: undefined,
             options: undefined,
             annotations: undefined,
@@ -572,10 +581,13 @@ describe('inferRelations', () => {
         uniques: [],
         indexes: [
           {
+            name: 'profile_user_id_plain_idx',
+            prefix: undefined,
             columns: ['user_id'],
+            expression: undefined,
+            where: undefined,
             unique: false,
             partial: false,
-            name: undefined,
             type: undefined,
             options: undefined,
             annotations: undefined,
@@ -626,10 +638,13 @@ describe('inferRelations', () => {
         // Same columns, reversed order: does not satisfy the FK's (tenant_id, user_id) order.
         indexes: [
           {
+            name: 'membership_user_tenant_idx',
+            prefix: undefined,
             columns: ['user_id', 'tenant_id'],
+            expression: undefined,
+            where: undefined,
             unique: false,
             partial: false,
-            name: undefined,
             type: undefined,
             options: undefined,
             annotations: undefined,

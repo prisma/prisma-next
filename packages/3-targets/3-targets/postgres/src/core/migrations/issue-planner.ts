@@ -476,11 +476,13 @@ function buildCreateTableCallsFromNode(
     ),
   ];
   for (const index of table.indexes) {
-    const indexName = index.name ?? defaultIndexName(table.name, index.columns);
+    const indexName = index.name ?? defaultIndexName(table.name, index.columns ?? []);
     const extras: { type?: string; options?: Record<string, unknown> } = {};
     if (index.type !== undefined) extras.type = index.type;
     if (index.options !== undefined) extras.options = index.options;
-    calls.push(new CreateIndexCall(schemaName, table.name, indexName, [...index.columns], extras));
+    calls.push(
+      new CreateIndexCall(schemaName, table.name, indexName, [...(index.columns ?? [])], extras),
+    );
   }
   for (const fk of table.foreignKeys) {
     calls.push(new AddForeignKeyCall(schemaName, table.name, fkSpecFromNode(fk, table.name)));
@@ -818,18 +820,20 @@ function mapIndexNodeIssue(
       SqlIndexIR,
       'a not-found index issue always carries the expected index node'
     >(issue.expected);
-    const indexName = index.name ?? defaultIndexName(tableName, index.columns);
+    const indexName = index.name ?? defaultIndexName(tableName, index.columns ?? []);
     const extras: { type?: string; options?: Record<string, unknown> } = {};
     if (index.type !== undefined) extras.type = index.type;
     if (index.options !== undefined) extras.options = index.options;
-    return ok([new CreateIndexCall(schemaName, tableName, indexName, [...index.columns], extras)]);
+    return ok([
+      new CreateIndexCall(schemaName, tableName, indexName, [...(index.columns ?? [])], extras),
+    ]);
   }
   if (issueOutcome(issue) === 'not-expected') {
     const index = blindCast<
       SqlIndexIR,
       'a not-expected index issue always carries the actual index node'
     >(issue.actual);
-    const indexName = index.name ?? defaultIndexName(tableName, index.columns);
+    const indexName = index.name ?? defaultIndexName(tableName, index.columns ?? []);
     return ok([new DropIndexCall(schemaName, tableName, indexName)]);
   }
   return notOk(nodeConflict('indexIncompatible', issue.path.join('/')));

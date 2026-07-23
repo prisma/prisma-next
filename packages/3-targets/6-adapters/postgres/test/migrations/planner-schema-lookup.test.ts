@@ -55,20 +55,26 @@ describe('buildSchemaLookupMap', () => {
         user: makeTable({
           indexes: [
             {
+              name: 'idx_created_at',
+              prefix: undefined,
               columns: ['created_at'],
+              expression: undefined,
+              where: undefined,
               unique: false,
               partial: false,
-              name: undefined,
               type: undefined,
               options: undefined,
               annotations: undefined,
               dependsOn: undefined,
             },
             {
+              name: 'idx_email',
+              prefix: undefined,
               columns: ['email'],
+              expression: undefined,
+              where: undefined,
               unique: true,
               partial: false,
-              name: undefined,
               type: undefined,
               options: undefined,
               annotations: undefined,
@@ -107,10 +113,13 @@ describe('hasUniqueConstraint', () => {
         uniques: [{ columns: ['email'] }],
         indexes: [
           {
+            name: 'idx_tenant_slug',
+            prefix: undefined,
             columns: ['tenant', 'slug'],
+            expression: undefined,
+            where: undefined,
             unique: true,
             partial: false,
-            name: undefined,
             type: undefined,
             options: undefined,
             annotations: undefined,
@@ -146,10 +155,13 @@ describe('hasIndex', () => {
         uniques: [{ columns: ['email'] }],
         indexes: [
           {
+            name: 'idx_created_at',
+            prefix: undefined,
             columns: ['created_at'],
+            expression: undefined,
+            where: undefined,
             unique: false,
             partial: false,
-            name: undefined,
             type: undefined,
             options: undefined,
             annotations: undefined,

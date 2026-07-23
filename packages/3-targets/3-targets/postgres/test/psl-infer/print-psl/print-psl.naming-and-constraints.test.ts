@@ -195,10 +195,13 @@ describe('printPsl', () => {
           uniques: [{ columns: ['type', 'code'] }],
           indexes: [
             {
+              name: 'record_category_idx',
+              prefix: undefined,
               columns: ['category', 'type'],
+              expression: undefined,
+              where: undefined,
               unique: false,
               partial: false,
-              name: undefined,
               type: undefined,
               options: undefined,
               annotations: undefined,
@@ -220,7 +223,7 @@ describe('printPsl', () => {
         category String
 
         @@unique([_type, code])
-        @@index([category, _type])
+        @@index([category, _type], map: "record_category_idx")
         @@map("record")
       }
       "
@@ -242,10 +245,13 @@ describe('printPsl', () => {
           uniques: [],
           indexes: [
             {
+              name: 'record_category_type_idx',
+              prefix: undefined,
               columns: ['category', 'type'],
+              expression: undefined,
+              where: undefined,
               unique: false,
               partial: false,
-              name: 'record_category_type_idx',
               type: undefined,
               options: undefined,
               annotations: undefined,
@@ -286,10 +292,13 @@ describe('printPsl', () => {
           uniques: [],
           indexes: [
             {
+              name: 'record_token_hash_idx',
+              prefix: undefined,
               columns: ['token'],
+              expression: undefined,
+              where: undefined,
               unique: false,
               partial: false,
-              name: 'record_token_hash_idx',
               type: 'hash',
               options: undefined,
               annotations: undefined,

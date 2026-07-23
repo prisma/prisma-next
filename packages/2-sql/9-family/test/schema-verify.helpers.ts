@@ -150,10 +150,13 @@ export function createSchemaTable(
     }>;
     uniques?: ReadonlyArray<{ columns: readonly string[]; name?: string }>;
     indexes?: ReadonlyArray<{
-      columns: readonly string[];
+      name: string;
+      prefix?: string;
+      columns?: readonly string[];
+      expression?: string;
+      where?: string;
       unique: boolean;
       partial?: boolean;
-      name?: string;
       type?: string;
       options?: Record<string, unknown>;
     }>;
@@ -175,10 +178,13 @@ export function createSchemaTable(
     foreignKeys: options?.foreignKeys ?? [],
     uniques: options?.uniques ?? [],
     indexes: (options?.indexes ?? []).map((idx) => ({
+      name: idx.name,
+      prefix: idx.prefix,
       columns: idx.columns,
+      expression: idx.expression,
+      where: idx.where,
       unique: idx.unique,
       partial: idx.partial ?? false,
-      name: idx.name,
       type: idx.type,
       options: idx.options,
       annotations: undefined,

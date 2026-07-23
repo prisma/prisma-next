@@ -540,6 +540,9 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
 
       const signature = JSON.stringify({
         columns: index.columns ?? null,
+        expression: index.expression ?? null,
+        where: index.where ?? null,
+        unique: index.unique,
         type: index.type ?? null,
         options: sortOptions(index.options),
       });

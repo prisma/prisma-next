@@ -1195,6 +1195,97 @@ describe('SQL contract validators', () => {
       expect(errors[0]).toContain('duplicate index definition');
     });
 
+    it('a unique index and a plain index on the same column tuple are not duplicates (twins)', () => {
+      const s = createContract<SqlStorage>({
+        storage: unboundTables({
+          user: table(
+            {
+              id: col('int4', 'pg/int4@1'),
+              email: col('text', 'pg/text@1'),
+            },
+            {
+              indexes: [
+                { name: 'user_email_unique_idx', columns: ['email'], unique: true },
+                { name: 'user_email_plain_idx', columns: ['email'], unique: false },
+              ],
+            },
+          ),
+        }),
+      }).storage;
+
+      expect(validateStorageSemantics(s)).toHaveLength(0);
+    });
+
+    it('two expression indexes with different bodies are not duplicates', () => {
+      const s = createContract<SqlStorage>({
+        storage: unboundTables({
+          user: table(
+            {
+              id: col('int4', 'pg/int4@1'),
+              email: col('text', 'pg/text@1'),
+            },
+            {
+              indexes: [
+                { name: 'user_email_lower', expression: 'lower(email)', unique: false },
+                { name: 'user_email_upper', expression: 'upper(email)', unique: false },
+              ],
+            },
+          ),
+        }),
+      }).storage;
+
+      expect(validateStorageSemantics(s)).toHaveLength(0);
+    });
+
+    it('two same-column indexes with different where predicates are not duplicates', () => {
+      const s = createContract<SqlStorage>({
+        storage: unboundTables({
+          user: table(
+            {
+              id: col('int4', 'pg/int4@1'),
+              email: col('text', 'pg/text@1'),
+            },
+            {
+              indexes: [
+                {
+                  name: 'user_email_active',
+                  columns: ['email'],
+                  where: 'deleted_at IS NULL',
+                  unique: false,
+                },
+                { name: 'user_email_all', columns: ['email'], unique: false },
+              ],
+            },
+          ),
+        }),
+      }).storage;
+
+      expect(validateStorageSemantics(s)).toHaveLength(0);
+    });
+
+    it('detects duplicate expression index definitions with identical bodies', () => {
+      const s = createContract<SqlStorage>({
+        storage: unboundTables({
+          user: table(
+            {
+              id: col('int4', 'pg/int4@1'),
+              email: col('text', 'pg/text@1'),
+            },
+            {
+              indexes: [
+                { name: 'user_email_lower1', expression: 'lower(email)', unique: false },
+                { name: 'user_email_lower2', expression: 'lower(email)', unique: false },
+              ],
+            },
+          ),
+        }),
+      }).storage;
+
+      const errors = validateStorageSemantics(s);
+      expect(errors).toHaveLength(1);
+      expect(errors[0]).toContain('duplicate index definition');
+    });
+
     it('rejects duplicate foreign key definitions within the same table', () => {
       const s = createContract<SqlStorage>({
         storage: unboundTables({

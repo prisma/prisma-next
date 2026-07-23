@@ -181,7 +181,7 @@ describe('SQLite Migration E2E - FK preservation through recreate-table', () => 
         // instead of silently passing on the unchanged table.
         expect(plannedOperationIds).toContain('recreateTable.User');
 
-        const indexCols = schema.tables['User']!.indexes.map((i) => [...i.columns]);
+        const indexCols = schema.tables['User']!.indexes.map((i) => [...(i.columns ?? [])]);
         expect(indexCols).toContainEqual(['email']);
         expect(indexCols).toContainEqual(['name', 'email']);
 
