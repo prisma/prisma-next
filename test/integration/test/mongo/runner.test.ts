@@ -106,11 +106,11 @@ function buildAppContract(): MongoContract {
           },
         },
       },
-      storageHash: coreHash('sha256:app-contract-multi-space'),
+      storageHash: coreHash('app-contract-multi-space'),
     },
     capabilities: {},
     extensionPacks: {},
-    profileHash: profileHash('sha256:app-profile'),
+    profileHash: profileHash('app-profile'),
     meta: {},
   };
 }
@@ -161,11 +161,11 @@ function buildAppContractMissingPosts(): MongoContract {
           },
         },
       },
-      storageHash: coreHash('sha256:app-contract-trimmed'),
+      storageHash: coreHash('app-contract-trimmed'),
     },
     capabilities: {},
     extensionPacks: {},
-    profileHash: profileHash('sha256:app-profile'),
+    profileHash: profileHash('app-profile'),
     meta: {},
   };
 }
@@ -197,11 +197,11 @@ function buildExtContract(): MongoContract {
           },
         },
       },
-      storageHash: coreHash('sha256:ext-contract-multi-space'),
+      storageHash: coreHash('ext-contract-multi-space'),
     },
     capabilities: {},
     extensionPacks: {},
-    profileHash: profileHash('sha256:ext-profile'),
+    profileHash: profileHash('ext-profile'),
     meta: {},
   };
 }

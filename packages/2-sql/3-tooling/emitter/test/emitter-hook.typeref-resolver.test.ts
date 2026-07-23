@@ -6,7 +6,7 @@ import { createEmitterTestContract as createContract } from './create-emitter-te
 
 // Integration test for the typeRef-resolver path: exercise the real SQL emitter walk end-to-end. Confirms that `sqlEmission.resolveFieldTypeParams` walks `storage.fields → namespace tables → columns → storage.types[ref] or namespace.types[ref]` and that the framework emit path (`generateContractDts`) consults the resolver via the `EmissionSpi.resolveFieldTypeParams` hook.
 
-const testHashes = { storageHash: 'sha256:test', profileHash: 'sha256:test' };
+const testHashes = { storageHash: 'test', profileHash: 'test' };
 
 function vectorCodecLookup(): CodecLookup {
   const vectorCodec = {

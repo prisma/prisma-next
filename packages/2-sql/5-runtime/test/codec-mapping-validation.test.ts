@@ -33,9 +33,9 @@ function contractWithNamespaces(namespaces: Record<string, SqlNamespace>): Contr
   return {
     targetFamily: 'sql',
     target: 'postgres',
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     roots: {},
-    storage: { storageHash: coreHash('sha256:test'), namespaces },
+    storage: { storageHash: coreHash('test'), namespaces },
     domain: applicationDomainOf({ models: {} }),
     capabilities: {},
   } as Contract<SqlStorage>;

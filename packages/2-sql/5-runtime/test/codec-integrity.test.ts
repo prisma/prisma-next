@@ -119,7 +119,7 @@ describe('createExecutionContext — column codec integrity', () => {
     readonly typeRef?: string;
   }): Contract<SqlStorage> {
     const storage: SqlStorage = new SqlStorage({
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -148,7 +148,7 @@ describe('createExecutionContext — column codec integrity', () => {
     return {
       targetFamily: 'sql',
       target: 'postgres',
-      profileHash: profileHash('sha256:test'),
+      profileHash: profileHash('test'),
       domain: applicationDomainOf({ models: {} }),
       roots: {},
       storage,
@@ -220,7 +220,7 @@ describe('createExecutionContext — column codec integrity', () => {
     // equal to "no typeParams" against the non-parameterized `pg/text@1`
     // descriptor.
     const storage: SqlStorage = new SqlStorage({
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -256,7 +256,7 @@ describe('createExecutionContext — column codec integrity', () => {
     const contract: Contract<SqlStorage> = {
       targetFamily: 'sql',
       target: 'postgres',
-      profileHash: profileHash('sha256:test'),
+      profileHash: profileHash('test'),
       domain: applicationDomainOf({ models: {} }),
       roots: {},
       storage,
@@ -347,7 +347,7 @@ describe('createExecutionContext — column codec integrity', () => {
 
   it('accepts a typeRef column whose typed instance carries typeParams', () => {
     const storage: SqlStorage = new SqlStorage({
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: createTestSqlNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -383,7 +383,7 @@ describe('createExecutionContext — column codec integrity', () => {
     const contract: Contract<SqlStorage> = {
       targetFamily: 'sql',
       target: 'postgres',
-      profileHash: profileHash('sha256:test'),
+      profileHash: profileHash('test'),
       domain: applicationDomainOf({ models: {} }),
       roots: {},
       storage,

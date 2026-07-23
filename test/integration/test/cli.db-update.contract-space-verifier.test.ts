@@ -58,7 +58,7 @@ withTempDir(({ createTempDir }) => {
             `);
             await client.query(`
               INSERT INTO prisma_contract.marker (space, core_hash, profile_hash, contract_json)
-              VALUES ('retired-extension', 'sha256:retired', 'sha256:retired-profile', '{}')
+              VALUES ('retired-extension', 'retired', 'retired-profile', '{}')
               ON CONFLICT (space) DO NOTHING
             `);
           });

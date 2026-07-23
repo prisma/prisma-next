@@ -11,7 +11,7 @@ import type { CodecCallContext } from '../src/shared/codec-types';
 
 const meta: PlanMeta = {
   target: 'mock',
-  storageHash: 'sha256:test',
+  storageHash: 'test',
   lane: 'raw-sql',
 };
 

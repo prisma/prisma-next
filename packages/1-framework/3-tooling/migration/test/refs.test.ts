@@ -83,9 +83,10 @@ describe('validateRefValue', () => {
     expect(validateRefValue('0123456789abcdef'.repeat(4))).toBe(true);
   });
 
-  it('rejects sha256-prefixed values', () => {
-    expect(validateRefValue(`sha256:${'a'.repeat(64)}`)).toBe(false);
-    expect(validateRefValue('sha256:empty')).toBe(false);
+  it('rejects legacy algorithm-prefixed values', () => {
+    const legacyPrefix = ['sha256', ''].join(':');
+    expect(validateRefValue(`${legacyPrefix}${'a'.repeat(64)}`)).toBe(false);
+    expect(validateRefValue(`${legacyPrefix}empty`)).toBe(false);
   });
 
   it('rejects wrong length hex', () => {

@@ -80,7 +80,7 @@ function makeContractWithValidator(
   return {
     target: 'mongo',
     targetFamily: 'mongo',
-    profileHash: 'sha256:test-profile',
+    profileHash: 'test-profile',
     capabilities: {},
     extensionPacks: {},
     meta: {},
@@ -153,8 +153,8 @@ describe('MongoMigrationRunner - validator widen', () => {
     });
 
     await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
-      storageHash: 'sha256:origin',
-      profileHash: 'sha256:p1',
+      storageHash: 'origin',
+      profileHash: 'p1',
     });
 
     const originIR = new MongoSchemaIR([
@@ -168,7 +168,7 @@ describe('MongoMigrationRunner - validator widen', () => {
       }),
     ]);
 
-    const destContract = makeContractWithValidator('users', { ...WIDENED_SCHEMA }, 'sha256:dest');
+    const destContract = makeContractWithValidator('users', { ...WIDENED_SCHEMA }, 'dest');
 
     const planner = new MongoMigrationPlanner();
     const planResult = planner.plan({
@@ -214,7 +214,7 @@ describe('MongoMigrationRunner - validator widen', () => {
 
     // Marker must have advanced to the destination hash.
     const marker = await controlAdapter.readMarker(new MongoControlDriver(db, client), 'app');
-    expect(marker?.storageHash).toBe('sha256:dest');
+    expect(marker?.storageHash).toBe('dest');
   });
 
   it('emits no operations when origin and destination validators are identical', async () => {
@@ -225,7 +225,7 @@ describe('MongoMigrationRunner - validator widen', () => {
       validationAction: 'error',
     });
 
-    const destContract = makeContractWithValidator('users', { ...WIDENED_SCHEMA }, 'sha256:dest');
+    const destContract = makeContractWithValidator('users', { ...WIDENED_SCHEMA }, 'dest');
 
     // Origin IR also matches the widened schema (simulating a retry / re-apply).
     const originIR = new MongoSchemaIR([
@@ -262,8 +262,8 @@ describe('MongoMigrationRunner - validator widen', () => {
     });
 
     await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
-      storageHash: 'sha256:origin',
-      profileHash: 'sha256:p1',
+      storageHash: 'origin',
+      profileHash: 'p1',
     });
 
     // Build a plan that STILL contains the widening collMod by feeding the planner
@@ -282,7 +282,7 @@ describe('MongoMigrationRunner - validator widen', () => {
       }),
     ]);
 
-    const destContract = makeContractWithValidator('users', { ...WIDENED_SCHEMA }, 'sha256:dest');
+    const destContract = makeContractWithValidator('users', { ...WIDENED_SCHEMA }, 'dest');
 
     const planner = new MongoMigrationPlanner();
     const planResult = planner.plan({
@@ -324,6 +324,6 @@ describe('MongoMigrationRunner - validator widen', () => {
     // The apply still succeeds: live schema already satisfies the contract, so verify
     // passes and the marker advances to the destination hash.
     const marker = await controlAdapter.readMarker(new MongoControlDriver(db, client), 'app');
-    expect(marker?.storageHash).toBe('sha256:dest');
+    expect(marker?.storageHash).toBe('dest');
   });
 });

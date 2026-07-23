@@ -10,10 +10,10 @@ function deserializedContract() {
   const json = {
     targetFamily: 'mongo' as const,
     target: 'mongo',
-    profileHash: 'sha256:test',
+    profileHash: 'test',
     roots: { items: { namespace: UNBOUND_NAMESPACE_ID, model: 'Item' } },
     storage: {
-      storageHash: 'sha256:test',
+      storageHash: 'test',
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
@@ -48,10 +48,10 @@ describe('MongoTargetSchemaVerifier', () => {
     const json = {
       targetFamily: 'mongo' as const,
       target: 'mongo',
-      profileHash: 'sha256:test',
+      profileHash: 'test',
       roots: {},
       storage: {
-        storageHash: 'sha256:test',
+        storageHash: 'test',
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: {
             id: UNBOUND_NAMESPACE_ID,

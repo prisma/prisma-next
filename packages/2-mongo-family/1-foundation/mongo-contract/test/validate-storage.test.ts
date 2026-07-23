@@ -18,7 +18,7 @@ import { MongoCollection } from '../src/ir/mongo-collection';
 import { MongoStorage } from '../src/ir/mongo-storage';
 import { validateMongoStorage } from '../src/validate-storage';
 
-const DUMMY_HASH = coreHash('sha256:test');
+const DUMMY_HASH = coreHash('test');
 
 function storageWithItemsCollections(
   collections: Record<string, MongoCollection>,
@@ -55,7 +55,7 @@ function makeMinimalContract(overrides: MongoContractTestOverrides = {}): MongoC
     domain: domain ?? applicationDomainOf({ models: models ?? defaultModels }),
     capabilities: {},
     extensionPacks: {},
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     meta: {},
     ...rest,
   };

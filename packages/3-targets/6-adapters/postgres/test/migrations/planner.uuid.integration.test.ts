@@ -32,9 +32,9 @@ import {
 const contractWithUuid: Contract<SqlStorage> = {
   target: 'postgres',
   targetFamily: 'sql',
-  profileHash: profileHash('sha256:test'),
+  profileHash: profileHash('test'),
   storage: new SqlStorage({
-    storageHash: coreHash('sha256:uuid-e2e'),
+    storageHash: coreHash('uuid-e2e'),
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
         id: UNBOUND_NAMESPACE_ID,

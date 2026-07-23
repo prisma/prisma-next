@@ -218,9 +218,9 @@ function createContract(
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:reconciliation-contract'),
+      storageHash: coreHash('reconciliation-contract'),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,

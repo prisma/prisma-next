@@ -31,7 +31,7 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
 
   it('accepts a tagged codec-instance entry unchanged', () => {
     const storage = new SqlStorage({
-      storageHash: coreHash('sha256:abc'),
+      storageHash: coreHash('abc'),
       namespaces: { [UNBOUND_NAMESPACE_ID]: unboundWithUsers },
       types: {
         Score: {
@@ -53,7 +53,7 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
   it('stamps the discriminator on an untagged codec triple authored via toStorageTypeInstance input', async () => {
     const { toStorageTypeInstance } = await import('../src/ir/storage-type-instance');
     const storage = new SqlStorage({
-      storageHash: coreHash('sha256:abc'),
+      storageHash: coreHash('abc'),
       namespaces: { [UNBOUND_NAMESPACE_ID]: unboundWithUsers },
       types: {
         Score: toStorageTypeInstance({
@@ -75,7 +75,7 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
     expect(
       () =>
         new SqlStorage({
-          storageHash: coreHash('sha256:abc'),
+          storageHash: coreHash('abc'),
           namespaces: { [UNBOUND_NAMESPACE_ID]: unboundWithUsers },
           types: { Embedding1536: untagged },
         }),
@@ -91,7 +91,7 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
     expect(
       () =>
         new SqlStorage({
-          storageHash: coreHash('sha256:abc'),
+          storageHash: coreHash('abc'),
           namespaces: { [UNBOUND_NAMESPACE_ID]: unboundWithUsers },
           types: { Score: untagged },
         }),
@@ -106,7 +106,7 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
     expect(
       () =>
         new SqlStorage({
-          storageHash: coreHash('sha256:abc'),
+          storageHash: coreHash('abc'),
           namespaces: { [UNBOUND_NAMESPACE_ID]: unboundWithUsers },
           types: { Mystery: unknownKind },
         }),
@@ -121,7 +121,7 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
       // typeParams omitted — the on-disk canonical form strips empty typeParams
     } as unknown as SqlStorageTypeEntry;
     const storage = new SqlStorage({
-      storageHash: coreHash('sha256:abc'),
+      storageHash: coreHash('abc'),
       namespaces: { [UNBOUND_NAMESPACE_ID]: unboundWithUsers },
       types: { Score: onDiskShape },
     });
@@ -139,7 +139,7 @@ describe('SqlStorage — polymorphic storage.types normalisation', () => {
     expect(
       () =>
         new SqlStorage({
-          storageHash: coreHash('sha256:abc'),
+          storageHash: coreHash('abc'),
           namespaces: { [UNBOUND_NAMESPACE_ID]: unboundWithUsers },
           types: { user_type: rawPostgresEnum },
         }),

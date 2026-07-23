@@ -23,9 +23,9 @@ function createContract(): Contract<SqlStorage> {
   return {
     target: 'sqlite',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:profile'),
+    profileHash: profileHash('profile'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:to'),
+      storageHash: coreHash('to'),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: sqliteCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -74,7 +74,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         contract: createContract(),
         schema: emptySchema,
         policy: { allowedOperationClasses: ['additive'] },
-        fromContract: fromContractWithHash('sha256:from'),
+        fromContract: fromContractWithHash('from-hash-stub'),
         frameworkComponents: [],
         spaceId: APP_SPACE_ID,
       });
@@ -87,7 +87,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
     it('describe() returns the supplied from/to meta derived from fromContract', () => {
       const planner = createSqliteMigrationPlanner(stubLowerer);
       const contract = createContract();
-      const fromContract = fromContractWithHash('sha256:from');
+      const fromContract = fromContractWithHash('from-hash-stub');
       const result = planner.plan({
         contract: contract,
         schema: emptySchema,
@@ -161,7 +161,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         contract: createContract(),
         schema: emptySchema,
         policy: { allowedOperationClasses: ['additive'] },
-        fromContract: fromContractWithHash('sha256:from'),
+        fromContract: fromContractWithHash('from-hash-stub'),
         frameworkComponents: [],
         spaceId: APP_SPACE_ID,
       });
@@ -177,7 +177,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
       expect(source).toContain('override readonly startContractJson = startContract;');
       expect(source).toContain('override readonly endContractJson = endContract;');
       expect(source).not.toContain('describe()');
-      expect(source).not.toContain(coreHash('sha256:from'));
+      expect(source).not.toContain(coreHash('from-hash-stub'));
       expect(source).toContain('this.createTable(');
     });
   });
@@ -189,14 +189,14 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         {
           packageDir: '/tmp/migration-pkg',
           fromHash: null,
-          toHash: 'sha256:to',
+          toHash: 'to-hash-stub',
         },
         APP_SPACE_ID,
       );
 
       expect(empty.targetId).toBe('sqlite');
       expect(empty.operations).toEqual([]);
-      expect(empty.destination).toEqual({ storageHash: 'sha256:to' });
+      expect(empty.destination).toEqual({ storageHash: 'to-hash-stub' });
     });
 
     it('renders a stub that derives from/to from contract JSON and has an empty operations list', () => {
@@ -204,8 +204,8 @@ describe('SqliteMigrationPlanner authoring surface', () => {
       const empty = planner.emptyMigration(
         {
           packageDir: '/tmp/migration-pkg',
-          fromHash: 'sha256:from',
-          toHash: 'sha256:to',
+          fromHash: 'from-hash-stub',
+          toHash: 'to-hash-stub',
         },
         APP_SPACE_ID,
       );
@@ -217,8 +217,8 @@ describe('SqliteMigrationPlanner authoring surface', () => {
       expect(source).toContain('export default class M extends Migration<Start, End>');
       expect(source).toContain('override readonly endContractJson = endContract;');
       expect(source).not.toContain('describe()');
-      expect(source).not.toContain('"sha256:from"');
-      expect(source).not.toContain('"sha256:to"');
+      expect(source).not.toContain('"from-hash-stub"');
+      expect(source).not.toContain('"to-hash-stub"');
       expect(source).toContain('override get operations()');
     });
   });

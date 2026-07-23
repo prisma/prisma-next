@@ -47,7 +47,7 @@ test('RuntimeCore is a RuntimeExecutor of TPlan', () => {
 test('execute(plan) enforces the TPlan constraint and returns AsyncIterableResult<Row>', () => {
   const meta: PlanMeta = {
     target: 'mock',
-    storageHash: 'sha256:test',
+    storageHash: 'test',
     lane: 'raw-sql',
   };
   type Row = { id: number };

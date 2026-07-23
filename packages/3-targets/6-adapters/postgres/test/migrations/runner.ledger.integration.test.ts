@@ -115,7 +115,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
     const destHash = contract.storage.storageHash;
     const edges: readonly AggregateMigrationEdgeRef[] = [
       {
-        migrationHash: 'sha256:mig-single',
+        migrationHash: 'mig-single',
         dirName: '001_single',
         from: EMPTY_CONTRACT_HASH,
         to: destHash,
@@ -163,7 +163,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
     expect(rows[0]).toMatchObject({
       space: LEDGER_TEST_SPACE_ID,
       migration_name: '001_single',
-      migration_hash: 'sha256:mig-single',
+      migration_hash: 'mig-single',
       origin_core_hash: EMPTY_CONTRACT_HASH,
       destination_core_hash: destHash,
     });
@@ -178,7 +178,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
       {
         space: LEDGER_TEST_SPACE_ID,
         migrationName: '001_single',
-        migrationHash: 'sha256:mig-single',
+        migrationHash: 'mig-single',
         from: null,
         to: destHash,
         operationCount: 1,
@@ -190,13 +190,13 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
     timeout: testTimeout,
   }, async () => {
     const runner = postgresTargetDescriptor.createRunner(familyInstance);
-    const midHash = 'sha256:snapshot-mid';
+    const midHash = 'snapshot-mid';
     const destHash = contract.storage.storageHash;
     const midContract = { models: ['user'] };
     const endContract = { models: ['user', 'post'] };
     const edges: readonly AggregateMigrationEdgeRef[] = [
       {
-        migrationHash: 'sha256:mig-snap-a',
+        migrationHash: 'mig-snap-a',
         dirName: '001_snap_a',
         from: EMPTY_CONTRACT_HASH,
         to: midHash,
@@ -204,7 +204,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
         destinationContractJson: midContract,
       },
       {
-        migrationHash: 'sha256:mig-snap-b',
+        migrationHash: 'mig-snap-b',
         dirName: '002_snap_b',
         from: midHash,
         to: destHash,
@@ -283,7 +283,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
     const destHash = contract.storage.storageHash;
     const edges: readonly AggregateMigrationEdgeRef[] = [
       {
-        migrationHash: 'sha256:mig-single',
+        migrationHash: 'mig-single',
         dirName: '001_single',
         from: EMPTY_CONTRACT_HASH,
         to: destHash,
@@ -335,26 +335,26 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
     timeout: testTimeout,
   }, async () => {
     const runner = postgresTargetDescriptor.createRunner(familyInstance);
-    const hashA = 'sha256:ledger-mid-a';
-    const hashB = 'sha256:ledger-mid-b';
+    const hashA = 'ledger-mid-a';
+    const hashB = 'ledger-mid-b';
     const destHash = contract.storage.storageHash;
     const edges: readonly AggregateMigrationEdgeRef[] = [
       {
-        migrationHash: 'sha256:mig-a',
+        migrationHash: 'mig-a',
         dirName: '001_a',
         from: EMPTY_CONTRACT_HASH,
         to: hashA,
         operationCount: 1,
       },
       {
-        migrationHash: 'sha256:mig-b',
+        migrationHash: 'mig-b',
         dirName: '002_b',
         from: hashA,
         to: hashB,
         operationCount: 2,
       },
       {
-        migrationHash: 'sha256:mig-c',
+        migrationHash: 'mig-c',
         dirName: '003_c',
         from: hashB,
         to: destHash,
@@ -467,7 +467,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
       {
         space: LEDGER_TEST_SPACE_ID,
         migrationName: '001_a',
-        migrationHash: 'sha256:mig-a',
+        migrationHash: 'mig-a',
         from: null,
         to: hashA,
         operationCount: 1,
@@ -475,7 +475,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
       {
         space: LEDGER_TEST_SPACE_ID,
         migrationName: '002_b',
-        migrationHash: 'sha256:mig-b',
+        migrationHash: 'mig-b',
         from: hashA,
         to: hashB,
         operationCount: 2,
@@ -483,7 +483,7 @@ describe.sequential('PostgresMigrationRunner - per-edge ledger', () => {
       {
         space: LEDGER_TEST_SPACE_ID,
         migrationName: '003_c',
-        migrationHash: 'sha256:mig-c',
+        migrationHash: 'mig-c',
         from: hashB,
         to: destHash,
         operationCount: 1,

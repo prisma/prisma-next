@@ -26,9 +26,9 @@ function createFkTestContract(fkConfig: {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:contract'),
+      storageHash: coreHash('contract'),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -234,11 +234,11 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
 
   it('does not plan a destructive drop for a constraintless FK in offline from-contract schema', async () => {
     const fromContract = createWorkflowStateContract({
-      storageHash: coreHash('sha256:from'),
+      storageHash: coreHash('from'),
       includeStateColumn: false,
     });
     const contract = createWorkflowStateContract({
-      storageHash: coreHash('sha256:to'),
+      storageHash: coreHash('to'),
       includeStateColumn: true,
     });
     const schema = contractToPostgresDatabaseSchemaNode(fromContract, {
@@ -285,7 +285,7 @@ function createWorkflowStateContract(options: {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     storage: new SqlStorage({
       storageHash: options.storageHash,
       namespaces: {

@@ -23,9 +23,9 @@ import {
 const extensionContract: Contract<SqlStorage> = {
   target: 'postgres',
   targetFamily: 'sql',
-  profileHash: profileHash('sha256:ext-test'),
+  profileHash: profileHash('ext-test'),
   storage: new SqlStorage({
-    storageHash: coreHash('sha256:ext-contract'),
+    storageHash: coreHash('ext-contract'),
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
         id: UNBOUND_NAMESPACE_ID,

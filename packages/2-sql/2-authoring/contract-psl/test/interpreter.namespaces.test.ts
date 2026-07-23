@@ -30,7 +30,7 @@ function makeSupabaseExtensionContract(): Contract {
       },
     },
     storage: {
-      storageHash: coreHash(`sha256:${'a'.repeat(64)}`),
+      storageHash: coreHash(`${'a'.repeat(64)}`),
       namespaces: {
         auth: {
           id: 'auth',
@@ -49,7 +49,7 @@ function makeSupabaseExtensionContract(): Contract {
     },
     capabilities: {},
     extensionPacks: {},
-    profileHash: profileHash(`sha256:${'b'.repeat(64)}`),
+    profileHash: profileHash(`${'b'.repeat(64)}`),
     meta: {},
   });
 }
@@ -72,7 +72,7 @@ function makeSupabaseExtensionContractUnbound(): Contract {
       },
     },
     storage: {
-      storageHash: coreHash(`sha256:${'c'.repeat(64)}`),
+      storageHash: coreHash(`${'c'.repeat(64)}`),
       namespaces: {
         __unbound__: {
           id: '__unbound__',
@@ -91,7 +91,7 @@ function makeSupabaseExtensionContractUnbound(): Contract {
     },
     capabilities: {},
     extensionPacks: {},
-    profileHash: profileHash(`sha256:${'d'.repeat(64)}`),
+    profileHash: profileHash(`${'d'.repeat(64)}`),
     meta: {},
   });
 }

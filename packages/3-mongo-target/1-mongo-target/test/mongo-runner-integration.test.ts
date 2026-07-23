@@ -81,7 +81,7 @@ function makeContract(
       }>;
     }
   >,
-  storageHash = 'sha256:dest',
+  storageHash = 'dest',
 ): MongoContract {
   const storageCollections: Record<string, Record<string, unknown>> = {};
   for (const [name, def] of Object.entries(collections)) {
@@ -219,7 +219,7 @@ describe('MongoMigrationRunner', () => {
         ],
       }),
     ]);
-    const contract = makeContract({ posts: {} }, 'sha256:dropped');
+    const contract = makeContract({ posts: {} }, 'dropped');
     const plan = planForContract(contract, originIR);
     const serialized = serializePlan(plan);
 
@@ -332,14 +332,14 @@ describe('MongoMigrationRunner', () => {
 
   it('returns MARKER_ORIGIN_MISMATCH when marker hash differs', async () => {
     await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
-      storageHash: 'sha256:different',
-      profileHash: 'sha256:p1',
+      storageHash: 'different',
+      profileHash: 'p1',
     });
 
     const contract = makeContract({
       users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
     });
-    const plan = planForContract(contract, undefined, bareContract('sha256:expected'));
+    const plan = planForContract(contract, undefined, bareContract('expected'));
     const serialized = serializePlan(plan);
 
     const runner = makeRunner();
@@ -363,8 +363,8 @@ describe('MongoMigrationRunner', () => {
     // does its own correctness check via live-schema introspection, so
     // marker continuity is not required.
     await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
-      storageHash: 'sha256:existing',
-      profileHash: 'sha256:p1',
+      storageHash: 'existing',
+      profileHash: 'p1',
     });
 
     const contract = makeContract({
@@ -390,7 +390,7 @@ describe('MongoMigrationRunner', () => {
     const contract = makeContract({
       users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
     });
-    const plan = planForContract(contract, undefined, bareContract('sha256:something'));
+    const plan = planForContract(contract, undefined, bareContract('something'));
     const serialized = serializePlan(plan);
 
     const runner = makeRunner();
@@ -411,14 +411,14 @@ describe('MongoMigrationRunner', () => {
 
   it('returns MARKER_CAS_FAILURE when concurrent marker change causes CAS miss', async () => {
     await controlAdapter.initMarker(new MongoControlDriver(db, client), 'app', {
-      storageHash: 'sha256:origin',
-      profileHash: 'sha256:profile',
+      storageHash: 'origin',
+      profileHash: 'profile',
     });
 
     const contract = makeContract({
       users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
     });
-    const plan = planForContract(contract, undefined, bareContract('sha256:origin'));
+    const plan = planForContract(contract, undefined, bareContract('origin'));
     const serialized = serializePlan(plan);
 
     const runner = makeRunner();
@@ -434,7 +434,7 @@ describe('MongoMigrationRunner', () => {
             .collection('_prisma_migrations')
             .updateOne(
               { _id: 'app' as never },
-              { $set: { storageHash: 'sha256:tampered-by-other-process' } },
+              { $set: { storageHash: 'tampered-by-other-process' } },
             );
         },
       },
@@ -489,7 +489,7 @@ describe('MongoMigrationRunner', () => {
 
     const marker = await controlAdapter.readMarker(new MongoControlDriver(db, client), 'app');
     expect(marker).not.toBeNull();
-    expect(marker?.storageHash).toBe('sha256:dest');
+    expect(marker?.storageHash).toBe('dest');
 
     const ledgerEntries = await db
       .collection('_prisma_migrations')
@@ -504,7 +504,7 @@ describe('MongoMigrationRunner - data transforms', () => {
     return {
       targetId: 'mongo',
       operations: ops as MigrationPlanOperation[],
-      destination: { storageHash: 'sha256:dest-dt' },
+      destination: { storageHash: 'dest-dt' },
     };
   }
 
@@ -516,7 +516,7 @@ describe('MongoMigrationRunner - data transforms', () => {
         collection,
         pipeline: [{ $match: { status: { $exists: false } } }, { $limit: 1 }],
       },
-      meta: { target: 'mongo', storageHash: 'sha256:x', lane: 'mongo-raw' },
+      meta: { target: 'mongo', storageHash: 'x', lane: 'mongo-raw' },
     };
   }
 
@@ -557,7 +557,7 @@ describe('MongoMigrationRunner - data transforms', () => {
           },
           meta: {
             target: 'mongo',
-            storageHash: 'sha256:x',
+            storageHash: 'x',
             lane: 'mongo-raw',
           },
         },
@@ -569,7 +569,7 @@ describe('MongoMigrationRunner - data transforms', () => {
     const result = await runner.execute({
       plan: makeDataTransformPlan([op]),
       migrationEdges: synthEdges(makeDataTransformPlan([op])),
-      destinationContract: bareContract('sha256:dest-dt'),
+      destinationContract: bareContract('dest-dt'),
       policy: { allowedOperationClasses: ['data'] },
       strictVerification: false,
       frameworkComponents: [],
@@ -604,7 +604,7 @@ describe('MongoMigrationRunner - data transforms', () => {
           },
           meta: {
             target: 'mongo',
-            storageHash: 'sha256:x',
+            storageHash: 'x',
             lane: 'mongo-raw',
           },
         },
@@ -616,7 +616,7 @@ describe('MongoMigrationRunner - data transforms', () => {
     const result = await runner.execute({
       plan: makeDataTransformPlan([op]),
       migrationEdges: synthEdges(makeDataTransformPlan([op])),
-      destinationContract: bareContract('sha256:dest-dt'),
+      destinationContract: bareContract('dest-dt'),
       policy: { allowedOperationClasses: ['data'] },
       strictVerification: false,
       frameworkComponents: [],
@@ -652,7 +652,7 @@ describe('MongoMigrationRunner - data transforms', () => {
           },
           meta: {
             target: 'mongo',
-            storageHash: 'sha256:x',
+            storageHash: 'x',
             lane: 'mongo-raw',
           },
         },
@@ -664,7 +664,7 @@ describe('MongoMigrationRunner - data transforms', () => {
     const result = await runner.execute({
       plan: makeDataTransformPlan([op]),
       migrationEdges: synthEdges(makeDataTransformPlan([op])),
-      destinationContract: bareContract('sha256:dest-dt'),
+      destinationContract: bareContract('dest-dt'),
       policy: { allowedOperationClasses: ['data'] },
       strictVerification: false,
       frameworkComponents: [],
@@ -697,7 +697,7 @@ describe('MongoMigrationRunner - data transforms', () => {
           },
           meta: {
             target: 'mongo',
-            storageHash: 'sha256:x',
+            storageHash: 'x',
             lane: 'mongo-raw',
           },
         },
@@ -709,7 +709,7 @@ describe('MongoMigrationRunner - data transforms', () => {
     const result = await runner.execute({
       plan: makeDataTransformPlan([op]),
       migrationEdges: synthEdges(makeDataTransformPlan([op])),
-      destinationContract: bareContract('sha256:dest-dt'),
+      destinationContract: bareContract('dest-dt'),
       policy: { allowedOperationClasses: ['data'] },
       frameworkComponents: [],
     });
@@ -735,7 +735,7 @@ describe('MongoMigrationRunner - data transforms', () => {
     const result = await runner.execute({
       plan: makeDataTransformPlan([op]),
       migrationEdges: synthEdges(makeDataTransformPlan([op])),
-      destinationContract: bareContract('sha256:dest-dt'),
+      destinationContract: bareContract('dest-dt'),
       policy: { allowedOperationClasses: ['additive'] },
       frameworkComponents: [],
     });
@@ -762,7 +762,7 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
       contract,
       schema: new MongoSchemaIR([]),
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
-      fromContract: bareContract('sha256:00'),
+      fromContract: bareContract('00'),
       frameworkComponents: [],
     });
     if (ddlResult.kind !== 'success') throw new Error('Planner failed');
@@ -777,7 +777,7 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
           ]),
           meta: {
             target: 'mongo',
-            storageHash: 'sha256:x',
+            storageHash: 'x',
             lane: 'mongo-raw',
           },
         }),
@@ -789,7 +789,7 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
           { status: { $exists: false } },
           { $set: { status: 'pending' } },
         ),
-        meta: { target: 'mongo', storageHash: 'sha256:x', lane: 'mongo-raw' },
+        meta: { target: 'mongo', storageHash: 'x', lane: 'mongo-raw' },
       }),
     });
 
@@ -800,7 +800,7 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
     const plan: MigrationPlan = {
       targetId: 'mongo',
       operations: JSON.parse(serializedJson) as MigrationPlanOperation[],
-      destination: { storageHash: 'sha256:dest-e2e' },
+      destination: { storageHash: 'dest-e2e' },
     };
 
     // Seed a row that needs the backfill so the data transform actually runs;
@@ -845,7 +845,7 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
         collection: 'accounts',
         pipeline: [{ $match: { active: { $exists: false } } }, { $limit: 1 }],
       },
-      meta: { target: 'mongo', storageHash: 'sha256:x', lane: 'mongo-raw' },
+      meta: { target: 'mongo', storageHash: 'x', lane: 'mongo-raw' },
     };
 
     const op = {
@@ -872,7 +872,7 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
           },
           meta: {
             target: 'mongo',
-            storageHash: 'sha256:x',
+            storageHash: 'x',
             lane: 'mongo-raw',
           },
         },
@@ -890,7 +890,7 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
     const plan: MigrationPlan = {
       targetId: 'mongo',
       operations: [op] as unknown as MigrationPlanOperation[],
-      destination: { storageHash: 'sha256:retry' },
+      destination: { storageHash: 'retry' },
     };
 
     const runner = makeRunner();
@@ -898,7 +898,7 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
     const result1 = await runner.execute({
       plan,
       migrationEdges: synthEdges(plan),
-      destinationContract: bareContract('sha256:retry'),
+      destinationContract: bareContract('retry'),
       policy: { allowedOperationClasses: ['data'] },
       strictVerification: false,
       frameworkComponents: [],
@@ -913,7 +913,7 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
     const result2 = await runner.execute({
       plan,
       migrationEdges: synthEdges(plan),
-      destinationContract: bareContract('sha256:retry'),
+      destinationContract: bareContract('retry'),
       policy: { allowedOperationClasses: ['data'] },
       strictVerification: false,
       frameworkComponents: [],
@@ -935,19 +935,19 @@ describe('mongoTargetDescriptor migrations.createRunner — per-edge ledger', ()
     );
     const driver = new MongoControlDriver(db, client);
     const space = 'ledger-wrapper-test';
-    const destHash = 'sha256:wrapper-dest';
-    const midHash = 'sha256:wrapper-mid';
+    const destHash = 'wrapper-dest';
+    const midHash = 'wrapper-mid';
     const contract = bareContract(destHash);
     const edges: readonly AggregateMigrationEdgeRef[] = [
       {
-        migrationHash: 'sha256:mig-a',
+        migrationHash: 'mig-a',
         dirName: '001_a',
         from: EMPTY_CONTRACT_HASH,
         to: midHash,
         operationCount: 1,
       },
       {
-        migrationHash: 'sha256:mig-b',
+        migrationHash: 'mig-b',
         dirName: '002_b',
         from: midHash,
         to: destHash,
@@ -985,7 +985,7 @@ describe('mongoTargetDescriptor migrations.createRunner — per-edge ledger', ()
     const ledger = await controlAdapter.readLedger(new MongoControlDriver(db, client), space);
     expect(ledger).toHaveLength(2);
     expect(ledger.map((entry) => entry.migrationName)).toEqual(['001_a', '002_b']);
-    expect(ledger.map((entry) => entry.migrationHash)).toEqual(['sha256:mig-a', 'sha256:mig-b']);
+    expect(ledger.map((entry) => entry.migrationHash)).toEqual(['mig-a', 'mig-b']);
   });
 });
 

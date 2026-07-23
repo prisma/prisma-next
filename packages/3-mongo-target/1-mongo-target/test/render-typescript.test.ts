@@ -10,8 +10,8 @@ import {
 import { renderCallsToTypeScript } from '../src/core/render-typescript';
 
 const META = {
-  from: 'sha256:0000000000000000000000000000000000000000000000000000000000000000',
-  to: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+  from: '0000000000000000000000000000000000000000000000000000000000000000',
+  to: '1111111111111111111111111111111111111111111111111111111111111111',
 } as const;
 
 const renderTypeScript = (
@@ -38,7 +38,7 @@ describe('renderCallsToTypeScript', () => {
   it('emits the contract-JSON imports + fields and the Migration<Start, End> header (with-start)', () => {
     const calls = [new CreateIndexCall('users', [{ field: 'email', direction: 1 }])];
 
-    const output = renderTypeScript(calls, { from: 'sha256:aaa', to: 'sha256:bbb' });
+    const output = renderTypeScript(calls, { from: 'aaa', to: 'bbb' });
 
     expect(output).toContain(
       'import endContract from \'./end-contract.json\' with { type: "json" };',
@@ -56,12 +56,12 @@ describe('renderCallsToTypeScript', () => {
   it('does NOT emit a describe() method (the base derives it from the contract JSON)', () => {
     const calls = [new DropCollectionCall('users')];
 
-    const output = renderTypeScript(calls, { from: 'sha256:aaa', to: 'sha256:bbb' });
+    const output = renderTypeScript(calls, { from: 'aaa', to: 'bbb' });
 
     expect(output).not.toContain('describe()');
     // The hash values are no longer literal-embedded — they come from the JSON.
-    expect(output).not.toContain('sha256:aaa');
-    expect(output).not.toContain('sha256:bbb');
+    expect(output).not.toContain('aaa');
+    expect(output).not.toContain('bbb');
   });
 
   it('prepends a node shebang as the first line under the default test env', () => {
@@ -218,7 +218,7 @@ describe('renderCallsToTypeScript', () => {
 
     const output = renderTypeScript(calls, {
       from: null,
-      to: 'sha256:def',
+      to: 'def',
     });
 
     expect(output).toContain('class M extends Migration<never, End> {');

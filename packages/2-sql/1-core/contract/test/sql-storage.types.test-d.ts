@@ -9,7 +9,7 @@ const unboundNs = createTestSqlNamespace({ id: UNBOUND_NAMESPACE_ID, entries: { 
 
 test('SqlStorage accepts namespaces with only a public key (no __unbound__)', () => {
   const storage = new SqlStorage({
-    storageHash: 'sha256:test' as StorageHashBase<string>,
+    storageHash: 'test' as StorageHashBase<string>,
     namespaces: { public: publicNs },
   });
   expectTypeOf(storage.namespaces).toExtend<Readonly<Record<string, SqlNamespace>>>();
@@ -17,7 +17,7 @@ test('SqlStorage accepts namespaces with only a public key (no __unbound__)', ()
 
 test('SqlStorage still accepts namespaces with only an __unbound__ key', () => {
   const storage = new SqlStorage({
-    storageHash: 'sha256:test' as StorageHashBase<string>,
+    storageHash: 'test' as StorageHashBase<string>,
     namespaces: { [UNBOUND_NAMESPACE_ID]: unboundNs },
   });
   expectTypeOf(storage.namespaces).toExtend<Readonly<Record<string, SqlNamespace>>>();

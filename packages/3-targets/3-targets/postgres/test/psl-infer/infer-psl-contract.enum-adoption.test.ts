@@ -127,9 +127,9 @@ function describedContractWithNativeEnum(input: {
   const contract: Contract<SqlStorage> = {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:contract'),
+      storageHash: coreHash('contract'),
       namespaces: {
         [input.namespaceId]: new PostgresSchema({
           id: input.namespaceId,

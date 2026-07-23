@@ -39,7 +39,7 @@ import {
 import { renderCallsToTypeScript } from '@prisma-next/target-postgres/render-typescript';
 import { describe, expect, it } from 'vitest';
 
-const META = { from: 'sha256:from', to: 'sha256:to' } as const;
+const META = { from: 'from', to: 'to' } as const;
 
 describe('Postgres call classes - renderTypeScript + importRequirements', () => {
   it('emits this.dropTable({...}) and contributes no imports', () => {
@@ -407,12 +407,15 @@ describe('renderCallsToTypeScript', () => {
   });
 
   it('derives describe() from contract JSON instead of embedding from/to hashes', () => {
-    const source = renderCallsToTypeScript([], { from: 'sha256:a', to: 'sha256:b' });
+    const source = renderCallsToTypeScript([], {
+      from: 'from-hash-stub',
+      to: 'to-hash-stub',
+    });
     // New shape: from/to are derived by the base from the imported contract JSON
     // (no describe() block, no hash literals).
     expect(source).not.toContain('describe()');
-    expect(source).not.toContain('sha256:a');
-    expect(source).not.toContain('sha256:b');
+    expect(source).not.toContain('from-hash-stub');
+    expect(source).not.toContain('to-hash-stub');
     expect(source).toContain('export default class M extends Migration<Start, End> {');
     expect(source).toContain('override readonly startContractJson = startContract;');
     expect(source).toContain('override readonly endContractJson = endContract;');

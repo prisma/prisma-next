@@ -126,7 +126,7 @@ describe('migration file E2E', () => {
       `import { createIndex, createCollection } from '${factoryExport}';`,
       '',
       'class M extends Migration {',
-      "  describe() { return { from: 'sha256:00', to: 'sha256:01' }; }",
+      "  describe() { return { from: '00', to: '01' }; }",
       '  get operations() {',
       '    return [',
       '      createCollection("users", {',
@@ -183,7 +183,7 @@ describe('migration file E2E', () => {
       `import { validatedCollection } from '${factoryExport}';`,
       '',
       'class M extends Migration {',
-      "  describe() { return { from: 'sha256:00', to: 'sha256:01' }; }",
+      "  describe() { return { from: '00', to: '01' }; }",
       '  get operations() {',
       '    return validatedCollection(',
       '      "users",',
@@ -221,8 +221,8 @@ describe('migration file E2E', () => {
 
   describe('renderCallsToTypeScript round-trip', () => {
     const defaultMeta = {
-      from: 'sha256:0000000000000000000000000000000000000000000000000000000000000000',
-      to: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      from: '0000000000000000000000000000000000000000000000000000000000000000',
+      to: '1111111111111111111111111111111111111111111111111111111111111111',
     } as const;
 
     it('produces ops.json identical to direct factory invocation', async () => {
@@ -306,7 +306,7 @@ describe('migration file E2E', () => {
       const { DropCollectionCall } = await import('../src/core/op-factory-call');
       const calls = [new DropCollectionCall('legacy')];
 
-      const meta = { from: 'sha256:aaa', to: 'sha256:bbb' } as const;
+      const meta = { from: 'aaa', to: 'bbb' } as const;
       const tsSource = renderCallsToTypeScript(calls, meta);
       const resolvedSource = tsSource
         .replace("'@prisma-next/family-mongo/migration'", `'${migrationExport}'`)
@@ -325,8 +325,8 @@ describe('migration file E2E', () => {
 
       const manifestJson = await readFile(join(tmpDir, 'migration.json'), 'utf-8');
       const manifest = JSON.parse(manifestJson);
-      expect(manifest.from).toBe('sha256:aaa');
-      expect(manifest.to).toBe('sha256:bbb');
+      expect(manifest.from).toBe('aaa');
+      expect(manifest.to).toBe('bbb');
     });
   });
 
@@ -337,7 +337,7 @@ describe('migration file E2E', () => {
       `import { createCollection, dataTransform } from '${factoryExport}';`,
       '',
       'class M extends Migration {',
-      "  describe() { return { from: 'sha256:00', to: 'sha256:01' }; }",
+      "  describe() { return { from: '00', to: '01' }; }",
       '  get operations() {',
       '    return [',
       '      createCollection("users"),',
@@ -350,7 +350,7 @@ describe('migration file E2E', () => {
       '            filter: { status: { $exists: false } },',
       '            update: { $set: { status: "active" } },',
       '          },',
-      '          meta: { target: "mongo", storageHash: "sha256:x", lane: "mongo-raw" },',
+      '          meta: { target: "mongo", storageHash: "x", lane: "mongo-raw" },',
       '        }),',
       '      }),',
       '    ];',
@@ -390,7 +390,7 @@ describe('migration file E2E', () => {
         `import { dataTransform } from '${factoryExport}';`,
         '',
         'class M extends Migration {',
-        "  describe() { return { from: 'sha256:00', to: 'sha256:01' }; }",
+        "  describe() { return { from: '00', to: '01' }; }",
         '  get operations() {',
         '    return [',
         '      dataTransform("backfill-with-check", {',
@@ -402,7 +402,7 @@ describe('migration file E2E', () => {
         '              collection: "users",',
         '              pipeline: [{ $match: { status: { $exists: false } } }, { $limit: 1 }],',
         '            },',
-        '            meta: { target: "mongo", storageHash: "sha256:x", lane: "mongo-raw" },',
+        '            meta: { target: "mongo", storageHash: "x", lane: "mongo-raw" },',
         '          }),',
         '        },',
         '        run: () => ({',
@@ -413,7 +413,7 @@ describe('migration file E2E', () => {
         '            filter: { status: { $exists: false } },',
         '            update: { $set: { status: "active" } },',
         '          },',
-        '          meta: { target: "mongo", storageHash: "sha256:x", lane: "mongo-raw" },',
+        '          meta: { target: "mongo", storageHash: "x", lane: "mongo-raw" },',
         '        }),',
         '      }),',
         '    ];',
@@ -483,8 +483,8 @@ describe('migration file E2E', () => {
       ];
 
       const directRunMeta = {
-        from: 'sha256:0000000000000000000000000000000000000000000000000000000000000000',
-        to: 'sha256:1111111111111111111111111111111111111111111111111111111111111111',
+        from: '0000000000000000000000000000000000000000000000000000000000000000',
+        to: '1111111111111111111111111111111111111111111111111111111111111111',
       } as const;
       const migrationSource = renderCallsToTypeScript(calls, directRunMeta)
         .replace("'@prisma-next/family-mongo/migration'", `'${familyMongoDistMigration}'`)
@@ -530,7 +530,7 @@ describe('migration file E2E', () => {
         `import { createIndex, dropIndex, createCollection, dropCollection, setValidation } from '${factoryExport}';`,
         '',
         'class M extends Migration {',
-        "  describe() { return { from: 'sha256:00', to: 'sha256:01' }; }",
+        "  describe() { return { from: '00', to: '01' }; }",
         '  get operations() {',
         '    return [',
         '      createCollection("users"),',

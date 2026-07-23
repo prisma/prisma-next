@@ -39,13 +39,13 @@ import type { PostgresContract } from '../src/core/types';
 const contract = new SqlContractSerializer().deserializeContract({
   target: 'postgres',
   targetFamily: 'sql',
-  profileHash: 'sha256:test-profile',
+  profileHash: 'test-profile',
   roots: {},
   capabilities: {},
   extensionPacks: {},
   meta: {},
   storage: {
-    storageHash: 'sha256:test-core',
+    storageHash: 'test-core',
     namespaces: {
       __unbound__: {
         id: '__unbound__',
@@ -495,8 +495,8 @@ describe('Postgres adapter', () => {
 
   it('readMarker parses a present marker row into a ContractMarkerRecord', async () => {
     const markerRow = {
-      core_hash: 'sha256:test-core',
-      profile_hash: 'sha256:test-profile',
+      core_hash: 'test-core',
+      profile_hash: 'test-profile',
       contract_json: { storage: {}, target: 'postgres' },
       canonical_version: 1,
       updated_at: new Date('2026-04-30T00:00:00Z'),
@@ -525,8 +525,8 @@ describe('Postgres adapter', () => {
 
     expect(result.kind).toBe('present');
     if (result.kind !== 'present') return;
-    expect(result.record.storageHash).toBe('sha256:test-core');
-    expect(result.record.profileHash).toBe('sha256:test-profile');
+    expect(result.record.storageHash).toBe('test-core');
+    expect(result.record.profileHash).toBe('test-profile');
     expect(result.record.appTag).toBe('app');
     expect(result.record.invariants).toEqual(['inv-1']);
   });
@@ -555,7 +555,7 @@ describe('Postgres adapter', () => {
     const publicContract = {
       ...contract,
       storage: new SqlStorage({
-        storageHash: 'sha256:test-core-public' as StorageHashBase<'sha256:test-core-public'>,
+        storageHash: 'test-core-public' as StorageHashBase<'test-core-public'>,
         namespaces: {
           public: new PostgresSchema({
             id: 'public',

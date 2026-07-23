@@ -84,7 +84,7 @@ function buildPortableContract<TTarget extends string>(target: PortableTargetPac
     target,
     createNamespace: createTestSqlNamespace,
     naming: { tables: 'snake_case', columns: 'snake_case' },
-    storageHash: 'sha256:portable-contract-dsl',
+    storageHash: 'portable-contract-dsl',
     models: {
       User,
       Post,

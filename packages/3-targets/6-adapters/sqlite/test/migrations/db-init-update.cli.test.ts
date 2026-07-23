@@ -58,9 +58,9 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
   return {
     target: 'sqlite',
     targetFamily: 'sql',
-    profileHash: profileHash(`sha256:ext-test-v${version}`),
+    profileHash: profileHash(`ext-test-v${version}`),
     storage: new SqlStorage({
-      storageHash: coreHash(`sha256:ext-contract-v${version}`),
+      storageHash: coreHash(`ext-contract-v${version}`),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: sqliteCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -451,7 +451,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
     const hookedAppContract: Contract<SqlStorage> = {
       ...appContract,
       storage: new SqlStorage({
-        storageHash: coreHash('sha256:app-with-hooked-email'),
+        storageHash: coreHash('app-with-hooked-email'),
         namespaces: {
           [UNBOUND_NAMESPACE_ID]: sqliteCreateNamespace({
             id: UNBOUND_NAMESPACE_ID,
@@ -476,7 +476,7 @@ describe('db init / db update aggregate pipeline (CLI) - sqlite', {
           }),
         },
       }),
-      profileHash: profileHash('sha256:app-with-hooked-email'),
+      profileHash: profileHash('app-with-hooked-email'),
     };
 
     const codecHookComponent: TargetBoundComponentDescriptor<'sql', 'sqlite'> = {

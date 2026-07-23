@@ -37,7 +37,7 @@ type VOContract = MongoContractWithTypeMaps<
   {
     readonly target: 'mongo';
     readonly targetFamily: 'mongo';
-    readonly profileHash: ProfileHashBase<'sha256:test'>;
+    readonly profileHash: ProfileHashBase<'test'>;
     readonly capabilities: Record<string, never>;
     readonly extensionPacks: Record<string, never>;
     readonly meta: Record<string, never>;
@@ -88,7 +88,7 @@ type VOContract = MongoContractWithTypeMaps<
       };
     };
     readonly storage: {
-      readonly storageHash: StorageHashBase<'sha256:test-storage'>;
+      readonly storageHash: StorageHashBase<'test-storage'>;
       readonly namespaces: {
         readonly __unbound__: {
           readonly id: '__unbound__';
@@ -186,7 +186,7 @@ type VOContractWithFieldTypes = MongoContractWithTypeMaps<
   {
     readonly target: 'mongo';
     readonly targetFamily: 'mongo';
-    readonly profileHash: ProfileHashBase<'sha256:test'>;
+    readonly profileHash: ProfileHashBase<'test'>;
     readonly capabilities: Record<string, never>;
     readonly extensionPacks: Record<string, never>;
     readonly meta: Record<string, never>;
@@ -237,7 +237,7 @@ type VOContractWithFieldTypes = MongoContractWithTypeMaps<
       };
     };
     readonly storage: {
-      readonly storageHash: StorageHashBase<'sha256:test-storage'>;
+      readonly storageHash: StorageHashBase<'test-storage'>;
       readonly namespaces: {
         readonly __unbound__: {
           readonly id: '__unbound__';
@@ -313,7 +313,7 @@ type ExtContract = MongoContractWithTypeMaps<
   {
     readonly target: 'mongo';
     readonly targetFamily: 'mongo';
-    readonly profileHash: ProfileHashBase<'sha256:test'>;
+    readonly profileHash: ProfileHashBase<'test'>;
     readonly capabilities: Record<string, never>;
     readonly extensionPacks: Record<string, never>;
     readonly meta: Record<string, never>;
@@ -424,7 +424,7 @@ type ExtContract = MongoContractWithTypeMaps<
       };
     };
     readonly storage: {
-      readonly storageHash: StorageHashBase<'sha256:ext-storage'>;
+      readonly storageHash: StorageHashBase<'ext-storage'>;
       readonly namespaces: {
         readonly __unbound__: {
           readonly id: '__unbound__';

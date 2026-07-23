@@ -10,7 +10,7 @@ import type { MongoExecutionPlan } from '../src/mongo-execution-plan';
 
 const meta: PlanMeta = {
   target: 'mongodb',
-  storageHash: 'sha256:test',
+  storageHash: 'test',
   lane: 'mongo',
 };
 

@@ -128,9 +128,9 @@ describe.sequential('Schema verification after runner - integration', () => {
       const contractWithDefaults: Contract<SqlStorage> = {
         target: 'postgres',
         targetFamily: 'sql',
-        profileHash: profileHash('sha256:test'),
+        profileHash: profileHash('test'),
         storage: new SqlStorage({
-          storageHash: coreHash('sha256:contract-with-defaults'),
+          storageHash: coreHash('contract-with-defaults'),
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
               id: UNBOUND_NAMESPACE_ID,

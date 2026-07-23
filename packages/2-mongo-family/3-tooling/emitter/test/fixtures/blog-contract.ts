@@ -58,7 +58,7 @@ export const blogContract = createMongoContract({
     },
   },
   storage: {
-    storageHash: coreHash('sha256:test'),
+    storageHash: coreHash('test'),
     namespaces: {
       __unbound__: {
         id: '__unbound__',

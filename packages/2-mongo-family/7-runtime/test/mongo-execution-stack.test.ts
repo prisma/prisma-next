@@ -153,7 +153,7 @@ describe('createMongoExecutionContext', () => {
       target: mongoRuntimeTarget,
       adapter: mongoRuntimeAdapter,
     });
-    const contract = { target: 'mongo' as const, storageHash: 'sha256:test' };
+    const contract = { target: 'mongo' as const, storageHash: 'test' };
     const context = createMongoExecutionContext({ contract, stack });
     expectTypeOf(context).toMatchTypeOf<MongoExecutionContext<typeof contract>>();
     expectTypeOf(context.contract).toEqualTypeOf<typeof contract>();

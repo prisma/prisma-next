@@ -69,7 +69,7 @@ withTempDir(({ createTempDir }) => {
         const migDir = findLatestMigrationDir(ctx);
         const manifestPath = join(migDir, 'migration.json');
         const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
-        manifest.migrationHash = `sha256:${'0'.repeat(64)}`;
+        manifest.migrationHash = `${'0'.repeat(64)}`;
         writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
 
         const check = await runMigrationCheck(ctx, ['--json']);
@@ -125,8 +125,8 @@ withTempDir(({ createTempDir }) => {
 
         const orphanManifest = {
           ...manifest,
-          from: `sha256:deadbeef${'0'.repeat(56)}`,
-          to: `sha256:cafebabe${'0'.repeat(56)}`,
+          from: `deadbeef${'0'.repeat(56)}`,
+          to: `cafebabe${'0'.repeat(56)}`,
         };
         const orphanOps = readFileSync(join(migDir, 'ops.json'), 'utf-8');
 
@@ -155,7 +155,7 @@ withTempDir(({ createTempDir }) => {
         const plan = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
         expect(plan.exitCode, 'plan').toBe(0);
 
-        const danglingHash = `sha256:${'f'.repeat(64)}`;
+        const danglingHash = `${'f'.repeat(64)}`;
         const refsDir = join(ctx.testDir, 'migrations', 'app', 'refs');
         mkdirSync(refsDir, { recursive: true });
         writeFileSync(
@@ -187,12 +187,12 @@ withTempDir(({ createTempDir }) => {
 
         if (existsSync(endContractPath)) {
           const contract = JSON.parse(readFileSync(endContractPath, 'utf-8'));
-          contract.storage.storageHash = `sha256:${'d'.repeat(64)}`;
+          contract.storage.storageHash = `${'d'.repeat(64)}`;
           writeFileSync(endContractPath, JSON.stringify(contract, null, 2));
         } else {
           writeFileSync(
             endContractPath,
-            JSON.stringify({ storage: { storageHash: `sha256:${'d'.repeat(64)}` } }, null, 2),
+            JSON.stringify({ storage: { storageHash: `${'d'.repeat(64)}` } }, null, 2),
           );
         }
 
@@ -228,12 +228,12 @@ withTempDir(({ createTempDir }) => {
 
         if (existsSync(endContractPath)) {
           const contract = JSON.parse(readFileSync(endContractPath, 'utf-8'));
-          contract.storage.storageHash = `sha256:${'d'.repeat(64)}`;
+          contract.storage.storageHash = `${'d'.repeat(64)}`;
           writeFileSync(endContractPath, JSON.stringify(contract, null, 2));
         } else {
           writeFileSync(
             endContractPath,
-            JSON.stringify({ storage: { storageHash: `sha256:${'d'.repeat(64)}` } }, null, 2),
+            JSON.stringify({ storage: { storageHash: `${'d'.repeat(64)}` } }, null, 2),
           );
         }
 

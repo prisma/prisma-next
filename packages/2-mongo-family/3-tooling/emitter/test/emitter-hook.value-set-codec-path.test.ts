@@ -24,7 +24,7 @@ const nonIdentityCodecLookup: CodecLookup = {
   },
 };
 
-const testHashes = { storageHash: 'sha256:test', profileHash: 'sha256:test' };
+const testHashes = { storageHash: 'test', profileHash: 'test' };
 
 const levelField = {
   nullable: false,
@@ -46,7 +46,7 @@ const itemModel: ContractModelBase = {
 function contractWithEncodedValueSet(): Contract {
   const base = createMongoContract({ models: { Item: itemModel } });
   const storage = {
-    storageHash: coreHash('sha256:test'),
+    storageHash: coreHash('test'),
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,

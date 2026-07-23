@@ -38,7 +38,7 @@ function createMiddlewareContext(overrides?: Partial<SqlMiddlewareContext>): Sql
 
 const baseMeta: PlanMeta = {
   target: 'postgres',
-  storageHash: 'sha256:test',
+  storageHash: 'test',
   lane: 'dsl',
 };
 

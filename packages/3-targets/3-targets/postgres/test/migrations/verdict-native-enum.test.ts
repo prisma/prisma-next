@@ -63,12 +63,12 @@ function makeContract(options: {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:native-enum-verdict-test'),
+    profileHash: profileHash('native-enum-verdict-test'),
     ...(options.defaultControlPolicy !== undefined
       ? { defaultControlPolicy: options.defaultControlPolicy }
       : {}),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:native-enum-verdict-test'),
+      storageHash: coreHash('native-enum-verdict-test'),
       namespaces: { public: schema },
     }),
     roots: {},

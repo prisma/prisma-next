@@ -7,7 +7,7 @@ import { MongoStorage } from '../src/ir/mongo-storage';
 describe('elementCoordinates with MongoStorage', () => {
   it('walks Mongo namespace collection entries', () => {
     const storage = new MongoStorage({
-      storageHash: coreHash('sha256:element-coordinates-mongo'),
+      storageHash: coreHash('element-coordinates-mongo'),
       namespaces: {
         app: buildMongoNamespace({ id: 'app', entries: { collection: { posts: {} } } }),
       },
@@ -26,7 +26,7 @@ describe('elementCoordinates with MongoStorage', () => {
 describe('coordinate-resolution acceptance — every elementCoordinates tuple resolves', () => {
   it('every coordinate from a mongo storage resolves through entityAt', () => {
     const storage = new MongoStorage({
-      storageHash: coreHash('sha256:coord-resolution-mongo'),
+      storageHash: coreHash('coord-resolution-mongo'),
       namespaces: {
         app: buildMongoNamespace({
           id: 'app',

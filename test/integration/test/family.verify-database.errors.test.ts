@@ -208,7 +208,7 @@ describe('family instance verify - errors', () => {
 
             // Write marker with different hash
             await seedTestMarker(client, {
-              storageHash: 'sha256:different-hash',
+              storageHash: 'different-hash',
               profileHash: contractWithDb.profileHash ?? contractWithDb.storage.storageHash,
               contractJson: contractWithDb,
               canonicalVersion: 1,
@@ -235,7 +235,7 @@ describe('family instance verify - errors', () => {
             code: 'PN-RUN-3002',
             summary: 'Hash mismatch',
             contract: expectedContract,
-            marker: { storageHash: 'sha256:different-hash' },
+            marker: { storageHash: 'different-hash' },
           });
         } finally {
           if (existsSync(testDirWithDb)) {
@@ -265,7 +265,7 @@ describe('family instance verify - errors', () => {
             // Write marker with different profileHash
             await seedTestMarker(client, {
               storageHash: contractWithDb.storage.storageHash,
-              profileHash: 'sha256:different-profile-hash',
+              profileHash: 'different-profile-hash',
               contractJson: contractWithDb,
               canonicalVersion: 1,
             });
@@ -291,7 +291,7 @@ describe('family instance verify - errors', () => {
             code: 'PN-RUN-3002',
             summary: 'Hash mismatch',
             contract: expectedContract,
-            marker: { profileHash: 'sha256:different-profile-hash' },
+            marker: { profileHash: 'different-profile-hash' },
           });
         } finally {
           if (existsSync(testDirWithDb)) {

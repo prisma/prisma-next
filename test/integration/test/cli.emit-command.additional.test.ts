@@ -62,8 +62,8 @@ describe('emit command: additional fixtures', () => {
         const storage = tsContract['storage'] as Record<string, unknown>;
         const storageHash = storage['storageHash'];
         const profileHash = tsContract['profileHash'];
-        expect(storageHash).toMatch(/^sha256:[a-f0-9]{64}$/);
-        expect(profileHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+        expect(storageHash).toMatch(/^[a-f0-9]{64}$/);
+        expect(profileHash).toMatch(/^[a-f0-9]{64}$/);
         tsProviderStorageHash = storageHash as string;
         tsProviderProfileHash = profileHash as string;
       } finally {
@@ -104,8 +104,8 @@ describe('emit command: additional fixtures', () => {
       expect(emitted).toMatchObject({
         targetFamily: 'sql',
       });
-      expect(emittedStorageHash).toMatch(/^sha256:[a-f0-9]{64}$/);
-      expect(emittedProfileHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+      expect(emittedStorageHash).toMatch(/^[a-f0-9]{64}$/);
+      expect(emittedProfileHash).toMatch(/^[a-f0-9]{64}$/);
       expect(emittedStorageHash).toBe(tsProviderStorageHash);
       expect(emittedProfileHash).toBe(tsProviderProfileHash);
       expect(emitted).not.toHaveProperty('sources');
@@ -330,7 +330,7 @@ model Post {
       const parsed = JSON.parse(jsonOutput);
       expect(parsed).toMatchObject({
         ok: true,
-        storageHash: expect.stringMatching(/^sha256:/),
+        storageHash: expect.stringMatching(/^[a-f0-9]{64}$/),
         files: {
           json: expect.stringContaining('contract.json'),
           dts: expect.stringContaining('contract.d.ts'),
@@ -438,7 +438,7 @@ model Post {
       const parsed = JSON.parse(jsonOutput);
       expect(parsed).toMatchObject({
         ok: true,
-        storageHash: expect.stringMatching(/^sha256:/),
+        storageHash: expect.stringMatching(/^[a-f0-9]{64}$/),
         files: {
           json: expect.stringContaining('contract.json'),
           dts: expect.stringContaining('contract.d.ts'),

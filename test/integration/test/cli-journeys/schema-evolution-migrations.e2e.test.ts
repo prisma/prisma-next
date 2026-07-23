@@ -155,7 +155,7 @@ withTempDir(({ createTempDir }) => {
         }
 
         // X.03: migration show with non-existent prefix
-        const showNotFound = await runMigrationShow(ctx, ['sha256:nonexistent123']);
+        const showNotFound = await runMigrationShow(ctx, ['nonexistent123']);
         expect(showNotFound.exitCode, 'X.03: show not found').toBe(1);
       },
       timeouts.spinUpPpgDev,

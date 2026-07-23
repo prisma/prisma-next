@@ -21,11 +21,11 @@ function table(columns: Record<string, StorageColumn>): StorageTable {
   return { columns, uniques: [], indexes: [], foreignKeys: [] };
 }
 
-function contract(tables: Record<string, StorageTable>, hash = 'sha256:c'): Contract<SqlStorage> {
+function contract(tables: Record<string, StorageTable>, hash = 'c'): Contract<SqlStorage> {
   return {
     target: 'sqlite',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     storage: new SqlStorage({
       storageHash: coreHash(hash),
       namespaces: {
@@ -98,7 +98,7 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
             email: col({ codecId: HOOKED_CODEC }),
           }),
         },
-        'sha256:to',
+        'to',
       ),
       schema: { tables: {} },
       policy: { allowedOperationClasses: ['additive'] },
@@ -142,13 +142,13 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
           email: col({ codecId: HOOKED_CODEC }),
         }),
       },
-      'sha256:from',
+      'from',
     );
     const toContract = contract(
       {
         User: table({ id: col({ codecId: 'sqlite/text@1' }) }),
       },
-      'sha256:to',
+      'to',
     );
 
     const result = planner.plan({
@@ -181,7 +181,7 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
         {
           User: table({ id: col({ codecId: 'sqlite/text@1' }) }),
         },
-        'sha256:to',
+        'to',
       ),
       schema: { tables: {} },
       policy: { allowedOperationClasses: ['additive'] },
@@ -221,7 +221,7 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
           name: col({ codecId: HOOKED_CODEC }),
         }),
       },
-      'sha256:to',
+      'to',
     );
 
     const a = planner.plan({

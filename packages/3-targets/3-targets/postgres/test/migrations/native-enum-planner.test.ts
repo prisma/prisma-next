@@ -106,10 +106,10 @@ function makeContract(options: { readonly withEnum: boolean }): Contract<SqlStor
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:native-enum-planner'),
+    profileHash: profileHash('native-enum-planner'),
     defaultControlPolicy: 'managed',
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:native-enum-planner'),
+      storageHash: coreHash('native-enum-planner'),
       namespaces: { sales: schema },
     }),
     roots: {},
@@ -367,7 +367,7 @@ describe('planner ownership + policy for enum extras', () => {
     // its physical type name in `entries.native_enum`, so `declaresEntity`
     // matches the coordinate and the app plan leaves it untouched.
     const siblingStorage = new SqlStorage({
-      storageHash: coreHash('sha256:sibling-owns-order-status'),
+      storageHash: coreHash('sibling-owns-order-status'),
       namespaces: {
         sales: new PostgresSchema({
           id: 'sales',
@@ -416,7 +416,7 @@ describe('D2-F1: enum drop-safety resolves ownership by physical type name', () 
   // not drop a type a sibling space owns in the same schema.
   function packStorageDeclaringRenamedEnum(): SqlStorage {
     return new SqlStorage({
-      storageHash: coreHash('sha256:pack-renamed-enum'),
+      storageHash: coreHash('pack-renamed-enum'),
       namespaces: {
         public: new PostgresSchema({
           id: 'public',
@@ -455,10 +455,10 @@ describe('D2-F1: enum drop-safety resolves ownership by physical type name', () 
     return {
       target: 'postgres',
       targetFamily: 'sql',
-      profileHash: profileHash('sha256:app-public'),
+      profileHash: profileHash('app-public'),
       defaultControlPolicy: 'managed',
       storage: new SqlStorage({
-        storageHash: coreHash('sha256:app-public'),
+        storageHash: coreHash('app-public'),
         namespaces: { public: schema },
       }),
       roots: {},

@@ -746,7 +746,7 @@ describe('interpretPslDocumentToMongoContract', () => {
           },
         },
       });
-      expect(ir.storage.storageHash).toMatch(/^sha256:/);
+      expect(ir.storage.storageHash).toMatch(/^[a-f0-9]{64}$/);
     });
 
     it('includes empty extensionPacks, capabilities, and meta', () => {
@@ -908,7 +908,7 @@ describe('interpretPslDocumentToMongoContract', () => {
       `);
 
       expect(ir).toEqual({
-        profileHash: expect.stringMatching(/^sha256:/),
+        profileHash: expect.stringMatching(/^[a-f0-9]{64}$/),
         targetFamily: 'mongo',
         target: 'mongo',
         roots: {
@@ -967,8 +967,8 @@ describe('interpretPslDocumentToMongoContract', () => {
         },
         storage: new MongoStorage({
           storageHash: expect.stringMatching(
-            /^sha256:/,
-          ) as unknown as StorageHashBase<`sha256:${string}`>,
+            /^[a-f0-9]{64}$/,
+          ) as unknown as StorageHashBase<string>,
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: buildMongoNamespace({
               id: UNBOUND_NAMESPACE_ID,

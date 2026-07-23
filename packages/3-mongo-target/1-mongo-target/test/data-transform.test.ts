@@ -27,7 +27,7 @@ function asDataTransformOp(op: AnyMongoMigrationOperation): MongoDataTransformOp
 function makePlanMeta() {
   return {
     target: 'mongo' as const,
-    storageHash: 'sha256:test',
+    storageHash: 'test',
     lane: 'mongo-raw',
   };
 }

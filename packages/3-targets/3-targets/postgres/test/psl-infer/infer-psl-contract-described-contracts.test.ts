@@ -78,9 +78,9 @@ function describedContract(
   const contract: Contract<SqlStorage> = {
     target: TARGET,
     targetFamily: TARGET_FAMILY,
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:contract'),
+      storageHash: coreHash('contract'),
       namespaces: storageNamespaces,
     }),
     roots: {},
@@ -113,9 +113,9 @@ function describedContractWithModel(options: {
   const contract: Contract<SqlStorage> = {
     target: TARGET,
     targetFamily: TARGET_FAMILY,
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:contract'),
+      storageHash: coreHash('contract'),
       namespaces: {
         [namespaceId]: new PostgresSchema({
           id: namespaceId,
@@ -207,7 +207,7 @@ describe('inferPostgresPslContract — described-contract omission', () => {
       contract: {
         ...describedContract({}).contract,
         storage: new SqlStorage({
-          storageHash: coreHash('sha256:contract'),
+          storageHash: coreHash('contract'),
           namespaces: {
             public: new PostgresSchema({
               id: 'public',
@@ -235,7 +235,7 @@ describe('inferPostgresPslContract — described-contract omission', () => {
       contract: {
         ...describedContract({}).contract,
         storage: new SqlStorage({
-          storageHash: coreHash('sha256:contract'),
+          storageHash: coreHash('contract'),
           namespaces: {
             public: new PostgresSchema({
               id: 'public',

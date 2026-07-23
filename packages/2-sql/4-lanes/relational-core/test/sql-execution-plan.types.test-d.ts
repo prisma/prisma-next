@@ -10,7 +10,7 @@ import type { SqlExecutionPlan } from '../src/sql-execution-plan';
 
 const meta: PlanMeta = {
   target: 'postgres',
-  storageHash: 'sha256:test',
+  storageHash: 'test',
   lane: 'sql',
 };
 

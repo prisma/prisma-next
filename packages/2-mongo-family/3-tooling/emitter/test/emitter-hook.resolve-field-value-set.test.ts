@@ -27,7 +27,7 @@ const userModel: ContractModelBase = {
 function contractWithValueSet(values: readonly string[]): Contract {
   const base = createMongoContract({ models: { User: userModel } });
   const storage = {
-    storageHash: coreHash('sha256:test'),
+    storageHash: coreHash('test'),
     namespaces: {
       [UNBOUND_NAMESPACE_ID]: {
         id: UNBOUND_NAMESPACE_ID,

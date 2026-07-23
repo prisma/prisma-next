@@ -87,8 +87,8 @@ describe('mongo contract builder', () => {
         },
       },
     });
-    expect(contract.profileHash).toMatch(/^sha256:/);
-    expect(contract.storage.storageHash).toMatch(/^sha256:/);
+    expect(contract.profileHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(contract.storage.storageHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it('supports owned models, polymorphism, and value objects', () => {

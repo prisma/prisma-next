@@ -165,7 +165,7 @@ const userModel = model('user', {
 // Create a complete contract
 const c = contract({
   target: 'postgres',
-  storageHash: 'sha256:abc123',
+  storageHash: 'abc123',
   storage: s,
   models: { User: userModel },
 });

@@ -263,7 +263,7 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
       createSqliteBuiltinCodecLookup(),
     ).readLedger(sqliteDriver, LEDGER_TEST_SPACE_ID);
 
-    const mongoDest = 'sha256:parity-mongo-multi';
+    const mongoDest = 'parity-mongo-multi';
     const mongoEdges = buildMultiEdgeRefs(mongoDest);
     const mongoPlan = {
       targetId: 'mongo' as const,
@@ -320,7 +320,7 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
     const destHash = pgContract.storage.storageHash;
     const edges: readonly AggregateMigrationEdgeRef[] = [
       {
-        migrationHash: 'sha256:parity-skip',
+        migrationHash: 'parity-skip',
         dirName: '001_skip',
         from: EMPTY_CONTRACT_HASH,
         to: destHash,
@@ -379,7 +379,7 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
     const sqliteDest = sqliteContract.storage.storageHash;
     const sqliteEdges: readonly AggregateMigrationEdgeRef[] = [
       {
-        migrationHash: 'sha256:parity-skip',
+        migrationHash: 'parity-skip',
         dirName: '001_skip',
         from: EMPTY_CONTRACT_HASH,
         to: sqliteDest,
@@ -427,13 +427,13 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
       createSqliteBuiltinCodecLookup(),
     ).readLedger(sqliteDriver, LEDGER_TEST_SPACE_ID);
 
-    const mongoDest = 'sha256:parity-mongo-skip';
+    const mongoDest = 'parity-mongo-skip';
     const collection = 'parity_skip_user';
     await mongoDb.createCollection(collection);
     await mongoDb.collection(collection).createIndex({ email: 1 }, { name: 'email_1' });
     const mongoEdges: readonly AggregateMigrationEdgeRef[] = [
       {
-        migrationHash: 'sha256:parity-skip',
+        migrationHash: 'parity-skip',
         dirName: '001_skip',
         from: EMPTY_CONTRACT_HASH,
         to: mongoDest,
@@ -577,7 +577,7 @@ describe.sequential('LedgerEntryRecord.operationCount parity across targets', {
       createSqliteBuiltinCodecLookup(),
     ).readLedger(sqliteDriver, LEDGER_TEST_SPACE_ID);
 
-    const mongoDest = 'sha256:parity-mongo-synth';
+    const mongoDest = 'parity-mongo-synth';
     const mongoPlan = {
       targetId: 'mongo' as const,
       spaceId: LEDGER_TEST_SPACE_ID,

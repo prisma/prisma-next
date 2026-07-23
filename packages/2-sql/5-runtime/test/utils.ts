@@ -463,7 +463,7 @@ export function createTestContract(
   },
 ): Contract<SqlStorage> {
   const { execution, ...rest } = contract;
-  const storageHashValue = coreHash(rest['storageHash'] ?? 'sha256:testcore');
+  const storageHashValue = coreHash(rest['storageHash'] ?? 'testcore');
 
   return {
     target: rest['target'] ?? 'postgres',
@@ -488,7 +488,7 @@ export function createTestContract(
     extensionPacks: rest['extensionPacks'] ?? {},
     meta: rest['meta'] ?? {},
     ...(execution ? { execution } : {}),
-    profileHash: profileHash(rest['profileHash'] ?? 'sha256:testprofile'),
+    profileHash: profileHash(rest['profileHash'] ?? 'testprofile'),
   };
 }
 

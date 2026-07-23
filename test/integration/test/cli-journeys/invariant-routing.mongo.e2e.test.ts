@@ -228,7 +228,7 @@ import { RawUpdateManyCommand, RawAggregateCommand } from '@prisma-next/mongo-qu
 
 const planMeta = {
   target: 'mongo',
-  storageHash: 'sha256:hand-authored',
+  storageHash: 'hand-authored',
   lane: 'mongo-raw',
   paramDescriptors: [],
 };
@@ -622,7 +622,7 @@ describe('Journey: Mongo invariant-aware ref routing (live database)', {
     // branch A. The contract files share the same hash, so we cannot get a
     // real second hash without a second contract fixture; clearing the
     // toContract bookend lets emit accept the synthetic destination.
-    const cbHash = `sha256:${'b'.repeat(64)}`;
+    const cbHash = `${'b'.repeat(64)}`;
     writeFileSync(
       branchBManifestPath,
       `${JSON.stringify({ ...branchBManifest, toContract: null }, null, 2)}\n`,

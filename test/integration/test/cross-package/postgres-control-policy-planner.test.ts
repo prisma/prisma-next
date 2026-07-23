@@ -28,9 +28,9 @@ function makeContract(
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:contract'),
+      storageHash: coreHash('contract'),
       namespaces: { [UNBOUND_NAMESPACE_ID]: unboundNs },
     }),
     roots: {},

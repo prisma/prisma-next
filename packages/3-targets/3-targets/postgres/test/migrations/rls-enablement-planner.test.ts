@@ -90,9 +90,9 @@ function buildContract(options: {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:rls-enablement-planner-test'),
+    profileHash: profileHash('rls-enablement-planner-test'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:rls-enablement-planner-test'),
+      storageHash: coreHash('rls-enablement-planner-test'),
       namespaces: { public: schema },
     }),
     roots: {},

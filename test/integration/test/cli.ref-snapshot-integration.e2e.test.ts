@@ -22,7 +22,7 @@ const execFileAsync = promisify(execFile);
 const TSX_BIN = resolve(__dirname, '../../../node_modules/.bin/tsx');
 const fixtureSubdir = 'migration-apply';
 const workspaceRoot = resolve(__dirname, '../../..');
-const HASH_FLOAT = `sha256:${'f'.repeat(64)}`;
+const HASH_FLOAT = `${'f'.repeat(64)}`;
 
 async function inDir<T>(dir: string, fn: () => Promise<T>): Promise<T> {
   const prev = process.cwd();

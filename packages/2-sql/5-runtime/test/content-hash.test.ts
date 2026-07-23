@@ -7,7 +7,7 @@ import { stubAst } from './utils';
 function makeMeta(overrides?: Partial<PlanMeta>): PlanMeta {
   return {
     target: 'postgres',
-    storageHash: 'sha256:test',
+    storageHash: 'test',
     lane: 'dsl',
     ...overrides,
   };
@@ -70,8 +70,8 @@ describe('computeSqlContentHash', () => {
 
   describe('discrimination', () => {
     it('discriminates on differing storageHash with same SQL and params', async () => {
-      const a = makeExec({ sql: 'select 1', params: [], meta: { storageHash: 'sha256:v1' } });
-      const b = makeExec({ sql: 'select 1', params: [], meta: { storageHash: 'sha256:v2' } });
+      const a = makeExec({ sql: 'select 1', params: [], meta: { storageHash: 'v1' } });
+      const b = makeExec({ sql: 'select 1', params: [], meta: { storageHash: 'v2' } });
       expect(await computeSqlContentHash(a)).not.toBe(await computeSqlContentHash(b));
     });
 
@@ -135,7 +135,7 @@ describe('computeSqlContentHash', () => {
       const exec = makeExec({
         sql: 'select 1',
         params: [42],
-        meta: { storageHash: 'sha256:abc' },
+        meta: { storageHash: 'abc' },
       });
       const hash = await computeSqlContentHash(exec);
       expect(hash).toMatch(/^sha512:[0-9a-f]{128}$/);

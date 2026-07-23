@@ -56,13 +56,13 @@ function lookupOf(
 const baseContract = new SqlContractSerializer().deserializeContract({
   target: 'postgres',
   targetFamily: 'sql',
-  profileHash: 'sha256:cast-policy-test',
+  profileHash: 'cast-policy-test',
   roots: {},
   capabilities: {},
   extensionPacks: {},
   meta: {},
   storage: {
-    storageHash: 'sha256:cast-policy',
+    storageHash: 'cast-policy',
     namespaces: {
       __unbound__: {
         id: '__unbound__',

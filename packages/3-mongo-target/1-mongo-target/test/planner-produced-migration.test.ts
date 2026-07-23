@@ -4,8 +4,8 @@ import { CreateIndexCall, DropIndexCall } from '../src/core/op-factory-call';
 import { PlannerProducedMongoMigration } from '../src/core/planner-produced-migration';
 
 const META = {
-  from: 'sha256:00',
-  to: 'sha256:01',
+  from: '00',
+  to: '01',
 } as const;
 
 describe('PlannerProducedMongoMigration', () => {
@@ -24,15 +24,15 @@ describe('PlannerProducedMongoMigration', () => {
   it('derives origin/destination from describe() (round-trips through MigrationPlan surface)', () => {
     const migration = new PlannerProducedMongoMigration([], META);
 
-    expect(migration.origin).toEqual({ storageHash: 'sha256:00' });
-    expect(migration.destination).toEqual({ storageHash: 'sha256:01' });
+    expect(migration.origin).toEqual({ storageHash: '00' });
+    expect(migration.destination).toEqual({ storageHash: '01' });
   });
 
   it("treats a null 'from' as a null origin so runners do not match against an empty hash", () => {
-    const migration = new PlannerProducedMongoMigration([], { from: null, to: 'sha256:01' });
+    const migration = new PlannerProducedMongoMigration([], { from: null, to: '01' });
 
     expect(migration.origin).toBeNull();
-    expect(migration.destination).toEqual({ storageHash: 'sha256:01' });
+    expect(migration.destination).toEqual({ storageHash: '01' });
   });
 
   it('renders the supplied OpFactoryCall list to runnable mongo operations via the operations getter', () => {

@@ -46,7 +46,7 @@ type ExampleModels = {
   };
 };
 
-type ExampleStorage = StorageBase<'sha256:abc123'> & {
+type ExampleStorage = StorageBase<'abc123'> & {
   readonly namespaces: Record<string, never>;
   readonly tables: {
     readonly user: {
@@ -79,7 +79,7 @@ test('ContractModel defaults to ModelStorageBase', () => {
 // ── StorageBase ──────────────────────────────────────────────────────────────
 
 test('StorageBase with specific hash extends default StorageBase', () => {
-  expectTypeOf<StorageBase<'sha256:abc123'>>().toExtend<StorageBase>();
+  expectTypeOf<StorageBase<'abc123'>>().toExtend<StorageBase>();
 });
 
 // ── Literal type preservation ────────────────────────────────────────────────
@@ -104,7 +104,7 @@ test('preserves model storage bridge literals through the domain namespace', () 
 
 test('preserves storage hash literal through TStorage', () => {
   expectTypeOf<ExampleContract['storage']['storageHash']>().toEqualTypeOf<
-    StorageHashBase<'sha256:abc123'>
+    StorageHashBase<'abc123'>
   >();
 });
 

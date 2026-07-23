@@ -99,7 +99,7 @@ withTempDir(({ createTempDir }) => {
         // `migrationHash` is the content-address over `(manifest, [])`.
         // The author re-emits after filling in placeholders to rewrite
         // both `ops.json` and `migrationHash`.
-        expect(manifestBefore.migrationHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+        expect(manifestBefore.migrationHash).toMatch(/^[a-f0-9]{64}$/);
         expect(JSON.parse(readFileSync(join(migrationDir, 'ops.json'), 'utf-8'))).toEqual([]);
 
         // Both queries are guarded by `id = -1` so the test's

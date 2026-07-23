@@ -183,7 +183,7 @@ function createMockMongoDriver(rows: Record<string, unknown>[] = []): MongoDrive
 const mongoMeta: PlanMeta = {
   target: 'mongo',
   targetFamily: 'mongo',
-  storageHash: 'sha256:mongo-test',
+  storageHash: 'mongo-test',
   lane: 'orm',
 };
 
@@ -216,7 +216,7 @@ describe('cross-family middleware proof', () => {
       params: [],
       meta: {
         target: 'postgres',
-        storageHash: 'sha256:sql-test',
+        storageHash: 'sql-test',
         lane: 'sql',
       },
     };
@@ -230,7 +230,7 @@ describe('cross-family middleware proof', () => {
       phase: 'beforeExecute',
       lane: 'sql',
       target: 'postgres',
-      storageHash: 'sha256:sql-test',
+      storageHash: 'sql-test',
     });
     expect(events[1]).toMatchObject({
       phase: 'afterExecute',
@@ -265,7 +265,7 @@ describe('cross-family middleware proof', () => {
       phase: 'beforeExecute',
       lane: 'orm',
       target: 'mongo',
-      storageHash: 'sha256:mongo-test',
+      storageHash: 'mongo-test',
     });
     expect(events[1]).toMatchObject({
       phase: 'afterExecute',
@@ -291,7 +291,7 @@ describe('cross-family middleware proof', () => {
       params: [],
       meta: {
         target: 'postgres',
-        storageHash: 'sha256:sql-hash',
+        storageHash: 'sql-hash',
         lane: 'sql',
       },
     };
@@ -303,7 +303,7 @@ describe('cross-family middleware proof', () => {
     const mongoPlan = createMongoPlan({
       target: 'mongo',
       targetFamily: 'mongo',
-      storageHash: 'sha256:mongo-hash',
+      storageHash: 'mongo-hash',
       lane: 'orm',
     });
 
@@ -351,7 +351,7 @@ describe('cross-family middleware proof', () => {
       params: [],
       meta: {
         target: 'postgres',
-        storageHash: 'sha256:sql-hash',
+        storageHash: 'sql-hash',
         lane: 'sql',
       },
     };
@@ -364,7 +364,7 @@ describe('cross-family middleware proof', () => {
     const mongoPlan = createMongoPlan({
       target: 'mongo',
       targetFamily: 'mongo',
-      storageHash: 'sha256:mongo-hash',
+      storageHash: 'mongo-hash',
       lane: 'orm',
     });
 

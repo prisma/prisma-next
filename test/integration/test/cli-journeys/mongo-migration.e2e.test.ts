@@ -266,7 +266,7 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
     const manifest = JSON.parse(readFileSync(join(migrationDir, 'migration.json'), 'utf-8')) as {
       migrationHash: string;
     };
-    expect(manifest.migrationHash).toMatch(/^sha256:/);
+    expect(manifest.migrationHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it('migration new --target mongo scaffolds an empty Migration stub with contract files copied', async () => {
@@ -320,7 +320,7 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
     // the scaffolded `migration.ts` carries no operations yet. The
     // developer fills in operations and re-runs `node migration.ts` to
     // rewrite both `ops.json` and `migrationHash`.
-    expect(manifest.migrationHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(manifest.migrationHash).toMatch(/^[a-f0-9]{64}$/);
   });
 });
 
@@ -419,7 +419,7 @@ import { RawUpdateManyCommand, RawAggregateCommand } from '@prisma-next/mongo-qu
 
 const planMeta = {
   target: 'mongo',
-  storageHash: 'sha256:hand-authored',
+  storageHash: 'hand-authored',
   lane: 'mongo-raw',
   paramDescriptors: [],
 };
@@ -482,7 +482,7 @@ MigrationCLI.run(import.meta.url, M);
     const manifest = JSON.parse(readFileSync(join(migrationDir, 'migration.json'), 'utf-8')) as {
       migrationHash: string;
     };
-    expect(manifest.migrationHash).toMatch(/^sha256:/);
+    expect(manifest.migrationHash).toMatch(/^[a-f0-9]{64}$/);
 
     const apply1 = await migrationApply(ctx);
     expect(apply1.exitCode, `migration apply additive: ${apply1.stdout}\n${apply1.stderr}`).toBe(0);

@@ -240,7 +240,7 @@ describe('SqliteControlAdapter.readMarker', () => {
       INSERT INTO _prisma_marker (
         space, core_hash, profile_hash, updated_at, meta, invariants
       ) VALUES (
-        'app', 'sha256:abc', 'sha256:def', '2024-01-01T00:00:00.000Z', '{}', 'not-an-array'
+        'app', 'abc', 'def', '2024-01-01T00:00:00.000Z', '{}', 'not-an-array'
       )
     `);
 

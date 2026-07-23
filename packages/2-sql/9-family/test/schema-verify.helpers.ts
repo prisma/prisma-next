@@ -45,10 +45,10 @@ export function createTestContract(
     target: 'postgres',
     targetFamily: 'sql',
     roots: {},
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     ...ifDefined('defaultControlPolicy', contractOverrides?.defaultControlPolicy),
     storage: new SqlStorage({
-      storageHash: 'sha256:test' as StorageHashBase<string>,
+      storageHash: 'test' as StorageHashBase<string>,
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: namespace,
       },

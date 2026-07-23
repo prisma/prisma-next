@@ -100,11 +100,11 @@ function appContract(): MongoContract {
           },
         },
       },
-      storageHash: coreHash('sha256:tc18-app-contract'),
+      storageHash: coreHash('tc18-app-contract'),
     },
     capabilities: {},
     extensionPacks: {},
-    profileHash: profileHash('sha256:tc18-app-profile'),
+    profileHash: profileHash('tc18-app-profile'),
     meta: {},
   };
 }
@@ -136,11 +136,11 @@ function extContract(): MongoContract {
           },
         },
       },
-      storageHash: coreHash('sha256:tc18-ext-contract'),
+      storageHash: coreHash('tc18-ext-contract'),
     },
     capabilities: {},
     extensionPacks: {},
-    profileHash: profileHash('sha256:tc18-ext-profile'),
+    profileHash: profileHash('tc18-ext-profile'),
     meta: {},
   };
 }

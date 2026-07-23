@@ -18,10 +18,10 @@ function makeSingletonUnboundContractJson() {
   return {
     targetFamily: 'mongo' as const,
     target: 'mongo',
-    profileHash: 'sha256:test',
+    profileHash: 'test',
     roots: {},
     storage: {
-      storageHash: 'sha256:test',
+      storageHash: 'test',
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
@@ -38,10 +38,10 @@ function makeValidContractJson() {
   return {
     targetFamily: 'mongo' as const,
     target: 'mongo',
-    profileHash: 'sha256:test',
+    profileHash: 'test',
     roots: { items: { model: 'Item', namespace: UNBOUND_NAMESPACE_ID } },
     storage: {
-      storageHash: 'sha256:test',
+      storageHash: 'test',
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: {
           id: UNBOUND_NAMESPACE_ID,
@@ -134,10 +134,10 @@ describe('MongoTargetContractSerializer', () => {
       return {
         targetFamily: 'mongo' as const,
         target: 'mongo',
-        profileHash: 'sha256:test',
+        profileHash: 'test',
         roots: { items: { model: 'Item', namespace: UNBOUND_NAMESPACE_ID } },
         storage: {
-          storageHash: 'sha256:test',
+          storageHash: 'test',
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: {
               id: UNBOUND_NAMESPACE_ID,
@@ -200,14 +200,14 @@ describe('MongoTargetContractSerializer', () => {
       return {
         targetFamily: 'mongo' as const,
         target: 'mongo',
-        profileHash: 'sha256:test',
+        profileHash: 'test',
         defaultControlPolicy: 'tolerated' as const,
         roots: {
           items: { model: 'Item', namespace: UNBOUND_NAMESPACE_ID },
           events: { model: 'Event', namespace: UNBOUND_NAMESPACE_ID },
         },
         storage: {
-          storageHash: 'sha256:test',
+          storageHash: 'test',
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: {
               id: UNBOUND_NAMESPACE_ID,

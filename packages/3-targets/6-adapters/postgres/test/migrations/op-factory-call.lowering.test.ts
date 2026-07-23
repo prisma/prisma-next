@@ -51,7 +51,7 @@ import { describe, expect, it } from 'vitest';
 import { createPostgresBuiltinCodecLookup } from '../../src/core/codec-lookup';
 import { PostgresControlAdapter } from '../../src/core/control-adapter';
 
-const META = { from: 'sha256:from', to: 'sha256:to' } as const;
+const META = { from: 'from', to: 'to' } as const;
 const testAdapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
 
 describe('renderOps', () => {
@@ -237,7 +237,7 @@ describe('TypeScriptRenderablePostgresMigration', () => {
     );
 
     expect(migration.targetId).toBe('postgres');
-    expect(migration.destination).toEqual({ storageHash: 'sha256:to' });
+    expect(migration.destination).toEqual({ storageHash: 'to' });
     expect(migration.describe()).toEqual(META);
 
     const operations = await Promise.all(migration.operations);

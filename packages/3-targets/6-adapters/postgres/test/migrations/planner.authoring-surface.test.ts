@@ -19,9 +19,9 @@ function createEmptyContract(): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:test'),
+      storageHash: coreHash('test'),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,
@@ -64,7 +64,7 @@ describe('PostgresMigrationPlanner authoring surface', () => {
       const fromContract: Contract<SqlStorage> = {
         ...createEmptyContract(),
         storage: new SqlStorage({
-          storageHash: coreHash('sha256:from'),
+          storageHash: coreHash('from-hash-stub'),
           namespaces: {
             [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
               id: UNBOUND_NAMESPACE_ID,
@@ -97,7 +97,7 @@ describe('PostgresMigrationPlanner authoring surface', () => {
       expect(source).toContain('export default class M extends Migration<Start, End>');
       expect(source).toContain('override readonly endContractJson = endContract;');
       expect(source).not.toContain('describe()');
-      expect(source).not.toContain(coreHash('sha256:from'));
+      expect(source).not.toContain(coreHash('from-hash-stub'));
     });
   });
 
@@ -108,14 +108,14 @@ describe('PostgresMigrationPlanner authoring surface', () => {
         {
           packageDir: '/tmp/migration-pkg',
           fromHash: null,
-          toHash: 'sha256:to',
+          toHash: 'to-hash-stub',
         },
         APP_SPACE_ID,
       );
 
       expect(empty.targetId).toBe('postgres');
       expect(empty.operations).toEqual([]);
-      expect(empty.destination).toEqual({ storageHash: 'sha256:to' });
+      expect(empty.destination).toEqual({ storageHash: 'to-hash-stub' });
     });
 
     it('renders a stub that derives from/to from contract JSON and has an empty operations list', () => {
@@ -123,8 +123,8 @@ describe('PostgresMigrationPlanner authoring surface', () => {
       const empty = planner.emptyMigration(
         {
           packageDir: '/tmp/migration-pkg',
-          fromHash: 'sha256:from',
-          toHash: 'sha256:to',
+          fromHash: 'from-hash-stub',
+          toHash: 'to-hash-stub',
         },
         APP_SPACE_ID,
       );
@@ -135,8 +135,8 @@ describe('PostgresMigrationPlanner authoring surface', () => {
       expect(source).toContain('export default class M extends Migration<Start, End>');
       expect(source).toContain('override readonly endContractJson = endContract;');
       expect(source).not.toContain('describe()');
-      expect(source).not.toContain('"sha256:from"');
-      expect(source).not.toContain('"sha256:to"');
+      expect(source).not.toContain('"from-hash-stub"');
+      expect(source).not.toContain('"to-hash-stub"');
       expect(source).toContain('override get operations()');
     });
   });

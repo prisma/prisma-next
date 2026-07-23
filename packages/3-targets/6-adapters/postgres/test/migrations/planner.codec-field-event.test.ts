@@ -41,11 +41,11 @@ function table(columns: Record<string, StorageColumn>): StorageTable {
   return { columns, uniques: [], indexes: [], foreignKeys: [] };
 }
 
-function contract(tables: Record<string, StorageTable>, hash = 'sha256:c'): Contract<SqlStorage> {
+function contract(tables: Record<string, StorageTable>, hash = 'c'): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     storage: new SqlStorage({
       storageHash: coreHash(hash),
       namespaces: {
@@ -124,7 +124,7 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
             email: col({ codecId: HOOKED_CODEC }),
           }),
         },
-        'sha256:to',
+        'to',
       ),
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
@@ -150,7 +150,7 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
         {
           User: table({ id: col({ codecId: PG_TEXT_CODEC }) }),
         },
-        'sha256:to',
+        'to',
       ),
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
@@ -191,7 +191,7 @@ describe('PostgresMigrationPlanner - codec onFieldEvent wiring', () => {
           name: col({ codecId: HOOKED_CODEC }),
         }),
       },
-      'sha256:to',
+      'to',
     );
 
     const a = planner.plan({

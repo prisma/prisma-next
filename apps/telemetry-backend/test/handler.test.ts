@@ -89,7 +89,7 @@ describe('telemetry POST /events', () => {
       agent: 'claude-code',
       extensions: ['pgvector', 'paradedb'],
       // Forward-compat unknown keys; the backend must silently drop these.
-      crashStackHash: 'sha256:abcdef',
+      crashStackHash: 'abcdef',
       gpuVendor: 'apple',
       experimentalCapabilities: { foo: 'bar' },
     };

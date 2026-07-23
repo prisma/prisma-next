@@ -23,7 +23,7 @@ function makeResult(args: {
     ok: args.ok,
     ...(args.ok ? {} : { code: 'PN-RUN-3010' }),
     summary: args.ok ? 'Database schema satisfies contract' : 'does not satisfy',
-    contract: { storageHash: 'sha256:x' },
+    contract: { storageHash: 'x' },
     target: { expected: 'mongo' },
     schema: { issues: args.issues },
     timings: { total: 0 },

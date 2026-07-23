@@ -71,11 +71,11 @@ function makeContract(
           entries: { collection: normalized },
         },
       },
-      storageHash: coreHash(`sha256:${hashSeed}`),
+      storageHash: coreHash(`${hashSeed}`),
     },
     capabilities: {},
     extensionPacks: {},
-    profileHash: profileHash('sha256:test'),
+    profileHash: profileHash('test'),
     meta: {},
   };
 }

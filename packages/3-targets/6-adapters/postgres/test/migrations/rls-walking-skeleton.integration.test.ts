@@ -82,9 +82,9 @@ function buildRlsWalkingSkeletonContract(): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash('sha256:rls-walking-skeleton'),
+    profileHash: profileHash('rls-walking-skeleton'),
     storage: new SqlStorage({
-      storageHash: coreHash('sha256:rls-walking-skeleton'),
+      storageHash: coreHash('rls-walking-skeleton'),
       namespaces: { public: schema },
     }),
     roots: {},

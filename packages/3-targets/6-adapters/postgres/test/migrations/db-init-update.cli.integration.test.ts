@@ -50,9 +50,9 @@ function buildExtensionContract(version: 1 | 2): Contract<SqlStorage> {
   return {
     target: 'postgres',
     targetFamily: 'sql',
-    profileHash: profileHash(`sha256:pg-ext-test-v${version}`),
+    profileHash: profileHash(`pg-ext-test-v${version}`),
     storage: new SqlStorage({
-      storageHash: coreHash(`sha256:pg-ext-contract-v${version}`),
+      storageHash: coreHash(`pg-ext-contract-v${version}`),
       namespaces: {
         [UNBOUND_NAMESPACE_ID]: postgresCreateNamespace({
           id: UNBOUND_NAMESPACE_ID,

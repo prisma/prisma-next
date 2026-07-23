@@ -46,8 +46,8 @@ describe('SqliteControlAdapter marker/ledger write lowering', () => {
   it('insertMarker lowers to a plain insert with DB-side updated_at', async () => {
     const driver = createCapturingDriver();
     await adapter.insertMarker(driver, 'app', {
-      storageHash: 'sha256:core',
-      profileHash: 'sha256:prof',
+      storageHash: 'core',
+      profileHash: 'prof',
     });
 
     const { sql, params } = driver.calls[0]!;
@@ -58,15 +58,15 @@ describe('SqliteControlAdapter marker/ledger write lowering', () => {
     );
     expect(sql).not.toContain('ON CONFLICT');
     expect(params[0]).toBe('app');
-    expect(params[1]).toBe('sha256:core');
-    expect(params[2]).toBe('sha256:prof');
+    expect(params[1]).toBe('core');
+    expect(params[2]).toBe('prof');
   });
 
   it('initMarker lowers to an upsert keyed on space with DB-side updated_at', async () => {
     const driver = createCapturingDriver();
     await adapter.initMarker(driver, 'app', {
-      storageHash: 'sha256:core',
-      profileHash: 'sha256:prof',
+      storageHash: 'core',
+      profileHash: 'prof',
       invariants: ['inv-a', 'inv-b'],
     });
 
@@ -82,8 +82,8 @@ describe('SqliteControlAdapter marker/ledger write lowering', () => {
         '"meta" = excluded."meta", "invariants" = excluded."invariants"',
     );
     expect(params[0]).toBe('app');
-    expect(params[1]).toBe('sha256:core');
-    expect(params[2]).toBe('sha256:prof');
+    expect(params[1]).toBe('core');
+    expect(params[2]).toBe('prof');
     expect(params[7]).toBe('["inv-a","inv-b"]');
   });
 
@@ -92,11 +92,11 @@ describe('SqliteControlAdapter marker/ledger write lowering', () => {
     // and select; SQLite stores invariants as JSON TEXT, so it arrives as a
     // string and is decoded before the merge.
     const driver = createCapturingDriver([
-      { core_hash: 'sha256:from', profile_hash: 'sha256:prof', invariants: '["inv-a","inv-b"]' },
+      { core_hash: 'from', profile_hash: 'prof', invariants: '["inv-a","inv-b"]' },
     ]);
-    const matched = await adapter.updateMarker(driver, 'app', 'sha256:from', {
-      storageHash: 'sha256:to',
-      profileHash: 'sha256:prof',
+    const matched = await adapter.updateMarker(driver, 'app', 'from', {
+      storageHash: 'to',
+      profileHash: 'prof',
       invariants: ['inv-b', 'inv-c'],
     });
 
@@ -108,21 +108,15 @@ describe('SqliteControlAdapter marker/ledger write lowering', () => {
         'RETURNING "_prisma_marker"."space"',
     );
     // union({a,b}, {b,c}) deduped + sorted, JSON-encoded — not the incoming set verbatim.
-    expect(update.params).toEqual([
-      'sha256:to',
-      'sha256:prof',
-      '["inv-a","inv-b","inv-c"]',
-      'app',
-      'sha256:from',
-    ]);
+    expect(update.params).toEqual(['to', 'prof', '["inv-a","inv-b","inv-c"]', 'app', 'from']);
     expect(matched).toBe(true);
   });
 
   it('updateMarker omits the invariants assignment when none are supplied', async () => {
     const driver = createCapturingDriver([]);
-    const matched = await adapter.updateMarker(driver, 'app', 'sha256:from', {
-      storageHash: 'sha256:to',
-      profileHash: 'sha256:prof',
+    const matched = await adapter.updateMarker(driver, 'app', 'from', {
+      storageHash: 'to',
+      profileHash: 'prof',
     });
 
     const { sql, params } = driver.calls[0]!;
@@ -132,7 +126,7 @@ describe('SqliteControlAdapter marker/ledger write lowering', () => {
         'WHERE ("_prisma_marker"."space" = ? AND "_prisma_marker"."core_hash" = ?) ' +
         'RETURNING "_prisma_marker"."space"',
     );
-    expect(params).toEqual(['sha256:to', 'sha256:prof', 'app', 'sha256:from']);
+    expect(params).toEqual(['to', 'prof', 'app', 'from']);
     expect(matched).toBe(false);
   });
 
@@ -140,10 +134,10 @@ describe('SqliteControlAdapter marker/ledger write lowering', () => {
     const driver = createCapturingDriver();
     await adapter.writeLedgerEntry(driver, 'app', {
       edgeId: 'edge-1',
-      from: 'sha256:from',
-      to: 'sha256:to',
+      from: 'from',
+      to: 'to',
       migrationName: '001_init',
-      migrationHash: 'sha256:mig',
+      migrationHash: 'mig',
       operations: [{ id: 'op-1' }],
     });
 
@@ -152,14 +146,7 @@ describe('SqliteControlAdapter marker/ledger write lowering', () => {
       'INSERT INTO "_prisma_ledger" ("space", "migration_name", "migration_hash", ' +
         '"origin_core_hash", "destination_core_hash", "operations") VALUES (?, ?, ?, ?, ?, ?)',
     );
-    expect(params).toEqual([
-      'app',
-      '001_init',
-      'sha256:mig',
-      'sha256:from',
-      'sha256:to',
-      '[{"id":"op-1"}]',
-    ]);
+    expect(params).toEqual(['app', '001_init', 'mig', 'from', 'to', '[{"id":"op-1"}]']);
   });
 });
 
@@ -184,26 +171,26 @@ describe('SqliteControlAdapter marker/ledger writes (end-to-end)', () => {
   it('initMarker stamps a readable marker row, idempotently', async () => {
     await withDb(async (driver) => {
       await adapter.initMarker(driver, 'app', {
-        storageHash: 'sha256:core',
-        profileHash: 'sha256:prof',
+        storageHash: 'core',
+        profileHash: 'prof',
         invariants: ['inv-a', 'inv-b'],
       });
 
       let marker = await adapter.readMarker(driver, 'app');
-      expect(marker!.storageHash).toBe('sha256:core');
+      expect(marker!.storageHash).toBe('core');
       expect(marker!.invariants).toEqual(['inv-a', 'inv-b']);
       expect(marker!.contractJson).toBeNull();
       expect(marker!.meta).toEqual({});
 
       await adapter.initMarker(driver, 'app', {
-        storageHash: 'sha256:core2',
-        profileHash: 'sha256:prof2',
+        storageHash: 'core2',
+        profileHash: 'prof2',
         invariants: ['inv-x'],
       });
       const all = await adapter.readAllMarkers(driver);
       expect(all.size).toBe(1);
       marker = await adapter.readMarker(driver, 'app');
-      expect(marker!.storageHash).toBe('sha256:core2');
+      expect(marker!.storageHash).toBe('core2');
       expect(marker!.invariants).toEqual(['inv-x']);
     });
   });
@@ -211,25 +198,25 @@ describe('SqliteControlAdapter marker/ledger writes (end-to-end)', () => {
   it('updateMarker advances on a matching expectedFrom and refuses a stale one', async () => {
     await withDb(async (driver) => {
       await adapter.initMarker(driver, 'app', {
-        storageHash: 'sha256:core',
-        profileHash: 'sha256:prof',
+        storageHash: 'core',
+        profileHash: 'prof',
       });
 
-      const stale = await adapter.updateMarker(driver, 'app', 'sha256:wrong', {
-        storageHash: 'sha256:next',
-        profileHash: 'sha256:prof2',
+      const stale = await adapter.updateMarker(driver, 'app', 'wrong', {
+        storageHash: 'next',
+        profileHash: 'prof2',
       });
       expect(stale).toBe(false);
-      expect((await adapter.readMarker(driver, 'app'))!.storageHash).toBe('sha256:core');
+      expect((await adapter.readMarker(driver, 'app'))!.storageHash).toBe('core');
 
-      const matched = await adapter.updateMarker(driver, 'app', 'sha256:core', {
-        storageHash: 'sha256:next',
-        profileHash: 'sha256:prof2',
+      const matched = await adapter.updateMarker(driver, 'app', 'core', {
+        storageHash: 'next',
+        profileHash: 'prof2',
         invariants: ['inv-1'],
       });
       expect(matched).toBe(true);
       const marker = await adapter.readMarker(driver, 'app');
-      expect(marker!.storageHash).toBe('sha256:next');
+      expect(marker!.storageHash).toBe('next');
       expect(marker!.invariants).toEqual(['inv-1']);
     });
   });
@@ -237,14 +224,14 @@ describe('SqliteControlAdapter marker/ledger writes (end-to-end)', () => {
   it('updateMarker accumulate-dedupes invariants across advances instead of overwriting', async () => {
     await withDb(async (driver) => {
       await adapter.initMarker(driver, 'app', {
-        storageHash: 'sha256:core',
-        profileHash: 'sha256:prof',
+        storageHash: 'core',
+        profileHash: 'prof',
         invariants: ['inv-b', 'inv-a'],
       });
 
-      const matched = await adapter.updateMarker(driver, 'app', 'sha256:core', {
-        storageHash: 'sha256:next',
-        profileHash: 'sha256:prof2',
+      const matched = await adapter.updateMarker(driver, 'app', 'core', {
+        storageHash: 'next',
+        profileHash: 'prof2',
         invariants: ['inv-c', 'inv-a'],
       });
       expect(matched).toBe(true);
@@ -260,18 +247,18 @@ describe('SqliteControlAdapter marker/ledger writes (end-to-end)', () => {
     await withDb(async (driver) => {
       await adapter.writeLedgerEntry(driver, 'app', {
         edgeId: 'edge-1',
-        from: 'sha256:from',
-        to: 'sha256:to',
+        from: 'from',
+        to: 'to',
         migrationName: '001_init',
-        migrationHash: 'sha256:mig',
+        migrationHash: 'mig',
         operations: [{ id: 'op-1' }, { id: 'op-2' }],
       });
 
       const ledger = await adapter.readLedger(driver, 'app');
       expect(ledger).toHaveLength(1);
       expect(ledger[0]!.migrationName).toBe('001_init');
-      expect(ledger[0]!.from).toBe('sha256:from');
-      expect(ledger[0]!.to).toBe('sha256:to');
+      expect(ledger[0]!.from).toBe('from');
+      expect(ledger[0]!.to).toBe('to');
       expect(ledger[0]!.operationCount).toBe(2);
     });
   });

@@ -17,7 +17,7 @@ const codecImports = [
 const contract: Contract = {
   ...ormContractJson,
   target: 'mongo',
-  profileHash: profileHash('sha256:orm-profile'),
+  profileHash: profileHash('orm-profile'),
   roots: Object.fromEntries(
     Object.entries(ormContractJson.roots).map(([key, ref]) => [
       key,
@@ -30,7 +30,7 @@ const contract: Contract = {
   >(ormContractJson.domain),
   storage: {
     ...ormContractJson.storage,
-    storageHash: coreHash('sha256:orm-storage'),
+    storageHash: coreHash('orm-storage'),
   },
   capabilities: {},
   extensionPacks: {},
@@ -38,8 +38,8 @@ const contract: Contract = {
 } as Contract;
 
 const hashes = {
-  storageHash: 'sha256:orm-storage',
-  profileHash: 'sha256:orm-profile',
+  storageHash: 'orm-storage',
+  profileHash: 'orm-profile',
 };
 
 const output = generateContractDts(contract, mongoEmission, codecImports, hashes);

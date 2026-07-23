@@ -12,7 +12,7 @@ import type { MongoExecutionPlan } from '../src/mongo-execution-plan';
 function makeMeta(overrides?: Partial<PlanMeta>): PlanMeta {
   return {
     target: 'mongodb',
-    storageHash: 'sha256:test',
+    storageHash: 'test',
     lane: 'mongo',
     ...overrides,
   };
@@ -83,8 +83,8 @@ describe('computeMongoContentHash', () => {
   describe('discrimination', () => {
     it('discriminates on differing storageHash with the same command', async () => {
       const command = new InsertOneWireCommand('users', { _id: 'a' });
-      const a = makeExec({ command, meta: { storageHash: 'sha256:v1' } });
-      const b = makeExec({ command, meta: { storageHash: 'sha256:v2' } });
+      const a = makeExec({ command, meta: { storageHash: 'v1' } });
+      const b = makeExec({ command, meta: { storageHash: 'v2' } });
       expect(await computeMongoContentHash(a)).not.toBe(await computeMongoContentHash(b));
     });
 
@@ -149,7 +149,7 @@ describe('computeMongoContentHash', () => {
     it('returns a fixed-size hashContent digest', async () => {
       const exec = makeExec({
         command: new InsertOneWireCommand('users', { _id: 'a' }),
-        meta: { storageHash: 'sha256:abc' },
+        meta: { storageHash: 'abc' },
       });
       const hash = await computeMongoContentHash(exec);
       expect(hash).toMatch(/^sha512:[0-9a-f]{128}$/);
