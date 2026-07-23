@@ -267,7 +267,7 @@ export const postgresScalarAuthoringTypes: AuthoringTypeNamespace = {
   Inet: { kind: 'typeConstructor', output: { codecId: 'pg/inet@1', nativeType: 'inet' } },
   SmallInt: { kind: 'typeConstructor', output: { codecId: 'pg/int2@1', nativeType: 'int2' } },
   Real: { kind: 'typeConstructor', output: { codecId: 'pg/float4@1', nativeType: 'float4' } },
-  Date: { kind: 'typeConstructor', output: { codecId: 'pg/timestamptz@1', nativeType: 'date' } },
+  Date: { kind: 'typeConstructor', output: { codecId: 'pg/date@1', nativeType: 'date' } },
   VarChar: {
     kind: 'typeConstructor',
     args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, optional: true }],
@@ -465,6 +465,7 @@ const targetTypesByCodecId: Record<string, readonly string[]> = {
   'pg/int2@1': ['int2'],
   'pg/float4@1': ['float4'],
   'pg/timestamp@1': ['timestamp'],
+  'pg/date@1': ['date'],
   'pg/time@1': ['time'],
   'pg/timetz@1': ['timetz'],
   'pg/json@1': ['json'],
