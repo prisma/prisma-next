@@ -35,7 +35,7 @@ const sqliteRuntimeAdapterDescriptor: SqlRuntimeAdapterDescriptor<
   mutationDefaultGenerators: createSqliteMutationDefaultGenerators,
   rawCodecInferer: sqliteRawCodecInferer,
   create(stack): SqliteRuntimeAdapterInstance {
-    const codecRegistry = assembleSqliteCodecRegistry(stack.target, stack.extensionPacks);
+    const codecRegistry = assembleSqliteCodecRegistry(stack.target, stack.extensions);
     return createSqliteAdapterWithCodecRegistry(codecRegistry);
   },
 };

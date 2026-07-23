@@ -162,7 +162,7 @@ function createComposedRuntimeAdapter(
     },
     adapter: sqliteRuntimeAdapterDescriptor,
     driver: undefined,
-    extensionPacks: [runtimeExtension('runtime-codecs', descriptors)],
+    extensions: [runtimeExtension('runtime-codecs', descriptors)],
   });
 }
 
@@ -177,7 +177,7 @@ function createComposedControlAdapter(
       types: { codecTypes: { codecDescriptors: targetDescriptors } },
     },
     adapter: sqliteAdapterControlDescriptor,
-    extensionPacks: [controlExtension('control-codecs', descriptors)],
+    extensions: [controlExtension('control-codecs', descriptors)],
   });
   return sqliteAdapterControlDescriptor.create(stack);
 }
@@ -188,7 +188,7 @@ const contract = new SqlContractSerializer().deserializeContract({
   profileHash: 'sha256:sqlite-codec-registry-composition',
   roots: {},
   capabilities: {},
-  extensionPacks: {},
+  extensions: {},
   meta: {},
   storage: {
     storageHash: 'sha256:sqlite-codec-registry-composition',
@@ -323,7 +323,7 @@ describe('SQLite adapter codec registry composition', () => {
       family: sqlFamilyDescriptor,
       target: sqliteTargetControlDescriptor,
       adapter: sqliteAdapterControlDescriptor,
-      extensionPacks: [controlExtension('control-materialization', [controlDescriptor])],
+      extensions: [controlExtension('control-materialization', [controlDescriptor])],
     });
     controlMaterializations = 0;
     sqliteAdapterControlDescriptor.create(stack);

@@ -17,7 +17,7 @@ const sqliteAdapterDescriptor: SqlControlAdapterDescriptor<'sqlite'> = {
     generatorDescriptors: createSqliteMutationDefaultGeneratorDescriptors(),
   },
   create(stack): SqlControlAdapter<'sqlite'> {
-    const codecRegistry = assembleSqliteCodecRegistry(stack.target, stack.extensionPacks);
+    const codecRegistry = assembleSqliteCodecRegistry(stack.target, stack.extensions);
     return new SqliteControlAdapter(codecRegistry);
   },
 };

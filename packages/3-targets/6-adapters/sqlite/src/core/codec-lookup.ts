@@ -34,12 +34,12 @@ function buildSqliteCodecRegistry(descriptors: ReadonlyArray<unknown>): SqliteCo
 
 export function assembleSqliteCodecRegistry(
   target: CodecContributor,
-  extensionPacks: ReadonlyArray<CodecContributor>,
+  extensions: ReadonlyArray<CodecContributor>,
 ): SqliteCodecRegistry {
   return buildSqliteCodecRegistry([
     ...descriptorsFrom([target]),
     ...sqliteCodecDescriptorRegistry.values(),
-    ...descriptorsFrom(extensionPacks),
+    ...descriptorsFrom(extensions),
   ]);
 }
 
