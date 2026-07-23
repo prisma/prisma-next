@@ -1,4 +1,7 @@
-import type { AuthoringTypeNamespace } from '@prisma-next/framework-components/authoring';
+import {
+  type AuthoringTypeNamespace,
+  collectScalarTypeConstructors,
+} from '@prisma-next/framework-components/authoring';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { assembleAuthoringContributions } from '@prisma-next/framework-components/control';
 import { buildSymbolTable } from '@prisma-next/psl-parser';
@@ -79,14 +82,7 @@ function parseAndEmit(source: string) {
     sourceId: 'schema.prisma',
     capabilities: {},
     target,
-    scalarColumnDescriptors: new Map([
-      ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
-      ['Uuid', { codecId: 'pg/uuid@1', nativeType: 'uuid' }],
-      ['Inet', { codecId: 'pg/inet@1', nativeType: 'inet' }],
-      ['Json', { codecId: 'pg/json@1', nativeType: 'json' }],
-      ['Jsonb', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
-      ['Numeric', { codecId: 'pg/numeric@1', nativeType: 'numeric' }],
-    ]),
+    scalarColumnDescriptors: collectScalarTypeConstructors(authoringTypes),
     authoringContributions: assembled,
     composedExtensionContracts: new Map(),
     createNamespace: postgresCreateNamespace,

@@ -10,8 +10,6 @@ const POSTGRES_TO_PSL: Record<string, string> = {
   bigint: 'BigInt',
   float8: 'Float',
   'double precision': 'Float',
-  timestamptz: 'DateTime',
-  'timestamp with time zone': 'DateTime',
   jsonb: 'Jsonb',
   bytea: 'Bytes',
 };
@@ -31,6 +29,8 @@ const PRESERVED_NATIVE_TYPES: Record<string, string> = {
   decimal: 'Numeric',
   timestamp: 'Timestamp',
   'timestamp without time zone': 'Timestamp',
+  timestamptz: 'Timestamptz',
+  'timestamp with time zone': 'Timestamptz',
   date: 'Date',
   time: 'Time',
   'time without time zone': 'Time',
