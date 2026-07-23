@@ -10,7 +10,7 @@ model User {
   age Int
   isActive Boolean @default(true)
   score Float?
-  profile Json?
+  profile Jsonb?
   embedding Embedding?
   createdAt DateTime @default(now())
 }

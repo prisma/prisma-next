@@ -7,6 +7,8 @@ import { type LspDiagnostic, mapParseDiagnostics } from './diagnostic-mapping';
  * `pslBlockDescriptors` is kept complete on the live path so extension-block
  * validation matches the build; the structural diagnostics (duplicate
  * declaration, invalid qualified type) hold even without descriptors.
+ * `scalarTypes` is not consumed by the pipeline itself — it is the
+ * control-stack projection semantic tokens and completions classify against.
  */
 export interface PipelineInputs {
   readonly scalarTypes: readonly string[];
@@ -31,7 +33,6 @@ export function runPipeline(text: string, inputs: PipelineInputs): PipelineResul
   const { table: symbolTable, diagnostics: symbolTableDiagnostics } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: inputs.scalarTypes,
     pslBlockDescriptors: inputs.pslBlockDescriptors,
   });
 

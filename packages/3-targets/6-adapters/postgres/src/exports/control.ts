@@ -10,13 +10,13 @@ import { PostgresControlAdapter } from '../core/control-adapter';
 import {
   createPostgresDefaultFunctionRegistry,
   createPostgresMutationDefaultGeneratorDescriptors,
-  createPostgresScalarTypeDescriptors,
+  postgresAuthoringTypes,
 } from '../core/control-mutation-defaults';
 import { postgresAdapterDescriptorMeta } from '../core/descriptor-meta';
 
 const postgresAdapterDescriptor: SqlControlAdapterDescriptor<'postgres'> = {
   ...postgresAdapterDescriptorMeta,
-  scalarTypeDescriptors: createPostgresScalarTypeDescriptors(),
+  authoring: { type: postgresAuthoringTypes, valueObjectStorageType: 'Jsonb' },
   controlMutationDefaults: {
     defaultFunctionRegistry: createPostgresDefaultFunctionRegistry(),
     generatorDescriptors: createPostgresMutationDefaultGeneratorDescriptors(),

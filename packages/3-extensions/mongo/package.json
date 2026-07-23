@@ -37,6 +37,7 @@
     "mongodb": "catalog:",
     "@prisma-next/emitter": "workspace:0.16.0",
     "@prisma-next/mongo-emitter": "workspace:0.16.0",
+    "@prisma-next/psl-parser": "workspace:0.14.0",
     "@prisma-next/test-utils": "workspace:0.16.0",
     "@prisma-next/tsconfig": "workspace:0.16.0",
     "@prisma-next/tsdown": "workspace:0.16.0",

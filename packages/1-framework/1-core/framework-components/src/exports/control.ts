@@ -99,7 +99,6 @@ export type {
 export {
   assembleAuthoringContributions,
   assembleControlMutationDefaults,
-  assembleScalarTypeDescriptors,
   assertUniqueCodecOwner,
   buildExtensionLoadOrder,
   createControlStack,

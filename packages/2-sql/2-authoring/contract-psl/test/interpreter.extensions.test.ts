@@ -13,7 +13,7 @@ import {
 
 const baseInput = {
   target: postgresTarget,
-  scalarTypeDescriptors: postgresScalarTypeDescriptors,
+  scalarColumnDescriptors: postgresScalarTypeDescriptors,
   composedExtensionContracts: new Map(),
   createNamespace: createTestSqlNamespace,
   capabilities: { sql: { scalarList: true } },
@@ -166,8 +166,9 @@ model Post {
               args: [{ kind: 'string' }, { kind: 'stringArray' }],
               output: {
                 codecId: 'custom/enum@1',
-                nativeType: { kind: 'arg', index: 0 },
+                nativeType: 'enum',
                 typeParams: {
+                  name: { kind: 'arg', index: 0 },
                   values: { kind: 'arg', index: 1 },
                 },
               },
@@ -182,8 +183,8 @@ model Post {
     expect(documentScopedTypes(result.value)).toMatchObject({
       Tag: {
         codecId: 'custom/enum@1',
-        nativeType: 'Tag',
-        typeParams: { values: ['hello, world', 'a,b,c', 'plain'] },
+        nativeType: 'enum',
+        typeParams: { name: 'Tag', values: ['hello, world', 'a,b,c', 'plain'] },
       },
     });
   });
@@ -582,7 +583,7 @@ namespace public {
     const result = interpretPslDocumentToSqlContract({
       ...symbolTableInput,
       target: postgresTarget,
-      scalarTypeDescriptors: postgresScalarTypeDescriptors,
+      scalarColumnDescriptors: postgresScalarTypeDescriptors,
       composedExtensionContracts: new Map(),
       authoringContributions,
       createNamespace,
@@ -650,7 +651,7 @@ model Foo {
       const result = interpretPslDocumentToSqlContract({
         ...symbolTableInput,
         target: postgresTarget,
-        scalarTypeDescriptors: postgresScalarTypeDescriptors,
+        scalarColumnDescriptors: postgresScalarTypeDescriptors,
         composedExtensionContracts: new Map(),
         authoringContributions: topThingAuthoringContributions,
         createNamespace,
@@ -697,7 +698,7 @@ namespace auth {
       const result = interpretPslDocumentToSqlContract({
         ...symbolTableInput,
         target: postgresTarget,
-        scalarTypeDescriptors: postgresScalarTypeDescriptors,
+        scalarColumnDescriptors: postgresScalarTypeDescriptors,
         composedExtensionContracts: new Map(),
         authoringContributions: topThingAuthoringContributions,
         createNamespace,
@@ -745,7 +746,7 @@ namespace auth {
       const result = interpretPslDocumentToSqlContract({
         ...symbolTableInput,
         target: postgresTarget,
-        scalarTypeDescriptors: postgresScalarTypeDescriptors,
+        scalarColumnDescriptors: postgresScalarTypeDescriptors,
         composedExtensionContracts: new Map(),
         authoringContributions: topThingAuthoringContributions,
         createNamespace,

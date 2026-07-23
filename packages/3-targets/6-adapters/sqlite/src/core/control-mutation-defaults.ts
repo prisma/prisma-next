@@ -1,5 +1,6 @@
 import type { ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import { timestampNowControlDescriptor } from '@prisma-next/family-sql/control';
+import type { AuthoringTypeNamespace } from '@prisma-next/framework-components/authoring';
 import type {
   ControlMutationDefaultEntry,
   DefaultFunctionLoweringContext,
@@ -7,10 +8,7 @@ import type {
   MutationDefaultGeneratorDescriptor,
   TypedDefaultFunctionCall,
 } from '@prisma-next/framework-components/control';
-import {
-  builtinGeneratorRegistryMetadata,
-  resolveBuiltinGeneratedColumnDescriptor,
-} from '@prisma-next/ids';
+import { builtinGeneratorRegistryMetadata } from '@prisma-next/ids';
 import type { FuncCallSig } from '@prisma-next/psl-parser';
 import { int, num, oneOf, optional, str } from '@prisma-next/psl-parser';
 import {
@@ -175,16 +173,48 @@ const sqliteDefaultFunctionRegistryEntries = [
   ],
 ] satisfies ReadonlyArray<readonly [string, ControlMutationDefaultEntry]>;
 
-const sqliteScalarTypeDescriptors = new Map<string, string>([
-  ['String', SQLITE_TEXT_CODEC_ID],
-  ['Int', SQLITE_INTEGER_CODEC_ID],
-  ['BigInt', SQLITE_BIGINT_CODEC_ID],
-  ['Float', SQLITE_REAL_CODEC_ID],
-  ['Decimal', SQLITE_TEXT_CODEC_ID],
-  ['DateTime', SQLITE_DATETIME_CODEC_ID],
-  ['Json', SQLITE_JSON_CODEC_ID],
-  ['Bytes', SQLITE_BLOB_CODEC_ID],
-]);
+/**
+ * The base PSL scalars as zero-arg type constructors in the unified authoring
+ * channel, with explicit `nativeType` values pinned to the codec manifests
+ * (`codecLookup.targetTypesFor(codecId)[0]`).
+ *
+ * The type position is the only storage decider: a mutation-default generator
+ * (`@default(uuid())`) never re-picks a column's storage.
+ */
+export const sqliteScalarAuthoringTypes = {
+  String: {
+    kind: 'typeConstructor',
+    output: { codecId: SQLITE_TEXT_CODEC_ID, nativeType: 'text' },
+  },
+  Int: {
+    kind: 'typeConstructor',
+    output: { codecId: SQLITE_INTEGER_CODEC_ID, nativeType: 'integer' },
+  },
+  BigInt: {
+    kind: 'typeConstructor',
+    output: { codecId: SQLITE_BIGINT_CODEC_ID, nativeType: 'integer' },
+  },
+  Float: {
+    kind: 'typeConstructor',
+    output: { codecId: SQLITE_REAL_CODEC_ID, nativeType: 'real' },
+  },
+  Decimal: {
+    kind: 'typeConstructor',
+    output: { codecId: SQLITE_TEXT_CODEC_ID, nativeType: 'text' },
+  },
+  DateTime: {
+    kind: 'typeConstructor',
+    output: { codecId: SQLITE_DATETIME_CODEC_ID, nativeType: 'text' },
+  },
+  Json: {
+    kind: 'typeConstructor',
+    output: { codecId: SQLITE_JSON_CODEC_ID, nativeType: 'text' },
+  },
+  Bytes: {
+    kind: 'typeConstructor',
+    output: { codecId: SQLITE_BLOB_CODEC_ID, nativeType: 'blob' },
+  },
+} as const satisfies AuthoringTypeNamespace;
 
 export function createSqliteDefaultFunctionRegistry(): ReadonlyMap<
   string,
@@ -199,27 +229,8 @@ export function createSqliteMutationDefaultGeneratorDescriptors(): readonly Muta
       ({ id, applicableCodecIds }): MutationDefaultGeneratorDescriptor => ({
         id,
         applicableCodecIds,
-        resolveGeneratedColumnDescriptor: ({ generated }) => {
-          if (generated.kind !== 'generator' || generated.id !== id) {
-            return undefined;
-          }
-          const descriptor = resolveBuiltinGeneratedColumnDescriptor({
-            id,
-            ...(generated.params ? { params: generated.params } : {}),
-          });
-          return {
-            codecId: descriptor.type.codecId,
-            nativeType: descriptor.type.nativeType,
-            ...(descriptor.type.typeRef ? { typeRef: descriptor.type.typeRef } : {}),
-            ...(descriptor.typeParams ? { typeParams: descriptor.typeParams } : {}),
-          };
-        },
       }),
     ),
     timestampNowControlDescriptor(),
   ];
-}
-
-export function createSqliteScalarTypeDescriptors(): ReadonlyMap<string, string> {
-  return new Map(sqliteScalarTypeDescriptors);
 }

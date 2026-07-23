@@ -119,14 +119,13 @@ function makeContractFromPsl(): MongoContract {
   const { table: symbolTable } = buildSymbolTable({
     document,
     sourceFile,
-    scalarTypes: [...mongoScalarTypeDescriptors.keys()],
     pslBlockDescriptors: {},
   });
   const result = interpretPslDocumentToMongoContract({
     symbolTable,
     sourceFile,
     sourceId: 'tasks.prisma',
-    scalarTypeDescriptors: mongoScalarTypeDescriptors,
+    scalarTypeCodecIds: mongoScalarTypeDescriptors,
     codecLookup: mongoCodecLookup,
   });
   if (!result.ok) {
