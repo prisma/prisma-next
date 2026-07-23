@@ -129,6 +129,15 @@ changes:
         - "extensionPacks"
         - "composedExtensionPacks"
       anyMatch: true
+  - id: orm-count-only-mutation-terminals-renamed
+    summary: Replace `createCount(...)`, `updateCount(...)`, and `deleteCount()` with `createAndCount(...)`, `updateAndCount(...)`, and `deleteAndCount()` in ORM call sites; arguments, guards, behavior, and `Promise<number>` results are unchanged, and no compatibility aliases remain.
+    detection:
+      glob: "**/*.{ts,tsx,mts,cts}"
+      contains:
+        - ".createCount("
+        - ".updateCount("
+        - ".deleteCount("
+      anyMatch: true
   - id: adopt-sql-json-projection-ast-foundations
     summary: Migrate relational AST construction and traversal to explicit JSON projection wrappers, expanded scalar-expression variants, grouped function-source aliases, and codec-preserving forwarded projections.
     detection:

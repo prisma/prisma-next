@@ -61,7 +61,7 @@ The pivot supersedes the user-facing PSL/TS surface from `682714eee`+ (the attri
 **CI gates (not ACs).**
 
 - `pnpm -F @prisma-next/sql-runtime test` — inherited runtime tests (cross-rows stability, empty-update skip, explicit-value-skip, validation at context creation) continue to pass.
-- `pnpm -F @prisma-next/sql-orm-client test` — inherited ORM-client tests (`create` / `createAll` / `updateAll` / `updateCount` / `upsert` / nested `updateFirstGraph`) continue to pass, including bulk-update cross-row-stability for `op: 'update'`.
+- `pnpm -F @prisma-next/sql-orm-client test` — inherited ORM-client tests (`create` / `createAll` / `updateAll` / `updateAndCount` / `upsert` / nested `updateFirstGraph`) continue to pass, including bulk-update cross-row-stability for `op: 'update'`.
 
 ## Milestone: Pivot to Field-Preset PSL Surface
 

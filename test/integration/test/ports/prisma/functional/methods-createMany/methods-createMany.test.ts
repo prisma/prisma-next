@@ -8,14 +8,14 @@ import contractJson from './_fixture/generated/contract.json' with { type: 'json
 //
 // Upstream tests nested `posts.createMany(...)` inside a `user.create(...)`.
 // prisma-next's nested-mutation API uses `posts => posts.create([...])`.
-// The count check uses createCount() for the bulk-create test.
+// The count check uses createAndCount() for the bulk-create test.
 
 describe('ports/prisma/functional/methods-createMany', () => {
   it(
     'should create many records',
     () =>
       withPostgresPort<Contract>({ contractJson }, async ({ db }) => {
-        const count = await db.public.User.createCount([
+        const count = await db.public.User.createAndCount([
           { email: 'user1@example.com' },
           { email: 'user2@example.com' },
           { email: 'user3@example.com' },

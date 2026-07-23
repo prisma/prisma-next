@@ -96,7 +96,7 @@ The variadic annotation argument is now available on every user-facing query-iss
 
 - **Read terminals (state-driven):** `all`, `first`. Annotations flow via `state.userAnnotations`, which `compileSelect` and `compileSelectWithIncludes` thread to `buildOrmQueryPlan`.
 - **Read terminals (post-wrap):** `Collection.aggregate`, `GroupedCollection.aggregate`. Annotations are merged into the compiled plan via `mergeUserAnnotations` after `compileAggregate` / `compileGroupedAggregate` runs.
-- **Write terminals (post-wrap):** `create`, `createAll`, `createCount`, `update`, `updateAll`, `updateCount`, `delete`, `deleteAll`, `deleteCount`, `upsert`. Each post-wraps the compiled mutation plan(s) before dispatch.
+- **Write terminals (post-wrap):** `create`, `createAll`, `createAndCount`, `update`, `updateAll`, `updateAndCount`, `delete`, `deleteAll`, `deleteAndCount`, `upsert`. Each post-wraps the compiled mutation plan(s) before dispatch.
 
 The runtime gate (`assertAnnotationsApplicable`) fires inside `#withAnnotations` (read state path) or `#buildAnnotationsMap` (post-wrap path), so cast-bypass cases throw `RUNTIME.ANNOTATION_INAPPLICABLE`.
 

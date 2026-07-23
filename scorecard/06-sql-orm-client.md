@@ -23,13 +23,13 @@ Legend:
 | `all()` result retrieval | ✅ | ✅ | — | `test/integration/test/sql-orm-client/include.test.ts`; `test/integration/test/sql-orm-client/codec-async.test.ts` (`for await` iteration over `all()`); `test/e2e/framework/test/sqlite/orm.test.ts` (`findMany › returns all rows`) |
 | `create` | ✅ | ✅ | — | `test/integration/test/sql-orm-client/create.test.ts`; `test/e2e/framework/test/sqlite/orm.test.ts` (`create`) |
 | `createAll` | ✅ | ✅ | — | `test/integration/test/sql-orm-client/create.test.ts`; `test/e2e/framework/test/sqlite/orm.test.ts` (`createAll`) |
-| `createCount` | ✅ | 🟡 | — | `test/integration/test/sql-orm-client/create.test.ts` (`createCount`) |
+| `createAndCount` | ✅ | 🟡 | — | `test/integration/test/sql-orm-client/create.test.ts` (`createAndCount`) |
 | `update` | ✅ | ✅ | — | `test/integration/test/sql-orm-client/update.test.ts`; `test/e2e/framework/test/sqlite/orm.test.ts` (`update`) |
 | `updateAll` | ✅ | 🟡 | — | `test/integration/test/sql-orm-client/update.test.ts` (`updateAll`) |
-| `updateCount` | ✅ | 🟡 | — | `test/integration/test/sql-orm-client/update.test.ts` (`updateCount`) |
+| `updateAndCount` | ✅ | 🟡 | — | `test/integration/test/sql-orm-client/update.test.ts` (`updateAndCount`) |
 | `delete` | ✅ | 🟡 | — | `test/integration/test/sql-orm-client/delete.test.ts` (`delete`) |
 | `deleteAll` | ✅ | 🟡 | — | `test/integration/test/sql-orm-client/delete.test.ts` (`deleteAll`) |
-| `deleteCount` | ✅ | ✅ | — | `test/integration/test/sql-orm-client/delete.test.ts` (`deleteCount`); `test/e2e/framework/test/sqlite/orm.test.ts` (`deleteCount`) |
+| `deleteAndCount` | ✅ | ✅ | — | `test/integration/test/sql-orm-client/delete.test.ts` (`deleteAndCount`); `test/e2e/framework/test/sqlite/orm.test.ts` (`deleteAndCount`) |
 | `upsert` (conflict fallback + explicit criteria) | ✅ | 🟡 | — | `test/integration/test/sql-orm-client/upsert.test.ts` |
 | `aggregate(spec)` | ✅ | 🟡 | — | `test/integration/test/sql-orm-client/aggregate.test.ts` |
 | `groupBy` | ✅ | 🟡 | — | `test/integration/test/sql-orm-client/group-by.test.ts` (`groupBy().aggregate() returns grouped counts`) |

@@ -158,7 +158,7 @@ const all = await db.asServiceRole().orm.public.Profile.select('id', 'username')
 // another owner's row affects 0 rows; a withCheck violation raises an error.
 const updated = await userDb.orm.public.Profile
   .where({ userId: me })
-  .updateCount({ username: 'new-name' });
+  .updateAndCount({ username: 'new-name' });
 ```
 
 Notes: `asAnon()` / `asServiceRole()` are sync; only `asUser` is async. Multi-namespace contracts address models by coordinate (`orm.public.Profile`, `sql.public.profile`) — see `prisma-next-queries` § *Namespace-aware accessors*. `RoleBoundDb.transaction(fn)` wraps work in a transaction on the role-bound session.

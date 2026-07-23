@@ -123,9 +123,9 @@ async create(
 ): Promise<Row>;
 ```
 
-Same shape for `createAll`, `createCount`, `update`, `updateAll`, `updateCount`, `delete`, `deleteAll`, `deleteCount`, `upsert`. Each terminal pins the kind to `'write'` when constructing its `MetaBuilder`.
+Same shape for `createAll`, `createAndCount`, `update`, `updateAll`, `updateAndCount`, `delete`, `deleteAll`, `deleteAndCount`, `upsert`. Each terminal pins the kind to `'write'` when constructing its `MetaBuilder`.
 
-`delete` / `deleteAll` / `deleteCount` (which take only `this`-typed receiver guards today) gain a single optional `configure` argument:
+`delete` / `deleteAll` / `deleteAndCount` (which take only `this`-typed receiver guards today) gain a single optional `configure` argument:
 
 ```typescript
 async delete(

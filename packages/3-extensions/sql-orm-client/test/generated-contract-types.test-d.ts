@@ -273,11 +273,11 @@ userCollection.upsert({
 const updatableUsers = userCollection.where({ email: 'alice@example.com' });
 updatableUsers.update({ name: 'Alice' });
 updatableUsers.updateAll({ name: 'Alice' });
-updatableUsers.updateCount({ name: 'Alice' });
+updatableUsers.updateAndCount({ name: 'Alice' });
 const deletableUsers = userCollection.where({ email: 'alice@example.com' });
 deletableUsers.delete();
 deletableUsers.deleteAll();
-deletableUsers.deleteCount();
+deletableUsers.deleteAndCount();
 // @ts-expect-error cursor() requires orderBy() first
 userCollection.cursor({ id: 'user_001' });
 // @ts-expect-error distinctOn() requires orderBy() first
@@ -286,14 +286,14 @@ userCollection.distinctOn('email');
 userCollection.update({ name: 'Alice' });
 // @ts-expect-error updateAll() requires where() first
 userCollection.updateAll({ name: 'Alice' });
-// @ts-expect-error updateCount() requires where() first
-userCollection.updateCount({ name: 'Alice' });
+// @ts-expect-error updateAndCount() requires where() first
+userCollection.updateAndCount({ name: 'Alice' });
 // @ts-expect-error delete() requires where() first
 userCollection.delete();
 // @ts-expect-error deleteAll() requires where() first
 userCollection.deleteAll();
-// @ts-expect-error deleteCount() requires where() first
-userCollection.deleteCount();
+// @ts-expect-error deleteAndCount() requires where() first
+userCollection.deleteAndCount();
 
 type SelectedUserRow = RowOf<typeof selectedUsers>;
 type SelectedUserWithPostsRow = RowOf<typeof selectedUsersWithPosts>;

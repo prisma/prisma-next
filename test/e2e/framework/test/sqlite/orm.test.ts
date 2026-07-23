@@ -95,7 +95,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
           invitedById: number | null;
         }>();
 
-        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 200 }).deleteCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 200 }).deleteAndCount();
       });
     });
   });
@@ -111,8 +111,8 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
         expect(rows[0]!.id).toBe(500);
         expect(rows[1]!.id).toBe(501);
 
-        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 500 }).deleteCount();
-        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 501 }).deleteCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 500 }).deleteAndCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 501 }).deleteAndCount();
       });
     });
   });
@@ -150,8 +150,8 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
         await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 601 }).update({ name: 'Updated' });
         expect(updated!.name).toBe('Updated');
 
-        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 600 }).deleteCount();
-        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 601 }).deleteCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 600 }).deleteAndCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 601 }).deleteAndCount();
       });
     });
   });
@@ -164,7 +164,9 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
           name: 'ToDelete',
           email: 'delete@example.com',
         });
-        const count = await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 300 }).deleteCount();
+        const count = await ormClient[UNBOUND_NAMESPACE_ID].User.where({
+          id: 300,
+        }).deleteAndCount();
         expect(count).toBe(1);
 
         expectTypeOf(count).toBeNumber();
@@ -186,10 +188,10 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
 
         const deletedA = await ormClient[UNBOUND_NAMESPACE_ID].User.where({
           id: 700,
-        }).deleteCount();
+        }).deleteAndCount();
         const deletedB = await ormClient[UNBOUND_NAMESPACE_ID].User.where({
           id: 701,
-        }).deleteCount();
+        }).deleteAndCount();
         expect(deletedA + deletedB).toBe(2);
       });
     });
@@ -231,7 +233,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
           label: string;
         } | null>();
 
-        await ormClient[UNBOUND_NAMESPACE_ID].TypedRow.where({ id: 10 }).deleteCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].TypedRow.where({ id: 10 }).deleteAndCount();
       });
     });
 
@@ -249,7 +251,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
         expect(found).not.toBeNull();
         expect(found!.metadata).toBeNull();
 
-        await ormClient[UNBOUND_NAMESPACE_ID].TypedRow.where({ id: 12 }).deleteCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].TypedRow.where({ id: 12 }).deleteAndCount();
       });
     });
   });
@@ -265,8 +267,8 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
         expect(rows[0]).toMatchObject({ id: 900, name: 'Explicit', label: 'custom' });
         expect(rows[1]).toMatchObject({ id: 901, name: 'Default', label: 'unnamed' });
 
-        await ormClient[UNBOUND_NAMESPACE_ID].Item.where({ id: 900 }).deleteCount();
-        await ormClient[UNBOUND_NAMESPACE_ID].Item.where({ id: 901 }).deleteCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].Item.where({ id: 900 }).deleteAndCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].Item.where({ id: 901 }).deleteAndCount();
       });
     });
   });
@@ -281,7 +283,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
         expect(result.id).toBe(800);
         expect(result.name).toBe('Upserted');
 
-        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 800 }).deleteCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 800 }).deleteAndCount();
       });
     });
 
@@ -300,7 +302,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
         expect(result.id).toBe(801);
         expect(result.name).toBe('UpsertUpdated');
 
-        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 801 }).deleteCount();
+        await ormClient[UNBOUND_NAMESPACE_ID].User.where({ id: 801 }).deleteAndCount();
       });
     });
   });

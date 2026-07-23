@@ -138,6 +138,15 @@ changes:
       glob: "**/prisma-next.config.ts"
       contains:
         - "outputPath"
+  - id: orm-count-only-mutation-terminals-renamed
+    summary: Replace `createCount(...)`, `updateCount(...)`, and `deleteCount()` with `createAndCount(...)`, `updateAndCount(...)`, and `deleteAndCount()` in ORM call sites; arguments, guards, behavior, and `Promise<number>` results are unchanged, and no compatibility aliases remain.
+    detection:
+      glob: "**/*.{ts,tsx,mts,cts}"
+      contains:
+        - ".createCount("
+        - ".updateCount("
+        - ".deleteCount("
+      anyMatch: true
   - id: psl-format-error-class-removed
     summary: |
       The `PslFormatError` class is deleted from `@prisma-next/psl-parser`. `format()`

@@ -318,9 +318,9 @@ describe('Collection', () => {
       ).resolves.toEqual({ count: 0 });
     });
 
-    it('createCount() returns 0 for empty payloads', async () => {
+    it('createAndCount() returns 0 for empty payloads', async () => {
       const { collection } = createCollection();
-      await expect(collection.createCount([])).resolves.toBe(0);
+      await expect(collection.createAndCount([])).resolves.toBe(0);
     });
 
     it('create() nested mutation throws when reload by primary key returns no row', async () => {
@@ -366,11 +366,11 @@ describe('Collection', () => {
       expect(runtime.executions).toHaveLength(2);
     });
 
-    it('createCount() uses split insert when defaultInInsert is absent', async () => {
+    it('createAndCount() uses split insert when defaultInInsert is absent', async () => {
       const { collection, runtime } = createReturningCollectionWithoutDefaultInInsert('User');
       runtime.setNextResults([[], []]);
 
-      const count = await collection.createCount([
+      const count = await collection.createAndCount([
         { id: 1, name: 'Alice', email: 'alice@example.com' },
         { id: 2, name: 'Bob', email: 'bob@example.com', invitedById: 1 },
       ]);

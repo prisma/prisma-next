@@ -245,14 +245,14 @@ describe('@updatedAt mutation defaults via Collection', () => {
     });
   });
 
-  describe('updateCount', () => {
+  describe('updateAndCount', () => {
     it('adds a generated updatedAt to the SET clause on a non-empty update', async () => {
       const { collection, runtime } = setupTagCollection();
       runtime.setNextResults([[{ id: TAG_ID_1 }], []]);
 
-      await collection.where({ id: tagId(TAG_ID_1) }).updateCount({ name: 'eng-v2' });
+      await collection.where({ id: tagId(TAG_ID_1) }).updateAndCount({ name: 'eng-v2' });
 
-      // updateCount issues a SELECT for matched ids, then an UPDATE.
+      // updateAndCount issues a SELECT for matched ids, then an UPDATE.
       const params = planParams(runtime.executions[runtime.executions.length - 1]);
       const dateParam = params.find((p) => p instanceof Date);
       expect(dateParam).toBeInstanceOf(Date);
@@ -261,7 +261,7 @@ describe('@updatedAt mutation defaults via Collection', () => {
     it('returns zero and emits no SQL on an empty update payload', async () => {
       const { collection, runtime } = setupTagCollection();
 
-      const count = await collection.where({ id: tagId(TAG_ID_1) }).updateCount({});
+      const count = await collection.where({ id: tagId(TAG_ID_1) }).updateAndCount({});
 
       expect(count).toBe(0);
       expect(runtime.executions).toHaveLength(0);
