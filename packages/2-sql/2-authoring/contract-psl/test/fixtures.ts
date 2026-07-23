@@ -14,6 +14,7 @@ import {
   type AuthoringFieldPresetDescriptor,
   type AuthoringPslBlockDescriptorNamespace,
   type AuthoringTypeNamespace,
+  collectScalarTypeConstructors,
   type PslExtensionBlock,
   resolveEnumCodecId,
 } from '@prisma-next/framework-components/authoring';
@@ -237,48 +238,36 @@ export const pgvectorExtensionPack: ExtensionPackRef<'sql', 'postgres'> = {
   version: '1.2.3-test',
 };
 
-export const postgresScalarTypeDescriptors = new Map([
-  ['String', { codecId: 'pg/text@1', nativeType: 'text' }],
-  ['Boolean', { codecId: 'pg/bool@1', nativeType: 'bool' }],
-  ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
-  ['BigInt', { codecId: 'pg/int8@1', nativeType: 'int8' }],
-  ['Float', { codecId: 'pg/float8@1', nativeType: 'float8' }],
-  ['Decimal', { codecId: 'pg/numeric@1', nativeType: 'numeric' }],
-  ['DateTime', { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' }],
-  ['Json', { codecId: 'pg/json@1', nativeType: 'json' }],
-  ['Jsonb', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
-  ['Bytes', { codecId: 'pg/bytea@1', nativeType: 'bytea' }],
-] as const);
+export const postgresBaseScalarAuthoringTypes: AuthoringTypeNamespace = {
+  String: { kind: 'typeConstructor', output: { codecId: 'pg/text@1', nativeType: 'text' } },
+  Boolean: { kind: 'typeConstructor', output: { codecId: 'pg/bool@1', nativeType: 'bool' } },
+  Int: { kind: 'typeConstructor', output: { codecId: 'pg/int4@1', nativeType: 'int4' } },
+  BigInt: { kind: 'typeConstructor', output: { codecId: 'pg/int8@1', nativeType: 'int8' } },
+  Float: { kind: 'typeConstructor', output: { codecId: 'pg/float8@1', nativeType: 'float8' } },
+  Decimal: {
+    kind: 'typeConstructor',
+    output: { codecId: 'pg/numeric@1', nativeType: 'numeric' },
+  },
+  DateTime: {
+    kind: 'typeConstructor',
+    output: { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' },
+  },
+  Json: { kind: 'typeConstructor', output: { codecId: 'pg/json@1', nativeType: 'json' } },
+  Jsonb: { kind: 'typeConstructor', output: { codecId: 'pg/jsonb@1', nativeType: 'jsonb' } },
+  Bytes: { kind: 'typeConstructor', output: { codecId: 'pg/bytea@1', nativeType: 'bytea' } },
+};
 
-export const postgresNativeScalarTypeDescriptors = new Map<
-  string,
-  { readonly codecId: string; readonly nativeType: string }
->([
-  ...postgresScalarTypeDescriptors,
-  ['VarChar', { codecId: 'sql/varchar@1', nativeType: 'character varying' }] as const,
-  ['Char', { codecId: 'sql/char@1', nativeType: 'character' }],
-  ['Numeric', { codecId: 'pg/numeric@1', nativeType: 'numeric' }],
-  ['Timestamp', { codecId: 'pg/timestamp@1', nativeType: 'timestamp' }],
-  ['Timestamptz', { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' }],
-  ['Time', { codecId: 'pg/time@1', nativeType: 'time' }],
-  ['Timetz', { codecId: 'pg/timetz@1', nativeType: 'timetz' }],
-  ['Uuid', { codecId: 'pg/uuid@1', nativeType: 'uuid' }],
-  ['Inet', { codecId: 'pg/inet@1', nativeType: 'inet' }],
-  ['SmallInt', { codecId: 'pg/int2@1', nativeType: 'int2' }],
-  ['Real', { codecId: 'pg/float4@1', nativeType: 'float4' }],
-  ['Date', { codecId: 'pg/timestamptz@1', nativeType: 'date' }],
-] as const);
+export const postgresScalarTypeDescriptors = collectScalarTypeConstructors(
+  postgresBaseScalarAuthoringTypes,
+);
 
 export const postgresScalarAuthoringTypes: AuthoringTypeNamespace = {
-  ...Object.fromEntries(
-    [...postgresNativeScalarTypeDescriptors].map(([name, { codecId, nativeType }]) => [
-      name,
-      {
-        kind: 'typeConstructor' as const,
-        output: { codecId, nativeType },
-      },
-    ]),
-  ),
+  ...postgresBaseScalarAuthoringTypes,
+  Uuid: { kind: 'typeConstructor', output: { codecId: 'pg/uuid@1', nativeType: 'uuid' } },
+  Inet: { kind: 'typeConstructor', output: { codecId: 'pg/inet@1', nativeType: 'inet' } },
+  SmallInt: { kind: 'typeConstructor', output: { codecId: 'pg/int2@1', nativeType: 'int2' } },
+  Real: { kind: 'typeConstructor', output: { codecId: 'pg/float4@1', nativeType: 'float4' } },
+  Date: { kind: 'typeConstructor', output: { codecId: 'pg/timestamptz@1', nativeType: 'date' } },
   VarChar: {
     kind: 'typeConstructor',
     args: [{ kind: 'number', name: 'length', integer: true, minimum: 1, optional: true }],
@@ -349,6 +338,10 @@ export const postgresScalarAuthoringTypes: AuthoringTypeNamespace = {
     },
   },
 };
+
+export const postgresNativeScalarTypeDescriptors = collectScalarTypeConstructors(
+  postgresScalarAuthoringTypes,
+);
 
 /**
  * Controlled test-only descriptor — intentionally uses pg/vector@1 with maximum: 2000 rather than importing the real pgvector pack, so interpreter unit tests stay layer-isolated. Real-pack parity is covered by `test/integration/test/authoring/parity/ts-psl-parity.real-packs.test.ts`.
@@ -431,26 +424,29 @@ export function symbolTableInputFromParseArgs(args: {
   });
 }
 
-export const sqliteScalarColumnDescriptors = new Map([
-  ['String', { codecId: 'sqlite/text@1', nativeType: 'text' }],
-  ['Boolean', { codecId: 'sqlite/integer@1', nativeType: 'integer' }],
-  ['Int', { codecId: 'sqlite/integer@1', nativeType: 'integer' }],
-  ['BigInt', { codecId: 'sqlite/bigint@1', nativeType: 'integer' }],
-  ['Float', { codecId: 'sqlite/real@1', nativeType: 'real' }],
-  ['Decimal', { codecId: 'sqlite/text@1', nativeType: 'text' }],
-  ['DateTime', { codecId: 'sqlite/datetime@1', nativeType: 'text' }],
-  ['Json', { codecId: 'sqlite/json@1', nativeType: 'text' }],
-  ['Bytes', { codecId: 'sqlite/blob@1', nativeType: 'blob' }],
-] as const);
+export const sqliteScalarAuthoringTypes: AuthoringTypeNamespace = {
+  String: { kind: 'typeConstructor', output: { codecId: 'sqlite/text@1', nativeType: 'text' } },
+  Boolean: {
+    kind: 'typeConstructor',
+    output: { codecId: 'sqlite/integer@1', nativeType: 'integer' },
+  },
+  Int: { kind: 'typeConstructor', output: { codecId: 'sqlite/integer@1', nativeType: 'integer' } },
+  BigInt: {
+    kind: 'typeConstructor',
+    output: { codecId: 'sqlite/bigint@1', nativeType: 'integer' },
+  },
+  Float: { kind: 'typeConstructor', output: { codecId: 'sqlite/real@1', nativeType: 'real' } },
+  Decimal: { kind: 'typeConstructor', output: { codecId: 'sqlite/text@1', nativeType: 'text' } },
+  DateTime: {
+    kind: 'typeConstructor',
+    output: { codecId: 'sqlite/datetime@1', nativeType: 'text' },
+  },
+  Json: { kind: 'typeConstructor', output: { codecId: 'sqlite/json@1', nativeType: 'text' } },
+  Bytes: { kind: 'typeConstructor', output: { codecId: 'sqlite/blob@1', nativeType: 'blob' } },
+};
 
-export const sqliteScalarAuthoringTypes: AuthoringTypeNamespace = Object.fromEntries(
-  [...sqliteScalarColumnDescriptors].map(([name, { codecId, nativeType }]) => [
-    name,
-    {
-      kind: 'typeConstructor' as const,
-      output: { codecId, nativeType },
-    },
-  ]),
+export const sqliteScalarColumnDescriptors = collectScalarTypeConstructors(
+  sqliteScalarAuthoringTypes,
 );
 
 const targetTypesByCodecId: Record<string, readonly string[]> = {
