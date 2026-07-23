@@ -34,3 +34,10 @@
 - **Builds on:** Dispatch 4's exhaustive scrub and the review/CI results from PR #1036.
 - **Hands to:** A mergeable slice 3 and an unblocked slice 4.
 - **Focus:** Existing uncommitted `Date`/`Inet` fixes, package-test and coverage failures, valid unresolved review findings, branch/upstream reconciliation, and the full slice validation gate. No deletion of the legacy `@db.*` implementation or migration-diagnostic work from slice 4.
+
+### Dispatch 6: post-push mainline reconciliation
+
+- **Outcome:** PR #1036 is conflict-free against the latest `main`, with any newly inherited live old-syntax fixtures migrated and the exact pushed head passing required CI.
+- **Builds on:** Dispatch 5's review-clean implementation and first current-main rebase.
+- **Hands to:** A mergeable PR and slice 4.
+- **Focus:** The newly reported GitHub merge conflict, minimal current-main conflict resolution, affected fixture regeneration, focused validation followed by the complete gate, and push. No product-scope expansion.
