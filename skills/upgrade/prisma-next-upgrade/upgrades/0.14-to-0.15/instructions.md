@@ -42,7 +42,80 @@ changes:
       contains:
         - "policy_select"
       anyMatch: true
+  - id: strip-sha256-hash-prefixes
+    summary: |
+      Content hashes are bare lowercase hex from 0.15 — the `sha256:` prefix is gone from every
+      surface (emitted `contract.json` / `contract.d.ts`, migration manifests, refs, CLI output,
+      and the database marker/ledger), and loaders reject the legacy prefixed form. Contract hash
+      VALUES are unchanged (only the prefix drops; `pnpm emit` regenerates live artefacts), but
+      `migrationHash` VALUES change because the hashed manifest bytes embed the now-bare
+      `from`/`to` strings. Run the colocated codemod over your checked-in `migrations/` trees:
+      it strips the prefix from every hash literal (manifests, `ops.json`, contract snapshots,
+      `.d.ts` branded literals), maps the empty-tree sentinel `sha256:empty` to `empty`,
+      recomputes each `migrationHash`, and repoints `refs/*.json`. Databases whose marker/ledger
+      still hold prefixed values report a hash mismatch on verify — there is no compatibility
+      shim; re-sign against the regenerated contract (`prisma-next db sign`).
+    detection:
+      glob: "**/*.{json,ts,tsx}"
+      contains:
+        - 'sha256:'
+      anyMatch: true
+    script: ./strip-sha256-hash-prefixes.ts
 ---
+
+# 0.14 → 0.15 — User upgrade instructions
+
+## `strip-sha256-hash-prefixes`
+
+Starting at the 0.15 release, every content hash Prisma Next mints or accepts is bare lowercase hex — the `sha256:` prefix is removed across the board: emitted `contract.json` / `contract.d.ts` (including the `StorageHashBase<'…'>` / `ProfileHashBase<'…'>` branded type literals), migration manifests, refs, CLI output, and the marker/ledger bookkeeping tables in your database. The prefix carried no information (the algorithm never varied per hash), and the hash **value** — not an in-band tag — signals a format change. Loaders and validators now reject the legacy prefixed form outright.
+
+Two distinct effects on your checked-in artefacts:
+
+- **Contract hashes keep their value.** `storageHash` / `profileHash` are computed over contract content, which never embedded its own hash — only the textual prefix drops.
+- **Migration hash values change.** `migrationHash` is computed over the manifest bytes, which embed the `from` / `to` contract-hash strings; with those now bare, every recomputed `migrationHash` differs from the stored one.
+
+### Migrate checked-in `migrations/` trees
+
+Run the colocated codemod from your project root:
+
+```bash
+pnpm exec tsx ./strip-sha256-hash-prefixes.ts
+```
+
+For every on-disk migration package (a `migration.json` with a sibling `ops.json`) it strips the prefix from the manifest's `from` / `to`, from hash literals inside `ops.json` and the sibling contract snapshots (`*-contract.json`, `*.d.ts`, `migration.ts`), recomputes `migrationHash` over the bare-hex content, and rewrites `refs/*.json` — repointing refs that held old migration hashes at the recomputed ones, and mapping the empty-tree sentinel `sha256:empty` to `empty`. The edit is format-preserving (only hash literals and the recomputed hash value change) and idempotent: re-running over an already-bare tree makes no further changes.
+
+Use `--check` for a dry run that lists files still needing the fix and exits non-zero if any remain:
+
+```bash
+pnpm exec tsx ./strip-sha256-hash-prefixes.ts --check
+```
+
+### Re-emit live contract artefacts
+
+Regenerate your emitted artefacts so `contract.json` / `contract.d.ts` pick up the bare-hex form:
+
+```bash
+pnpm emit
+# (runs `prisma-next contract emit` under the hood)
+```
+
+The regenerated files differ only in hash representation — the hash values themselves are unchanged.
+
+### Update hash literals your own code carries
+
+If your application or tests hard-code hash strings (asserting a `migrationHash`, comparing a `storageHash`, matching CLI output), drop the `sha256:` prefix — and for migration hashes, read the new value from the regenerated manifest, since the value itself changed.
+
+### Database marker/ledger
+
+There is no compatibility shim: a database whose marker/ledger rows still hold prefixed values reports a hash mismatch on `prisma-next db verify`. Re-sign the database against your regenerated contract:
+
+```bash
+prisma-next db sign
+```
+
+### Validation
+
+After the codemod and re-emit, run `pnpm typecheck && pnpm test` (or your application's equivalent), and exercise any command that loads your migrations (deploy or migration-status step) — the loader recomputes and verifies each manifest's `migrationHash` on read, so a stale or still-prefixed manifest fails immediately. `git grep -n "sha256:"` over your project should return no hits in committed artefacts.
 
 <!--
 TML-2503 (extension-supabase Slice E — launch close-out, PR #985): docs + test only.
