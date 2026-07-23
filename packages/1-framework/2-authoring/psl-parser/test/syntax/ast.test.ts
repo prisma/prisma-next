@@ -335,7 +335,6 @@ describe('FieldAttributeAst', () => {
   });
 
   it('exposes namespaced attribute parts', () => {
-    // @extension.VarChar
     const b = new GreenNodeBuilder();
     b.startNode('FieldAttribute');
     b.token('At', '@');

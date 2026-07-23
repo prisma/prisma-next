@@ -202,11 +202,6 @@ export const postgresScalarAuthoringTypes = {
   },
 } as const satisfies AuthoringTypeNamespace;
 
-/**
- * Native storage types as first-class top-level type constructors
- * (TML-2986). Every argument is optional, so each name is also authorable bare
- * (`VarChar` ≡ `VarChar()`), and omitted arguments omit their typeParams keys.
- */
 export const postgresNativeAuthoringTypes = {
   VarChar: {
     kind: 'typeConstructor',

@@ -45,7 +45,7 @@ No parser work is required for the new syntax: the PSL grammar already parses ba
 ## Non-goals
 
 - **No contract-format change.** `contract.json` / `contract.d.ts` storage-type entries keep their `{ codecId, nativeType, typeParams }` shape; the runtime plane is untouched.
-- **No new native types beyond `Jsonb`.** Parity move plus the one name the `Json` re-binding requires — no `Inet`, `Bit`, or other expansion.
+- **No native-type expansion beyond parity plus `Jsonb`.** Every existing `@db.Type` mapping, including `@db.Inet`, gains the corresponding bare `Type`; unrelated Postgres types such as `Bit` remain out of scope.
 - **No TypeScript-builder surface change.** `varcharColumn(191)` et al. in the postgres adapter's `column-types` exports stay as they are.
 - **No mongo semantic change.** `@db.*` was SQL-family-only. The mongo adapter and interpreter migrate **mechanically** to the unified contribution channel (its six scalars become zero-arg type constructors); mongo contract emission stays byte-identical, and no mongo authoring syntax changes.
 - **No implementation of ADR 231's combinator kit.** This project removes the surface ADR 231 excluded; it does not advance the declarative-attribute-spec design itself.

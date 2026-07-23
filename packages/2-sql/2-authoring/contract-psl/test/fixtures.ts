@@ -269,7 +269,6 @@ export const postgresNativeScalarTypeDescriptors = new Map<
   ['Date', { codecId: 'pg/timestamptz@1', nativeType: 'date' }],
 ] as const);
 
-/** The postgres scalar types in unified-namespace form: top-level zero-arg type constructors. */
 export const postgresScalarAuthoringTypes: AuthoringTypeNamespace = {
   ...Object.fromEntries(
     [...postgresNativeScalarTypeDescriptors].map(([name, { codecId, nativeType }]) => [

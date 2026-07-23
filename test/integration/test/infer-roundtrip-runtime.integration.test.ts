@@ -117,11 +117,6 @@ withTempDir(({ createTempDir }) => {
     it(
       '"amount Decimal" emits cleanly and builds an ExecutionContext',
       async () => {
-        // Hand-authored, not inferred: `control-mutation-defaults.ts` maps
-        // the bare `Decimal` scalar straight to `pg/numeric@1` with no
-        // `typeParams` — the same base-scalar path the unbounded-numeric
-        // scenario above reaches
-        // indirectly, exercised here without infer in the loop.
         const ctx: JourneyContext = setupJourney({
           connectionString: database.connectionString,
           createTempDir,

@@ -448,8 +448,7 @@ function assertColumnCodecIntegrity(
         // non-parameterized codec only conflicts with typeParams that carry
         // at least one key. The PSL interpreter emits `typeParams: {}` for
         // bare native-type aliases with no arguments; treating that as
-        // a mismatch would reject every such alias against `pg/text@1`
-        // (e.g. the supabase extension's `Uuid` type).
+        // a mismatch would reject every such alias against its codec.
         const refTypeParams = ref.typeParams;
         const refHasTypeParamKeys =
           refTypeParams !== undefined &&
