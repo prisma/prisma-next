@@ -9,7 +9,7 @@ Every in-scope upstream test lands in exactly one bucket (the accounting invaria
 
 1. **Ported & passing** — a vitest test here using the same schema, logically the same query through prisma-next's nearest public API, and the same assertions.
 2. **Ported & failing** — a faithful port that hits a real prisma-next gap: `test.fails` + an entry in the corpus `failing.md`.
-3. **Non-portable** — an individual line in the suite's `non-ported/<suite>/<suite>.md` (source location + what it tests + the specific reason it cannot be expressed).
+3. **Non-portable** — an individual line in the suite's `non-ported/functional/<suite>/<suite>.md` (source location + what it tests + the specific reason it cannot be expressed).
 
 The per-test ledger is the checklist corpus at [`projects/port-all-tests/checklists/`](../../../../projects/port-all-tests/checklists/README.md); the reviewer checks a box only once its disposition is verified.
 
@@ -27,7 +27,8 @@ ports/
           prisma-next.config.ts
           generated/            emitted contract.json + contract.d.ts
     non-ported/
-      <suite>/<suite>.md        non-portable tests, one file per suite (mirrors functional/)
+      functional/
+        <suite>/<suite>.md      non-portable tests, one file per suite (mirrors functional/<suite>/)
     failing.md                  all test.fails entries (single file)
   engines/         ports of prisma/prisma-engines (same shape)
 ```
