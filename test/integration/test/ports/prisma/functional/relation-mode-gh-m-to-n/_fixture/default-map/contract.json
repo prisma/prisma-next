@@ -1,0 +1,334 @@
+{
+  "schemaVersion": "1",
+  "targetFamily": "sql",
+  "target": "postgres",
+  "profileHash": "3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
+  "roots": {
+    "CategoriesOnPostsManyToMany_AtAtMap": {
+      "model": "CategoriesOnPostsManyToMany",
+      "namespace": "public"
+    },
+    "CategoryManyToMany_AtAtMap": {
+      "model": "CategoryManyToMany",
+      "namespace": "public"
+    },
+    "PostManyToMany_AtAtMap": {
+      "model": "PostManyToMany",
+      "namespace": "public"
+    }
+  },
+  "domain": {
+    "namespaces": {
+      "public": {
+        "models": {
+          "CategoriesOnPostsManyToMany": {
+            "fields": {
+              "categoryId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "postId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "category": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "categoryId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "CategoryManyToMany",
+                  "namespace": "public"
+                }
+              },
+              "post": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "postId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "PostManyToMany",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "categoryId": {
+                  "column": "categoryId_AtMap"
+                },
+                "postId": {
+                  "column": "postId_AtMap"
+                }
+              },
+              "namespaceId": "public",
+              "table": "CategoriesOnPostsManyToMany_AtAtMap"
+            }
+          },
+          "CategoryManyToMany": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "published": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "posts": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "categoryId"
+                  ]
+                },
+                "to": {
+                  "model": "CategoriesOnPostsManyToMany",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id_AtMap"
+                },
+                "published": {
+                  "column": "published_AtMap"
+                }
+              },
+              "namespaceId": "public",
+              "table": "CategoryManyToMany_AtAtMap"
+            }
+          },
+          "PostManyToMany": {
+            "fields": {
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "published": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "categories": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "postId"
+                  ]
+                },
+                "to": {
+                  "model": "CategoriesOnPostsManyToMany",
+                  "namespace": "public"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "id": {
+                  "column": "id"
+                },
+                "published": {
+                  "column": "published_AtMap"
+                }
+              },
+              "namespaceId": "public",
+              "table": "PostManyToMany_AtAtMap"
+            }
+          }
+        }
+      }
+    }
+  },
+  "storage": {
+    "namespaces": {
+      "public": {
+        "entries": {
+          "table": {
+            "CategoriesOnPostsManyToMany_AtAtMap": {
+              "columns": {
+                "categoryId_AtMap": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "postId_AtMap": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "source": {
+                    "columns": [
+                      "postId_AtMap"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "CategoriesOnPostsManyToMany_AtAtMap"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "PostManyToMany_AtAtMap"
+                  }
+                },
+                {
+                  "source": {
+                    "columns": [
+                      "categoryId_AtMap"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "CategoriesOnPostsManyToMany_AtAtMap"
+                  },
+                  "target": {
+                    "columns": [
+                      "id_AtMap"
+                    ],
+                    "namespaceId": "public",
+                    "tableName": "CategoryManyToMany_AtAtMap"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "categoryId_AtMap"
+                  ],
+                  "name": "CategoriesOnPostsManyToMany_AtAtMap_categoryId_AtMap_idx"
+                },
+                {
+                  "columns": [
+                    "postId_AtMap"
+                  ],
+                  "name": "CategoriesOnPostsManyToMany_AtAtMap_postId_AtMap_idx"
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "postId_AtMap",
+                  "categoryId_AtMap"
+                ]
+              },
+              "uniques": []
+            },
+            "CategoryManyToMany_AtAtMap": {
+              "columns": {
+                "id_AtMap": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "published_AtMap": {
+                  "codecId": "pg/bool@1",
+                  "nativeType": "bool",
+                  "nullable": true
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id_AtMap"
+                ]
+              },
+              "uniques": []
+            },
+            "PostManyToMany_AtAtMap": {
+              "columns": {
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "published_AtMap": {
+                  "codecId": "pg/bool@1",
+                  "nativeType": "bool",
+                  "nullable": true
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            }
+          }
+        },
+        "id": "public",
+        "kind": "postgres-schema"
+      }
+    },
+    "storageHash": "62904e2263003b7fadfb47e49eb699670f83b2d669692d75bf5ecb4032cd527b"
+  },
+  "capabilities": {
+    "postgres": {
+      "distinctOn": true,
+      "jsonAgg": true,
+      "lateral": true,
+      "limit": true,
+      "orderBy": true,
+      "returning": true
+    },
+    "sql": {
+      "defaultInInsert": true,
+      "enums": true,
+      "lateral": true,
+      "returning": true,
+      "scalarList": true
+    }
+  },
+  "extensions": {},
+  "meta": {},
+  "_generated": {
+    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+    "message": "This file is automatically generated by \"prisma-next contract emit\".",
+    "regenerate": "To regenerate, run: prisma-next contract emit"
+  }
+}
