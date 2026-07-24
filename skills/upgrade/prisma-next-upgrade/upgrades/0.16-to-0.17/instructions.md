@@ -197,7 +197,7 @@ changes:
       `prisma-next contract emit`; with `Jsonb` the emitted `contract.json` is byte-identical
       to the pre-0.16 output. A field left as `Json` now emits a native `json` column and a
       new storage hash, which against an existing jsonb database is a schema change. The
-      The removed `@db.Json` spelling must be rewritten from `Json @db.Json` to bare `Json`; any remaining use fails with migration guidance to use `Json` in type position. SQLite and Mongo `Json` bindings are untouched. The TS builder surface (`field.json()`, `jsonbColumn`) is unchanged and stays jsonb.
+      removed `@db.Json` spelling must be rewritten from `Json @db.Json` to bare `Json`; any remaining use fails with migration guidance to use `Json` in type position. SQLite and Mongo `Json` bindings are untouched. The TS builder surface (`field.json()`, `jsonbColumn`) is unchanged and stays jsonb.
     detection:
       glob: "**/*.prisma"
       contains:
