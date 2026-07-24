@@ -136,6 +136,17 @@ describe('qualifyName', () => {
     expect(() => qualifyName('schema', 'table\0name')).toThrow(
       'Identifier cannot contain null bytes',
     );
+    for (const [schemaName, objectName] of [
+      ['schema\0name', 'table'],
+      ['schema', 'table\0name'],
+    ] as const) {
+      const error = catchStructured(() => qualifyName(schemaName, objectName));
+      expect(isStructuredError(error)).toBe(true);
+      expect(error).toMatchObject({
+        code: 'CONTRACT.IDENTIFIER_INVALID',
+        meta: { context: 'identifier' },
+      });
+    }
   });
 });
 
@@ -176,6 +187,12 @@ describe('enum value security scenarios', () => {
   it('rejects enum values with null bytes', () => {
     const maliciousValue = 'active\0';
     expect(() => escapeLiteral(maliciousValue)).toThrow('Literal value cannot contain null bytes');
+    const error = catchStructured(() => escapeLiteral(maliciousValue));
+    expect(isStructuredError(error)).toBe(true);
+    expect(error).toMatchObject({
+      code: 'CONTRACT.IDENTIFIER_INVALID',
+      meta: { context: 'literal' },
+    });
   });
 
   it('handles unicode enum values safely', () => {
@@ -224,5 +241,11 @@ describe('validateEnumValueLength', () => {
     const label = '€'.repeat(22);
     expect(label.length).toBe(22);
     expect(() => validateEnumValueLength(label, 'Status')).toThrow('byte label limit');
+    const error = catchStructured(() => validateEnumValueLength(label, 'Status'));
+    expect(isStructuredError(error)).toBe(true);
+    expect(error).toMatchObject({
+      code: 'CONTRACT.IDENTIFIER_INVALID',
+      meta: { value: label, context: 'enum-label' },
+    });
   });
 });

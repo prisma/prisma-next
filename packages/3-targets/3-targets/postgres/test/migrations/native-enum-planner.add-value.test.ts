@@ -13,6 +13,7 @@ import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adap
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
+import { isStructuredError } from '@prisma-next/utils/structured-error';
 import { describe, expect, it } from 'vitest';
 import { buildPostgresPlanDiff } from '../../src/core/migrations/diff-database-schema';
 import { coalesceSubtreeIssues, planIssues } from '../../src/core/migrations/issue-planner';
@@ -303,6 +304,17 @@ describe('AddNativeEnumValueCall op', () => {
     expect(() => new AddNativeEnumValueCall('sales', 'order_status', tooLong)).toThrow(
       'byte label limit',
     );
+    let caught: unknown;
+    try {
+      new AddNativeEnumValueCall('sales', 'order_status', tooLong);
+    } catch (error) {
+      caught = error;
+    }
+    expect(isStructuredError(caught)).toBe(true);
+    expect(caught).toMatchObject({
+      code: 'CONTRACT.IDENTIFIER_INVALID',
+      meta: { value: tooLong, context: 'enum-label' },
+    });
   });
 
   it('throws when toOp is called without a lowerer', async () => {
