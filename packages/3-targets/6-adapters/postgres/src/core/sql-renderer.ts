@@ -44,6 +44,8 @@ import {
   quoteQualifiedName,
 } from '@prisma-next/target-postgres/sql-utils';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { assertNever, InternalError } from '@prisma-next/utils/internal-error';
+import { adapterError } from './adapter-errors';
 import type { PostgresContract } from './types';
 
 /**
@@ -95,13 +97,15 @@ function renderTypedParam(
     meta !== undefined ||
     codecLookup.targetTypesFor(codecId) !== undefined;
   if (!isRegistered) {
-    throw new Error(
+    throw adapterError(
+      'RUNTIME.PARAM_REF_MISSING_CODEC',
       `Postgres lowering: ParamRef carries codecId "${codecId}" but the ` +
         'assembled codec lookup has no entry for it. This usually indicates ' +
         'a missing extension pack in the runtime stack — register the pack ' +
         'that contributes this codec (e.g. `extensions: [pgvectorRuntime]`), ' +
         'or use the codec directly from `@prisma-next/target-postgres/codecs` ' +
         "if it's a builtin.",
+      { meta: { codecId } },
     );
   }
   // `typeParams` above already resolved a parameterized codec's per-instance
@@ -201,7 +205,7 @@ export function renderLoweredSql(
       break;
     // v8 ignore next 4
     default:
-      throw new Error(`Unsupported AST node kind: ${unreachableKind(node)}`);
+      assertNever(node, `Unsupported AST node kind: ${unreachableKind(node)}`);
   }
 
   return Object.freeze({ sql, params: Object.freeze(params) });
@@ -460,14 +464,18 @@ function qualifyTableFromNamespaceCoordinate(
   }
   const namespace = contract.storage.namespaces[table.namespaceId];
   if (namespace === undefined) {
-    throw new Error(
+    throw adapterError(
+      'RUNTIME.NAMESPACE_UNKNOWN',
       `Table "${table.name}" references namespace "${table.namespaceId}" which is not present as a Postgres schema on the contract`,
+      { meta: { table: table.name, namespaceId: table.namespaceId, reason: 'not-present' } },
     );
   }
   const qualifyTable = namespace.qualifyTable;
   if (qualifyTable === undefined) {
-    throw new Error(
+    throw adapterError(
+      'RUNTIME.NAMESPACE_UNKNOWN',
       `Table "${table.name}" references namespace "${table.namespaceId}" which is not materialised as a Postgres schema on the contract`,
+      { meta: { table: table.name, namespaceId: table.namespaceId, reason: 'not-materialised' } },
     );
   }
   return qualifyTable.call(namespace, table.name);
@@ -505,13 +513,17 @@ function renderSource(
     }
     // v8 ignore next 4
     default:
-      throw new Error(`Unsupported source node kind: ${unreachableKind(node)}`);
+      assertNever(node, `Unsupported source node kind: ${unreachableKind(node)}`);
   }
 }
 
 function assertScalarSubquery(query: SelectAst): void {
   if (query.projection.length !== 1) {
-    throw new Error('Subquery expressions must project exactly one column');
+    throw adapterError(
+      'RUNTIME.AST_INVALID',
+      'Subquery expressions must project exactly one column',
+      { meta: { node: 'subquery-expr' } },
+    );
   }
 }
 
@@ -816,14 +828,14 @@ function renderExpr(expr: AnyExpression, contract: PostgresContract, pim: ParamI
       return renderRawExpr(node, contract, pim);
     // v8 ignore next 4
     default:
-      throw new Error(`Unsupported expression node kind: ${unreachableKind(node)}`);
+      assertNever(node, `Unsupported expression node kind: ${unreachableKind(node)}`);
   }
 }
 
 function renderParamRef(ref: AnyParamRef, pim: ParamIndexMap): string {
   const index = pim.indexMap.get(ref);
   if (index === undefined) {
-    throw new Error('ParamRef not found in index map');
+    throw new InternalError('ParamRef not found in index map');
   }
   if (ref.kind === 'prepared-param-ref') {
     return renderTypedParam(
@@ -900,8 +912,10 @@ function renderOperation(
       }
       const arg = args[Number(argIndex)];
       if (arg === undefined) {
-        throw new Error(
+        throw adapterError(
+          'CONTRACT.PACK_CONTRIBUTION_INVALID',
           `Operation lowering template for "${expr.method}" referenced missing argument {{arg${argIndex}}}; template has ${args.length} arg(s)`,
+          { meta: { method: expr.method } },
         );
       }
       return arg;
@@ -964,7 +978,11 @@ function getInsertColumnOrder(
     }
   }
   if (!table) {
-    throw new Error(`INSERT target table not found in contract storage: ${tableName}`);
+    throw adapterError(
+      'RUNTIME.AST_INVALID',
+      `INSERT target table not found in contract storage: ${tableName}`,
+      { meta: { node: 'insert', table: tableName } },
+    );
   }
   return Object.keys(table.columns);
 }
@@ -988,7 +1006,7 @@ function renderInsertValue(
       return renderExpr(value, contract, pim);
     // v8 ignore next 4
     default:
-      throw new Error(`Unsupported value node in INSERT: ${unreachableKind(value)}`);
+      assertNever(value, `Unsupported value node in INSERT: ${unreachableKind(value)}`);
   }
 }
 
@@ -996,7 +1014,9 @@ function renderInsert(ast: InsertAst, contract: PostgresContract, pim: ParamInde
   const table = qualifyTableFromNamespaceCoordinate(ast.table, contract);
   const rows = ast.rows;
   if (rows.length === 0) {
-    throw new Error('INSERT requires at least one row');
+    throw adapterError('RUNTIME.AST_INVALID', 'INSERT requires at least one row', {
+      meta: { node: 'insert' },
+    });
   }
   const hasExplicitValues = rows.some((row) => Object.keys(row).length > 0);
   const insertClause = (() => {
@@ -1034,7 +1054,11 @@ function renderInsert(ast: InsertAst, contract: PostgresContract, pim: ParamInde
     ? (() => {
         const conflictColumns = ast.onConflict.columns.map((col) => quoteIdentifier(col.column));
         if (conflictColumns.length === 0) {
-          throw new Error('INSERT onConflict requires at least one conflict column');
+          throw adapterError(
+            'RUNTIME.AST_INVALID',
+            'INSERT onConflict requires at least one conflict column',
+            { meta: { node: 'insert-on-conflict' } },
+          );
         }
 
         const action = ast.onConflict.action;
@@ -1044,7 +1068,11 @@ function renderInsert(ast: InsertAst, contract: PostgresContract, pim: ParamInde
           case 'do-update-set': {
             const updateEntries = Object.entries(action.set);
             if (updateEntries.length === 0) {
-              throw new Error('INSERT onConflict do-update-set requires at least one assignment');
+              throw adapterError(
+                'RUNTIME.AST_INVALID',
+                'INSERT onConflict do-update-set requires at least one assignment',
+                { meta: { node: 'insert-on-conflict' } },
+              );
             }
             const updates = updateEntries.map(([colName, value]) => {
               return `${quoteIdentifier(colName)} = ${renderExpr(value, contract, pim)}`;
@@ -1053,7 +1081,7 @@ function renderInsert(ast: InsertAst, contract: PostgresContract, pim: ParamInde
           }
           // v8 ignore next 4
           default:
-            throw new Error(`Unsupported onConflict action: ${unreachableKind(action)}`);
+            assertNever(action, `Unsupported onConflict action: ${unreachableKind(action)}`);
         }
       })()
     : '';
@@ -1068,7 +1096,9 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract, pim: ParamInde
   const table = qualifyTableFromNamespaceCoordinate(ast.table, contract);
   const setEntries = Object.entries(ast.set);
   if (setEntries.length === 0) {
-    throw new Error('UPDATE requires at least one SET assignment');
+    throw adapterError('RUNTIME.AST_INVALID', 'UPDATE requires at least one SET assignment', {
+      meta: { node: 'update' },
+    });
   }
   const setClauses = setEntries.map(([col, val]) => {
     const column = quoteIdentifier(col);

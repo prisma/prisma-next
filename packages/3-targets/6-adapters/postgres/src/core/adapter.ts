@@ -11,6 +11,7 @@ import type {
 import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import type { PostgresDdlNode } from '@prisma-next/target-postgres/ddl';
+import { adapterError } from './adapter-errors';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
 import { PostgresControlAdapter } from './control-adapter';
 import { renderLoweredSql } from './sql-renderer';
@@ -75,8 +76,10 @@ class PostgresAdapterImpl
     context: LowererContext<PostgresContract>,
   ): PostgresLoweredStatement {
     if (isDdlNode(ast)) {
-      throw new Error(
+      throw adapterError(
+        'RUNTIME.DDL_UNSUPPORTED',
         'lower() does not lower DDL on the runtime adapter — DDL lowering is a control-plane concern handled by the control adapter.',
+        { meta: { surface: 'runtime-adapter' } },
       );
     }
     return renderLoweredSql(ast, context.contract, this.codecLookup);
@@ -98,8 +101,10 @@ export const postgresRawCodecInferer: RawCodecInferer = {
       case 'object':
         if (value instanceof Uint8Array) return 'pg/bytea';
     }
-    throw new Error(
+    throw adapterError(
+      'RUNTIME.RAW_SQL_UNSUPPORTED_INTERPOLATION',
       'unsupported JS value type for raw-SQL interpolation: wrap this value in `param(...)` with an explicit codec',
+      { meta: { valueType: typeof value } },
     );
   },
 };

@@ -45,6 +45,7 @@ import { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-typ
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { structuredError } from '@prisma-next/utils/structured-error';
 import { renderLoweredSql } from './adapter';
 import { encodeControlQueryParams } from './control-codecs';
 import { coerceLedgerAppliedAt, operationCountFromStored } from './ledger-decode';
@@ -146,8 +147,10 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
    */
   lower(ast: AnyQueryAst | SqliteDdlNode, context: LowererContext<unknown>): LoweredStatement {
     if (isDdlNode(ast)) {
-      throw new Error(
+      throw structuredError(
+        'RUNTIME.DDL_UNSUPPORTED',
         'lower() cannot lower DDL: DDL default literals require inline codec encoding, which is async. Use lowerToExecuteRequest().',
+        { meta: { surface: 'control-adapter' } },
       );
     }
     return renderLoweredSql(
@@ -658,9 +661,11 @@ function mapSqliteReferentialAction(rule: string): SqlReferentialAction | undefi
   const normalized = rule.toUpperCase();
   const mapped = SQLITE_REFERENTIAL_ACTION_MAP[normalized];
   if (mapped === undefined) {
-    throw new Error(
+    throw structuredError(
+      'CONTRACT.INTROSPECTION_UNSUPPORTED',
       `Unknown SQLite referential action rule: "${rule}". ` +
         'Expected one of: NO ACTION, RESTRICT, CASCADE, SET NULL, SET DEFAULT.',
+      { meta: { rule } },
     );
   }
   if (mapped === 'noAction') return undefined;
@@ -702,7 +707,8 @@ function sqliteInlineLiteral(wire: unknown): string {
   if (typeof wire === 'boolean') return wire ? '1' : '0';
   if (typeof wire === 'number') {
     if (!Number.isFinite(wire)) {
-      throw new Error(
+      throw structuredError(
+        'CONTRACT.DEFAULT_INVALID',
         `sqliteRenderDdlExecuteRequest: non-finite number wire value ${String(wire)} cannot be emitted as a DEFAULT literal`,
       );
     }
@@ -711,7 +717,8 @@ function sqliteInlineLiteral(wire: unknown): string {
   if (typeof wire === 'bigint') return String(wire);
   if (wire instanceof Date) {
     if (Number.isNaN(wire.getTime())) {
-      throw new Error(
+      throw structuredError(
+        'CONTRACT.DEFAULT_INVALID',
         'sqliteRenderDdlExecuteRequest: invalid Date value cannot be emitted as a DEFAULT literal',
       );
     }
@@ -725,7 +732,11 @@ function sqliteInlineLiteral(wire: unknown): string {
     return `X'${hex}'`;
   }
   if (typeof wire === 'object') return `'${escapeLiteral(JSON.stringify(wire))}'`;
-  throw new Error(`sqliteRenderDdlExecuteRequest: unexpected wire type "${typeof wire}"`);
+  throw structuredError(
+    'CONTRACT.PACK_CONTRIBUTION_INVALID',
+    `sqliteRenderDdlExecuteRequest: unexpected wire type "${typeof wire}"`,
+    { meta: { wireType: typeof wire } },
+  );
 }
 
 async function sqliteRenderDdlColumnDefault(
@@ -791,9 +802,11 @@ function sqliteRenderDdlConstraint(constraint: DdlTableConstraint): string {
     return sql;
   }
   if (constraint.kind === 'check-expression') {
-    throw new Error(
+    throw structuredError(
+      'CONTRACT.CONSTRAINT_INVALID',
       `SQLite does not support expression CHECK constraints (constraint "${constraint.name}"). ` +
         'Scalar-array columns and their element-non-null checks are Postgres-only.',
+      { meta: { constraintName: constraint.name } },
     );
   }
   const cols = constraint.columns.map(quoteIdentifier).join(', ');

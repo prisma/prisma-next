@@ -76,6 +76,7 @@ import {
 } from '@prisma-next/target-postgres/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { adapterError } from './adapter-errors';
 import { encodeControlQueryParams } from './control-codecs';
 import {
   execute,
@@ -148,8 +149,10 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    */
   lower(ast: AnyQueryAst | PostgresDdlNode, context: LowererContext<unknown>): LoweredStatement {
     if (isDdlNode(ast)) {
-      throw new Error(
+      throw adapterError(
+        'RUNTIME.DDL_UNSUPPORTED',
         'lower() cannot lower DDL: DDL default literals require inline codec encoding, which is async. Use lowerToExecuteRequest().',
+        { meta: { surface: 'control-adapter' } },
       );
     }
     return renderLoweredSql(
@@ -1548,8 +1551,10 @@ const PG_REFERENTIAL_ACTION_MAP: Record<PgReferentialActionRule, SqlReferentialA
 function mapReferentialAction(rule: string): SqlReferentialAction | undefined {
   const mapped = PG_REFERENTIAL_ACTION_MAP[rule as PgReferentialActionRule];
   if (mapped === undefined) {
-    throw new Error(
+    throw adapterError(
+      'CONTRACT.INTROSPECTION_UNSUPPORTED',
       `Unknown PostgreSQL referential action rule: "${rule}". Expected one of: NO ACTION, RESTRICT, CASCADE, SET NULL, SET DEFAULT.`,
+      { meta: { rule } },
     );
   }
   if (mapped === 'noAction') return undefined;
@@ -1620,8 +1625,10 @@ export function parsePgReloptions(
   for (const entry of reloptions) {
     const eq = entry.indexOf('=');
     if (eq === -1) {
-      throw new Error(
+      throw adapterError(
+        'CONTRACT.INTROSPECTION_UNSUPPORTED',
         `Postgres introspection: malformed reloption entry "${entry}" on index "${indexName}" (expected "key=value")`,
+        { meta: { entry, indexName } },
       );
     }
     const key = entry.slice(0, eq);
@@ -1777,8 +1784,10 @@ function pgInlineLiteral(wire: unknown, nativeType: string): string {
   if (typeof wire === 'boolean') return wire ? 'true' : 'false';
   if (typeof wire === 'number') {
     if (!Number.isFinite(wire)) {
-      throw new Error(
+      throw adapterError(
+        'CONTRACT.DEFAULT_INVALID',
         `pgRenderDdlExecuteRequest: non-finite number wire value ${String(wire)} cannot be emitted as a DEFAULT literal for native type "${nativeType}"`,
+        { meta: { nativeType } },
       );
     }
     return String(wire);
@@ -1786,8 +1795,10 @@ function pgInlineLiteral(wire: unknown, nativeType: string): string {
   if (typeof wire === 'bigint') return String(wire);
   if (wire instanceof Date) {
     if (Number.isNaN(wire.getTime())) {
-      throw new Error(
+      throw adapterError(
+        'CONTRACT.DEFAULT_INVALID',
         `pgRenderDdlExecuteRequest: invalid Date value cannot be emitted as a DEFAULT literal for native type "${nativeType}"`,
+        { meta: { nativeType } },
       );
     }
     const quoted = `'${escapeLiteral(wire.toISOString())}'`;
@@ -1810,8 +1821,10 @@ function pgInlineLiteral(wire: unknown, nativeType: string): string {
     const quoted = `'${escapeLiteral(JSON.stringify(wire))}'`;
     return `${quoted}::${nativeType}`;
   }
-  throw new Error(
+  throw adapterError(
+    'CONTRACT.PACK_CONTRIBUTION_INVALID',
     `pgRenderDdlExecuteRequest: unexpected wire type "${typeof wire}" for native type "${nativeType}"`,
+    { meta: { wireType: typeof wire, nativeType } },
   );
 }
 

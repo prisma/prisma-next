@@ -41,6 +41,7 @@ import { isDdlNode } from '@prisma-next/sql-relational-core/ast';
 import type { RawCodecInferer } from '@prisma-next/sql-relational-core/expression';
 import type { SqliteDdlNode } from '@prisma-next/target-sqlite/ddl';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
+import { assertNever, InternalError } from '@prisma-next/utils/internal-error';
 import { structuredError } from '@prisma-next/utils/structured-error';
 import { createSqliteBuiltinCodecLookup } from './codec-lookup';
 import { SqliteControlAdapter } from './control-adapter';
@@ -110,8 +111,10 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
     context: LowererContext<SqliteContract>,
   ): SqliteLoweredStatement {
     if (isDdlNode(ast)) {
-      throw new Error(
+      throw structuredError(
+        'RUNTIME.DDL_UNSUPPORTED',
         'lower() does not lower DDL on the runtime adapter — DDL lowering is a control-plane concern handled by the control adapter.',
+        { meta: { surface: 'runtime-adapter' } },
       );
     }
     return renderLoweredSql(ast, context.contract);
@@ -135,8 +138,10 @@ export const sqliteRawCodecInferer: RawCodecInferer = {
       case 'object':
         if (value instanceof Uint8Array) return 'sqlite/blob@1';
     }
-    throw new Error(
+    throw structuredError(
+      'RUNTIME.RAW_SQL_UNSUPPORTED_INTERPOLATION',
       'unsupported JS value type for raw-SQL interpolation: wrap this value in `param(...)` with an explicit codec',
+      { meta: { valueType: typeof value } },
     );
   },
 };
@@ -177,7 +182,7 @@ export function renderLoweredSql(
       sql = renderDelete(node, contract);
       break;
     default:
-      throw new Error(`Unsupported AST node kind: ${nodeKind(node)}`);
+      throw new InternalError(`Unsupported AST node kind: ${nodeKind(node)}`);
   }
 
   return Object.freeze({ sql, params });
@@ -255,14 +260,18 @@ function qualifyTableFromNamespaceCoordinate(
   }
   const namespace = contract.storage.namespaces[table.namespaceId];
   if (namespace === undefined) {
-    throw new Error(
+    throw structuredError(
+      'RUNTIME.NAMESPACE_UNKNOWN',
       `Table "${table.name}" references namespace "${table.namespaceId}" which is not present on the contract`,
+      { meta: { table: table.name, namespaceId: table.namespaceId, reason: 'not-present' } },
     );
   }
   const qualifyTable = namespace.qualifyTable;
   if (qualifyTable === undefined) {
-    throw new Error(
+    throw structuredError(
+      'RUNTIME.NAMESPACE_UNKNOWN',
       `Table "${table.name}" references namespace "${table.namespaceId}" which is not materialised for SQL rendering on the contract`,
+      { meta: { table: table.name, namespaceId: table.namespaceId, reason: 'not-materialised' } },
     );
   }
   return qualifyTable.call(namespace, table.name);
@@ -303,7 +312,7 @@ function renderSource(source: AnyFromSource, contract: SqliteContract): string {
       return node.alias !== undefined ? `${call} AS ${quoteIdentifier(node.alias)}` : call;
     }
     default:
-      throw new Error(`Unsupported source node kind: ${unreachableKind(node)}`);
+      return assertNever(node, `Unsupported source node kind: ${unreachableKind(node)}`);
   }
 }
 
@@ -346,7 +355,7 @@ function renderExpr(expr: AnyExpression, contract?: SqliteContract): string {
       return `(${node.exprs.map((part) => renderExpr(part, contract)).join(' OR ')})`;
     case 'exists': {
       if (contract === undefined) {
-        throw new Error('EXISTS subquery rendering requires a Sqlite contract');
+        throw new InternalError('EXISTS subquery rendering requires a Sqlite contract');
       }
       const notKeyword = node.notExists ? 'NOT ' : '';
       const subquery = renderSelect(node.subquery, contract);
@@ -366,7 +375,7 @@ function renderExpr(expr: AnyExpression, contract?: SqliteContract): string {
     case 'raw-expr':
       return renderRawExpr(node, contract);
     default:
-      throw new Error(`Unsupported expression node kind: ${unreachableKind(node)}`);
+      return assertNever(node, `Unsupported expression node kind: ${unreachableKind(node)}`);
   }
 }
 
@@ -422,10 +431,14 @@ function renderOperation(expr: OperationExpr, contract?: SqliteContract): string
 
 function renderSubqueryExpr(expr: SubqueryExpr, contract?: SqliteContract): string {
   if (expr.query.projection.length !== 1) {
-    throw new Error('Subquery expressions must project exactly one column');
+    throw structuredError(
+      'RUNTIME.AST_INVALID',
+      'Subquery expressions must project exactly one column',
+      { meta: { node: 'subquery' } },
+    );
   }
   if (contract === undefined) {
-    throw new Error('Subquery expression rendering requires a Sqlite contract');
+    throw new InternalError('Subquery expression rendering requires a Sqlite contract');
   }
   return `(${renderSelect(expr.query, contract)})`;
 }
@@ -616,7 +629,7 @@ function renderJsonArrayAggExpr(expr: JsonArrayAggExpr, contract?: SqliteContrac
 
 function renderJoin(join: JoinAst, contract?: SqliteContract): string {
   if (contract === undefined) {
-    throw new Error('JOIN rendering requires a Sqlite contract');
+    throw new InternalError('JOIN rendering requires a Sqlite contract');
   }
   const joinType = join.joinType.toUpperCase();
   const source = renderSource(join.source, contract);
@@ -641,9 +654,13 @@ function renderInsertValue(value: InsertValue): string {
     case 'raw-expr':
       return renderExpr(value);
     case 'default-value':
-      throw new Error('SQLite does not support DEFAULT as a value in INSERT ... VALUES');
+      throw structuredError(
+        'RUNTIME.AST_UNSUPPORTED',
+        'SQLite does not support DEFAULT as a value in INSERT ... VALUES',
+        { meta: { node: 'default-value' } },
+      );
     default:
-      throw new Error(`Unsupported value node in INSERT: ${unreachableKind(value)}`);
+      return assertNever(value, `Unsupported value node in INSERT: ${unreachableKind(value)}`);
   }
 }
 
@@ -652,7 +669,9 @@ function renderInsert(ast: InsertAst, contract: SqliteContract): string {
   const rows = ast.rows;
   const firstRow = rows[0];
   if (firstRow === undefined) {
-    throw new Error('INSERT requires at least one row');
+    throw structuredError('RUNTIME.AST_INVALID', 'INSERT requires at least one row', {
+      meta: { node: 'insert', table: ast.table.name },
+    });
   }
 
   const columnOrder = Object.keys(firstRow);
@@ -667,7 +686,11 @@ function renderInsert(ast: InsertAst, contract: SqliteContract): string {
         const renderedRow = columnOrder.map((column) => {
           const value = row[column];
           if (value === undefined) {
-            throw new Error(`Missing value for column "${column}" in INSERT row`);
+            throw structuredError(
+              'RUNTIME.AST_INVALID',
+              `Missing value for column "${column}" in INSERT row`,
+              { meta: { node: 'insert', table: ast.table.name, column } },
+            );
           }
           return renderInsertValue(value);
         });
@@ -681,7 +704,11 @@ function renderInsert(ast: InsertAst, contract: SqliteContract): string {
   if (ast.onConflict) {
     const conflictColumns = ast.onConflict.columns.map((col) => quoteIdentifier(col.column));
     if (conflictColumns.length === 0) {
-      throw new Error('INSERT onConflict requires at least one conflict column');
+      throw structuredError(
+        'RUNTIME.AST_INVALID',
+        'INSERT onConflict requires at least one conflict column',
+        { meta: { node: 'insert', table: ast.table.name } },
+      );
     }
 
     const action = ast.onConflict.action;
@@ -697,7 +724,7 @@ function renderInsert(ast: InsertAst, contract: SqliteContract): string {
         break;
       }
       default:
-        throw new Error(`Unsupported onConflict action: ${unreachableKind(action)}`);
+        assertNever(action, `Unsupported onConflict action: ${unreachableKind(action)}`);
     }
   }
 

@@ -4,7 +4,6 @@ import {
   escapeLiteral,
   qualifyName,
   quoteIdentifier,
-  SqlEscapeError,
 } from '@prisma-next/target-postgres/sql-utils';
 import { PostgresControlAdapter } from '../core/control-adapter';
 import {
@@ -32,4 +31,4 @@ export { parsePostgresDefault } from '@prisma-next/target-postgres/default-norma
 export { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 export { createPostgresBuiltinCodecLookup } from '../core/codec-lookup';
 export { PostgresControlAdapter } from '../core/control-adapter';
-export { escapeLiteral, qualifyName, quoteIdentifier, SqlEscapeError };
+export { escapeLiteral, qualifyName, quoteIdentifier };
