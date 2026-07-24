@@ -1264,8 +1264,10 @@ export class RenameIndexCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `RenameIndexCall.toOp: a lowerer is required on the Postgres planner path (index "${this.oldIndexName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'RenameIndexCall' } },
       );
     }
     return renameIndex(
