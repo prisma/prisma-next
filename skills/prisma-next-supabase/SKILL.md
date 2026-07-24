@@ -71,15 +71,11 @@ export default defineConfig({
 The concept: your models live in your namespaces (`public`); Supabase's live in the pack's (`auth`, `storage`). A relation field typed `supabase:auth.AuthUser` is a **cross-space FK** — the planner emits `REFERENCES "auth"."users"("id")`, and the target table is verified, never migrated. RLS policies are top-level `policy_<operation>` blocks in the same namespace as their target model, and the target model must opt in with `@@rls`. Mirror `examples/supabase/src/contract.prisma`:
 
 ```prisma
-types {
-  AuthUserId = Uuid
-}
-
 namespace public {
   model Profile {
-    id       Uuid       @id @default(uuid())
+    id       Uuid   @id @default(uuid())
     username String
-    userId   AuthUserId @unique
+    userId   Uuid   @unique
     user     supabase:auth.AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
     @@map("profile")
     @@rls
