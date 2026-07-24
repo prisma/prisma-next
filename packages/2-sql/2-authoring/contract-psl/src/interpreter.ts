@@ -984,20 +984,28 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       if (parsed === undefined) {
         continue;
       }
-      const columnNames = mapFieldNamesToColumns({
-        modelName: model.name,
-        fieldNames: parsed.fields,
-        mapping,
-        sourceId,
-        diagnostics,
-        span: modelAttribute.span,
-        entityLabel: attributeLabel,
-      });
-      if (!columnNames) {
-        continue;
+      let columnNames: readonly string[] | undefined;
+      if (parsed.fields !== undefined) {
+        const mapped = mapFieldNamesToColumns({
+          modelName: model.name,
+          fieldNames: parsed.fields,
+          mapping,
+          sourceId,
+          diagnostics,
+          span: modelAttribute.span,
+          entityLabel: attributeLabel,
+        });
+        if (!mapped) {
+          continue;
+        }
+        columnNames = mapped;
       }
       indexNodes.push({
-        columns: columnNames,
+        ...ifDefined('columns', columnNames),
+        ...ifDefined('expression', parsed.expression),
+        ...ifDefined('where', parsed.where),
+        ...ifDefined('unique', parsed.unique),
+        ...ifDefined('name', parsed.name),
         ...ifDefined('map', parsed.map),
         ...ifDefined('type', parsed.type),
         ...ifDefined('options', parsed.options),
