@@ -396,7 +396,8 @@
     "execute": [
       {
         "description": "create index \"post_userId_idx_a489d58a\"",
-        "sql": "CREATE INDEX \"post_userId_idx_a489d58a\" ON \"public\".\"post\" (\"userId\")"
+        "sql": "CREATE INDEX \"post_userId_idx_a489d58a\" ON \"public\".\"post\" (\"userId\")",
+        "params": []
       }
     ],
     "postcheck": [
@@ -464,7 +465,8 @@
     "execute": [
       {
         "description": "create index \"task_userId_idx_a489d58a\"",
-        "sql": "CREATE INDEX \"task_userId_idx_a489d58a\" ON \"public\".\"task\" (\"userId\")"
+        "sql": "CREATE INDEX \"task_userId_idx_a489d58a\" ON \"public\".\"task\" (\"userId\")",
+        "params": []
       }
     ],
     "postcheck": [
@@ -566,7 +568,8 @@
     "execute": [
       {
         "description": "create index \"post_tag_postId_idx_a7a72715\"",
-        "sql": "CREATE INDEX \"post_tag_postId_idx_a7a72715\" ON \"public\".\"post_tag\" (\"postId\")"
+        "sql": "CREATE INDEX \"post_tag_postId_idx_a7a72715\" ON \"public\".\"post_tag\" (\"postId\")",
+        "params": []
       }
     ],
     "postcheck": [
@@ -600,7 +603,8 @@
     "execute": [
       {
         "description": "create index \"post_tag_tagId_idx_86854244\"",
-        "sql": "CREATE INDEX \"post_tag_tagId_idx_86854244\" ON \"public\".\"post_tag\" (\"tagId\")"
+        "sql": "CREATE INDEX \"post_tag_tagId_idx_86854244\" ON \"public\".\"post_tag\" (\"tagId\")",
+        "params": []
       }
     ],
     "postcheck": [
