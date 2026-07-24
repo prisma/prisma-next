@@ -9,7 +9,7 @@ This page is a working reference: a concrete example to ground the mental model,
 Imagine an `orders` collection where each document has `customerId`, `amount`, and `status`. We want the top ten customers by total spend on active orders:
 
 ```ts
-import { mongoQuery } from '@prisma-next/mongo-query-builder';
+import { acc, mongoQuery } from '@prisma-next/mongo-query-builder';
 import type { Contract } from './contract';
 import contractJson from './contract.json' with { type: 'json' };
 
@@ -18,7 +18,7 @@ const query = mongoQuery<Contract>({ contractJson });
 const plan = query
   .from('orders')
   .match((f) => f.status.eq('active'))
-  .group((f, acc) => ({
+  .group((f) => ({
     _id: f.customerId,
     total: acc.sum(f.amount),
   }))
@@ -204,14 +204,16 @@ The Atlas-only search stages take their config as an object that mirrors the Mon
 
 Writes branch by where in the chain they live:
 
+Updater callbacks return an **array** of update operations (`UpdaterResult`), even when there is only one — a bare operation like `(f) => f.status.set('archived')` is rejected.
+
 **Unqualified writes** are valid only on the root `CollectionHandle`:
 
 ```ts
 query.from('orders').insertOne({ customerId: '…', amount: 99, status: 'active' });
 query.from('orders').insertMany([ /* … */ ]);
-query.from('orders').updateAll((f) => f.status.set('archived'));
+query.from('orders').updateAll((f) => [f.status.set('archived')]);
 query.from('orders').deleteAll();
-query.from('orders').upsertOne((f) => f._id.eq('o-1'), (f) => f.amount.set(0));
+query.from('orders').upsertOne((f) => f._id.eq('o-1'), (f) => [f.amount.set(0)]);
 ```
 
 **Filtered writes** are valid after `.match(...)`:
@@ -221,19 +223,19 @@ orders.match((f) => f.status.eq('cancelled')).deleteMany();
 
 orders
   .match((f) => f._id.eq('o-1'))
-  .updateOne((f) => f.amount.set(99));
+  .updateOne((f) => [f.amount.set(99)]);
 
 orders
   .match((f) => f._id.eq('o-1'))
-  .upsertOne((f) => f.amount.set(99));
+  .upsertOne((f) => [f.amount.set(99)]);
 ```
 
-**Find-and-modify** also requires a `.match(...)` and returns the matched document (or `null`):
+**Find-and-modify** also requires a `.match(...)` and returns the document (or `null` if nothing matched). The `returnDocument` option selects whether you get the pre-update (`'before'`) or post-update (`'after'`, the default) version:
 
 ```ts
 orders
   .match((f) => f._id.eq('o-1'))
-  .findOneAndUpdate((f) => f.status.set('shipped'), { returnNewDocument: true });
+  .findOneAndUpdate((f) => [f.status.set('shipped')], { returnDocument: 'after' });
 
 orders.match((f) => f._id.eq('o-1')).findOneAndDelete();
 ```
