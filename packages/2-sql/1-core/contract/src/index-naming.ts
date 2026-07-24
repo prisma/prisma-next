@@ -4,6 +4,7 @@ import {
   defaultIndexName,
   formatWireName,
 } from '@prisma-next/sql-schema-ir/naming';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import type { IndexInput } from './ir/sql-index';
 
 /**
@@ -36,7 +37,7 @@ export function lowerAuthoredIndex(tableName: string, authored: AuthoredIndexInp
 
   if (authored.map !== undefined) {
     if (authored.name !== undefined) {
-      throw new Error(
+      throw new InternalError(
         `Index "${authored.map}" on table "${tableName}": map and name are mutually exclusive.`,
       );
     }

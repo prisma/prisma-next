@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { structuredError } from '@prisma-next/utils/structured-error';
 
 export function defaultIndexName(tableName: string, columns: readonly string[]): string {
   return `${tableName}_${columns.join('_')}_idx`;
@@ -109,8 +110,10 @@ export const WIRE_NAME_PREFIX_MAX_LENGTH = 54;
  */
 export function assertWireNamePrefixLength(prefix: string, subject: string): void {
   if (prefix.length > WIRE_NAME_PREFIX_MAX_LENGTH) {
-    throw new Error(
+    throw structuredError(
+      'CONTRACT.WIRE_NAME_PREFIX_TOO_LONG',
       `${subject} "${prefix}" exceeds the ${WIRE_NAME_PREFIX_MAX_LENGTH}-character maximum (Postgres identifiers cap at 63 characters and the wire name appends a 9-character hash suffix).`,
+      { meta: { prefix, maxLength: WIRE_NAME_PREFIX_MAX_LENGTH } },
     );
   }
 }

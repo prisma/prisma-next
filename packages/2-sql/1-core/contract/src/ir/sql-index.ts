@@ -1,3 +1,4 @@
+import { ContractValidationError } from '@prisma-next/contract/contract-validation-error';
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { formatWireName, parseWireName } from '@prisma-next/sql-schema-ir/naming';
 import { SqlNode } from './sql-node';
@@ -46,18 +47,23 @@ export class Index extends SqlNode {
   constructor(input: IndexInput) {
     super();
     if (input.name === undefined || input.name.length === 0) {
-      throw new Error(
+      throw new ContractValidationError(
         'Index: every index carries a full physical name; an expression index must be explicitly named (a default name cannot be derived from an expression).',
+        'storage',
       );
     }
     if ((input.columns === undefined) === (input.expression === undefined)) {
-      throw new Error(`Index "${input.name}": exactly one of columns or expression must be set.`);
+      throw new ContractValidationError(
+        `Index "${input.name}": exactly one of columns or expression must be set.`,
+        'storage',
+      );
     }
     if (input.prefix !== undefined) {
       const parsed = parseWireName(input.name);
       if (parsed === undefined || parsed.prefix !== input.prefix) {
-        throw new Error(
+        throw new ContractValidationError(
           `Index "${input.name}": prefix "${input.prefix}" does not match the wire name (expected "${formatWireName(input.prefix, '<8hex>')}").`,
+          'storage',
         );
       }
     }

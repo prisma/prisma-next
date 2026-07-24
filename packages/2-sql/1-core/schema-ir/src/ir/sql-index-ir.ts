@@ -2,6 +2,7 @@ import type { DiffableNode, SchemaNodeRef } from '@prisma-next/framework-compone
 import { freezeNode } from '@prisma-next/framework-components/ir';
 import { isArrayEqual } from '@prisma-next/utils/array-equal';
 import { blindCast } from '@prisma-next/utils/casts';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
 import type { SqlAnnotations } from './sql-column-ir';
 import { assertNode, defineNonEnumerable, SqlSchemaIRNode } from './sql-schema-ir-node';
@@ -93,7 +94,7 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
   constructor(input: SqlIndexIRInput) {
     super();
     if ((input.columns === undefined) === (input.expression === undefined)) {
-      throw new Error(
+      throw new InternalError(
         `SqlIndexIR "${input.name}": exactly one of columns or expression must be set.`,
       );
     }
