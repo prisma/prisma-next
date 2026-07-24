@@ -36,7 +36,7 @@ import {
   type ForeignKeyAuthoringInput,
   materializeForeignKeysAndIndexes,
 } from '@prisma-next/sql-contract/foreign-key-materialization';
-import { lowerAuthoredIndex } from '@prisma-next/sql-contract/index-naming';
+import { type AuthoredIndexInput, lowerAuthoredIndex } from '@prisma-next/sql-contract/index-naming';
 import { validateIndexTypes } from '@prisma-next/sql-contract/index-type-validation';
 import {
   createIndexTypeRegistry,
@@ -921,13 +921,22 @@ export function buildSqlContractFromDefinition(
         ...ifDefined('name', u.name),
       }));
       const declaredIndexes = (semanticModel.indexes ?? []).map((i) =>
-        lowerAuthoredIndex(tableName, {
-          columns: i.columns,
-          map: i.map,
-          name: i.name,
-          type: i.type,
-          options: i.options,
-        }),
+        lowerAuthoredIndex(
+          tableName,
+          // The blind cast defers the columns-xor-expression decision to
+          // lowerAuthoredIndex's runtime guard, which owns the diagnostic
+          // for the neither/both cases.
+          blindCast<AuthoredIndexInput, 'columns-xor-expression enforced by lowerAuthoredIndex'>({
+            ...ifDefined('columns', i.columns),
+            ...ifDefined('expression', i.expression),
+            where: i.where,
+            unique: i.unique,
+            map: i.map,
+            name: i.name,
+            type: i.type,
+            options: i.options,
+          }),
+        ),
       );
       const primaryKey = semanticModel.id
         ? { columns: semanticModel.id.columns, ...ifDefined('name', semanticModel.id.name) }

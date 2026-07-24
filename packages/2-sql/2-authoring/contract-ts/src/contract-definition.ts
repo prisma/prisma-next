@@ -56,10 +56,16 @@ export interface UniqueConstraintNode {
 }
 
 export interface IndexNode {
-  readonly columns: readonly string[];
-  /** Exact physical name (PSL `map:`) — adopted verbatim, no wire hash. */
+  /** Column tuple. Exactly one of `columns` / `expression` is set. */
+  readonly columns?: readonly string[];
+  /** Opaque SQL: the entire element list of CREATE INDEX — never parsed. */
+  readonly expression?: string;
+  /** Opaque SQL: partial-index predicate (WHERE body, without the keyword). */
+  readonly where?: string;
+  readonly unique?: boolean;
+  /** Exact physical name (`map:`) — adopted verbatim, no wire hash. */
   readonly map?: string;
-  /** Managed wire-name prefix (TS `name:`) — lowers to `<name>_<8hex>`. */
+  /** Managed wire-name prefix (`name:`) — lowers to `<name>_<8hex>`. */
   readonly name?: string;
   readonly type?: string;
   readonly options?: Record<string, unknown>;
