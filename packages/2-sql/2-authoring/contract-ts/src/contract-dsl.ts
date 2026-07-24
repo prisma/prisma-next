@@ -1050,7 +1050,14 @@ function createConstraintsDsl<IndexTypes extends IndexTypeMap = Record<never, ne
       ...(opts?.where !== undefined ? { where: opts.where } : {}),
       ...(opts?.unique !== undefined ? { unique: opts.unique } : {}),
       ...(opts?.type !== undefined ? { type: opts.type } : {}),
-      ...(opts?.options !== undefined ? { options: opts.options as Record<string, unknown> } : {}),
+      ...(opts?.options !== undefined
+        ? {
+            options: blindCast<
+              Record<string, unknown>,
+              'the public overloads type options as the pack-declared options object; the loose implementation signature erases it to unknown'
+            >(opts.options),
+          }
+        : {}),
     };
     return isExpressionForm
       ? { ...carried, expression: fieldsOrOptions.expression }

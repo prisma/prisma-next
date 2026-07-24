@@ -86,10 +86,11 @@ async function runInitialFlow(ctx: JourneyContext, connectionString: string): Pr
   );
   const verifyFail = await runDbVerify(ctx, ['--schema-only']);
   expect(verifyFail.exitCode, 'verify fails after out-of-band drop').toBe(1);
-  expect(
-    stripAnsi(verifyFail.stderr) + stripAnsi(verifyFail.stdout),
-    'verify names the dropped index',
-  ).toContain('users_email_eq_adef23ad');
+  // The drift listing is a diagnostic: ui.log routes it to stderr (stdout
+  // carries data output only, per the terminal-ui contract).
+  expect(stripAnsi(verifyFail.stderr), 'verify names the dropped index').toContain(
+    'users_email_eq_adef23ad',
+  );
 
   await withClient(connectionString, (client) =>
     client.query(
