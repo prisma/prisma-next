@@ -231,7 +231,9 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
  * {@link SqlIndexIR.contentEquals} so the relation holds for any input.
  * The contract JSON and the wire-name content hash keep the authored
  * spelling: `@@index([a], type: "btree")` and `@@index([a])` are distinct
- * wire names whose shared content converges via a phase-2 rename.
+ * wire names — but content-equal after normalization, so a spelling change
+ * between them converges as a rename via the planner's phase-2 content
+ * pairing (the hashes differ, so phase-1 never pairs them).
  */
 function normalizeIndexType(type: string | undefined): string | undefined {
   return type === 'btree' ? undefined : type;
