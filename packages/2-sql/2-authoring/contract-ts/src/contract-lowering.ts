@@ -811,8 +811,14 @@ function resolveModelNode(
     ...(unique.name ? { name: unique.name } : {}),
   })) satisfies readonly UniqueConstraintNode[];
   const indexes = (spec.sqlSpec?.indexes ?? []).map((index) => ({
-    columns: mapFieldNamesToColumnNames(spec.modelName, index.fields, spec.fieldToColumn),
+    ...(index.fields !== undefined
+      ? { columns: mapFieldNamesToColumnNames(spec.modelName, index.fields, spec.fieldToColumn) }
+      : {}),
+    ...ifDefined('expression', index.expression),
+    ...ifDefined('where', index.where),
+    ...ifDefined('unique', index.unique),
     ...ifDefined('name', index.name),
+    ...ifDefined('map', index.map),
     ...ifDefined('type', index.type),
     ...ifDefined('options', index.options),
   })) satisfies readonly IndexNode[];
