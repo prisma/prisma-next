@@ -576,7 +576,6 @@ model User {
     );
   });
 
-
   it('does not report family/target namespaces as uncomposed attribute namespaces', () => {
     const document = symbolTableInputFromParseArgs({
       schema: `model User {
