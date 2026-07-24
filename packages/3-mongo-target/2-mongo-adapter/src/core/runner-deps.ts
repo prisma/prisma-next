@@ -12,15 +12,18 @@ import type {
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import type { Db } from 'mongodb';
 import { createMongoAdapter } from '../mongo-adapter';
+import { describeReceivedValue, mongoAdapterError } from './errors';
 import { MongoInspectionExecutor } from './inspection-executor';
 import { MongoControlAdapterImpl } from './mongo-control-adapter';
 import { isMongoControlDriver } from './mongo-control-driver';
 
 export function extractDb(driver: ControlDriverInstance<'mongo', 'mongo'>): Db {
   if (!isMongoControlDriver(driver)) {
-    throw new Error(
+    throw mongoAdapterError(
+      'CONFIG.VALIDATION_FAILED',
       'Expected a Mongo control driver created by ' +
         'mongoControlDriver.create() from `@prisma-next/driver-mongo/control`.',
+      { meta: { received: describeReceivedValue(driver) } },
     );
   }
   return driver.db;

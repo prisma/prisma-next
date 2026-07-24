@@ -19,6 +19,7 @@ import type { MongoValue } from '@prisma-next/mongo-value';
 import { blindCast } from '@prisma-next/utils/casts';
 import type { Document } from 'mongodb';
 import { createMongoAdapter } from '../mongo-adapter';
+import { describeReceivedValue, mongoAdapterError } from './errors';
 import { introspectSchema } from './introspect-schema';
 import {
   MONGO_LEDGER_COLLECTION,
@@ -55,9 +56,11 @@ export class MongoControlAdapterImpl implements MongoControlAdapter<'mongo'> {
     };
     const wireCommand = await this.#adapter.lower(plan, {});
     if (!isMongoControlDriver(driver)) {
-      throw new Error(
+      throw mongoAdapterError(
+        'CONFIG.VALIDATION_FAILED',
         'Mongo control adapter requires a Mongo control driver with an execute() transport. ' +
           'Provide a MongoControlDriver from `@prisma-next/driver-mongo/control`.',
+        { meta: { received: describeReceivedValue(driver) } },
       );
     }
     const rows: Document[] = [];

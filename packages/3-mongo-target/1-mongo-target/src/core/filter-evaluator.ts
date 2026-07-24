@@ -10,6 +10,7 @@ import type {
 } from '@prisma-next/mongo-query-ast/control';
 import { deepEqual } from '@prisma-next/mongo-schema-ir';
 import type { MongoValue } from '@prisma-next/mongo-value';
+import { mongoTargetError } from './mongo-target-errors';
 
 function getNestedField(doc: Record<string, unknown>, path: string): unknown {
   const parts = path.split('.');
@@ -44,7 +45,11 @@ function evaluateFieldOp(op: string, actual: unknown, expected: MongoValue): boo
     case '$in':
       return Array.isArray(expected) && expected.some((v) => deepEqual(actual, v));
     default:
-      throw new Error(`Unsupported filter operator in migration check: ${op}`);
+      throw mongoTargetError(
+        'MIGRATION.OPERATION_UNSUPPORTED',
+        `Unsupported filter operator in migration check: ${op}`,
+        { meta: { operator: op } },
+      );
   }
 }
 
@@ -79,6 +84,10 @@ export class FilterEvaluator implements MongoFilterVisitor<boolean> {
   }
 
   expr(_expr: MongoExprFilter): boolean {
-    throw new Error('Aggregation expression filters are not supported in migration checks');
+    throw mongoTargetError(
+      'MIGRATION.OPERATION_UNSUPPORTED',
+      'Aggregation expression filters are not supported in migration checks',
+      { meta: { operator: '$expr' } },
+    );
   }
 }

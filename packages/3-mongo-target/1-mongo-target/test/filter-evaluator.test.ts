@@ -6,6 +6,7 @@ import {
   MongoOrExpr,
 } from '@prisma-next/mongo-query-ast/control';
 import { MongoAggLiteral } from '@prisma-next/mongo-query-ast/execution';
+import { isStructuredError } from '@prisma-next/utils/structured-error';
 import { describe, expect, it } from 'vitest';
 import { FilterEvaluator } from '../src/core/filter-evaluator';
 
@@ -287,6 +288,21 @@ describe('FilterEvaluator', () => {
     it('throws for unsupported operator', () => {
       const filter = MongoFieldFilter.of('name', '$regex', 'alice');
       expect(() => evaluate(filter, { name: 'alice' })).toThrow(/Unsupported.*\$regex/);
+    });
+
+    it('raises MIGRATION.OPERATION_UNSUPPORTED as a structured error', () => {
+      const filter = MongoFieldFilter.of('name', '$regex', 'alice');
+      let caught: unknown;
+      try {
+        evaluate(filter, { name: 'alice' });
+      } catch (error) {
+        caught = error;
+      }
+      expect(isStructuredError(caught)).toBe(true);
+      expect(caught).toMatchObject({
+        code: 'MIGRATION.OPERATION_UNSUPPORTED',
+        meta: { operator: '$regex' },
+      });
     });
   });
 });

@@ -13,6 +13,7 @@ import {
   type MongoMigrationPlanOperation,
   MongoOrExpr,
 } from '@prisma-next/mongo-query-ast/control';
+import { isStructuredError } from '@prisma-next/utils/structured-error';
 import { describe, expect, it } from 'vitest';
 import { deserializeMongoOps, serializeMongoOps } from '../src/core/mongo-ops-serializer';
 
@@ -260,6 +261,30 @@ describe('serializeMongoOps / deserializeMongoOps', () => {
       },
     ];
     expect(() => deserializeMongoOps(json)).toThrow(/Unknown filter expression kind/);
+  });
+
+  it('raises MIGRATION.INVALID_OPERATION_ENTRY as a structured error for a malformed entry', () => {
+    const json = [
+      {
+        id: 'test',
+        label: 'test',
+        operationClass: 'additive',
+        precheck: [],
+        execute: [{ description: 'test', command: { kind: 'teleport' } }],
+        postcheck: [],
+      },
+    ];
+    let caught: unknown;
+    try {
+      deserializeMongoOps(json);
+    } catch (error) {
+      caught = error;
+    }
+    expect(isStructuredError(caught)).toBe(true);
+    expect(caught).toMatchObject({
+      code: 'MIGRATION.INVALID_OPERATION_ENTRY',
+      meta: { context: 'DDL command', kind: 'teleport' },
+    });
   });
 
   it('rejects createIndex with missing collection', () => {

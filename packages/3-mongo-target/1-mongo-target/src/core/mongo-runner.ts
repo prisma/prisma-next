@@ -25,6 +25,7 @@ import type {
   MongoMigrationCheck,
   MongoMigrationPlanOperation,
 } from '@prisma-next/mongo-query-ast/control';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { FilterEvaluator } from './filter-evaluator';
 import { deserializeMongoOps } from './mongo-ops-serializer';
@@ -271,7 +272,7 @@ export class MongoMigrationRunner {
     const edges = options.migrationEdges;
     const totalEdgeOps = edges.reduce((sum, edge) => sum + edge.operationCount, 0);
     if (totalEdgeOps !== plan.operations.length) {
-      throw new Error(
+      throw new InternalError(
         `Ledger write: plan.operations length (${plan.operations.length}) does not match sum of migrationEdges operationCount (${totalEdgeOps})`,
       );
     }

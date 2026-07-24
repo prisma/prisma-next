@@ -48,6 +48,7 @@ import {
 } from '@prisma-next/mongo-query-ast/execution';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
+import { mongoTargetError } from './mongo-target-errors';
 
 const IndexKeyDirection = type('1 | -1 | "text" | "2dsphere" | "2d" | "hashed"');
 const IndexKeyJson = type({ field: 'string', direction: IndexKeyDirection });
@@ -277,7 +278,10 @@ function validate<T>(schema: { assert: (data: unknown) => T }, data: unknown, co
     /* v8 ignore start -- assertion libraries always throw Error instances */
     const message = error instanceof Error ? error.message : String(error);
     /* v8 ignore stop */
-    throw new Error(`Invalid ${context}: ${message}`);
+    throw mongoTargetError('MIGRATION.INVALID_OPERATION_ENTRY', `Invalid ${context}: ${message}`, {
+      meta: { context },
+      cause: error,
+    });
   }
 }
 
@@ -339,17 +343,35 @@ function deserializeFilterExpr(json: unknown): MongoFilterExpr {
     }
     case 'and': {
       const exprs = record['exprs'];
-      if (!Array.isArray(exprs)) throw new Error('Invalid and filter: missing exprs array');
+      if (!Array.isArray(exprs)) {
+        throw mongoTargetError(
+          'MIGRATION.INVALID_OPERATION_ENTRY',
+          'Invalid and filter: missing exprs array',
+          { meta: { context: 'and filter' } },
+        );
+      }
       return MongoAndExpr.of(exprs.map(deserializeFilterExpr));
     }
     case 'or': {
       const exprs = record['exprs'];
-      if (!Array.isArray(exprs)) throw new Error('Invalid or filter: missing exprs array');
+      if (!Array.isArray(exprs)) {
+        throw mongoTargetError(
+          'MIGRATION.INVALID_OPERATION_ENTRY',
+          'Invalid or filter: missing exprs array',
+          { meta: { context: 'or filter' } },
+        );
+      }
       return MongoOrExpr.of(exprs.map(deserializeFilterExpr));
     }
     case 'not': {
       const expr = record['expr'];
-      if (!expr || typeof expr !== 'object') throw new Error('Invalid not filter: missing expr');
+      if (!expr || typeof expr !== 'object') {
+        throw mongoTargetError(
+          'MIGRATION.INVALID_OPERATION_ENTRY',
+          'Invalid not filter: missing expr',
+          { meta: { context: 'not filter' } },
+        );
+      }
       return new MongoNotExpr(deserializeFilterExpr(expr));
     }
     case 'exists': {
@@ -357,7 +379,11 @@ function deserializeFilterExpr(json: unknown): MongoFilterExpr {
       return new MongoExistsExpr(data.field, data.exists);
     }
     default:
-      throw new Error(`Unknown filter expression kind: ${kind}`);
+      throw mongoTargetError(
+        'MIGRATION.INVALID_OPERATION_ENTRY',
+        `Unknown filter expression kind: ${kind}`,
+        { meta: { context: 'filter expression', kind } },
+      );
   }
 }
 
@@ -421,7 +447,11 @@ export function deserializePipelineStage(json: unknown): MongoPipelineStage {
       return new MongoMergeStage(opts);
     }
     default:
-      throw new Error(`Unknown pipeline stage kind: ${kind}`);
+      throw mongoTargetError(
+        'MIGRATION.INVALID_OPERATION_ENTRY',
+        `Unknown pipeline stage kind: ${kind}`,
+        { meta: { context: 'pipeline stage', kind } },
+      );
   }
 }
 
@@ -475,7 +505,11 @@ export function deserializeDmlCommand(json: unknown): AnyMongoCommand {
       return new AggregateCommand(data.collection, pipeline);
     }
     default:
-      throw new Error(`Unknown DML command kind: ${kind}`);
+      throw mongoTargetError(
+        'MIGRATION.INVALID_OPERATION_ENTRY',
+        `Unknown DML command kind: ${kind}`,
+        { meta: { context: 'DML command', kind } },
+      );
   }
 }
 
@@ -554,7 +588,11 @@ function deserializeDdlCommand(json: unknown): AnyMongoDdlCommand {
       });
     }
     default:
-      throw new Error(`Unknown DDL command kind: ${kind}`);
+      throw mongoTargetError(
+        'MIGRATION.INVALID_OPERATION_ENTRY',
+        `Unknown DDL command kind: ${kind}`,
+        { meta: { context: 'DDL command', kind } },
+      );
   }
 }
 
@@ -571,7 +609,11 @@ function deserializeInspectionCommand(json: unknown): AnyMongoInspectionCommand 
       return new ListCollectionsCommand();
     }
     default:
-      throw new Error(`Unknown inspection command kind: ${kind}`);
+      throw mongoTargetError(
+        'MIGRATION.INVALID_OPERATION_ENTRY',
+        `Unknown inspection command kind: ${kind}`,
+        { meta: { context: 'inspection command', kind } },
+      );
   }
 }
 
