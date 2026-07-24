@@ -237,6 +237,15 @@ changes:
         - '\sDate(\s|\?|\[|$)'
       anyMatch: true
 
+  - id: postgres-extension-codecs-require-target-descriptors
+    summary: Migrate PostgreSQL-bound extension codecs to the target-owned descriptor protocol and contribute one target-typed descriptor set through runtime and control stacks.
+    detection:
+      glob: "**/*.{ts,tsx}"
+      contains:
+        - "extends CodecDescriptorImpl"
+        - "CodecDescriptorImpl<"
+        - "readonly AnyCodecDescriptor[]"
+      anyMatch: true
 ---
 
 # 0.16 → 0.17 — Extension-author upgrade instructions
@@ -295,3 +304,18 @@ Relational JSON container AST construction now requires an explicit value-projec
 `FunctionSource.of(fn, args, alias)` now groups alias state so returned-column aliases cannot exist without a table alias. Replace a string third argument such as `FunctionSource.of(fn, args, 'rows')` with `FunctionSource.of(fn, args, { alias: 'rows' })`; when returned-column names are required, pass `{ alias: 'rows', columnAliases: ['value', 'ordinality'] }`. Calls that omit the alias remain unchanged.
 
 When an extension forwards an existing `ProjectionItem` through a derived-table or row-number wrapper, preserve its known codec in the reconstructed projection: use `ProjectionItem.of(item.alias, ColumnRef.of(wrapperAlias, item.alias), item.codec)`. Leave the codec undefined only for computed or otherwise unknown projected results. After applying the applicable edits, run the extension's typecheck and tests; update AST-shape fixtures to assert the explicit wrapper nodes and preserved codec metadata.
+## `postgres-extension-codecs-require-target-descriptors`
+
+For every codec descriptor contributed by a PostgreSQL extension, add `@prisma-next/target-postgres` at the same 0.17 version as the extension's other `@prisma-next/*` packages under `dependencies`. Do not leave it only in `devDependencies`: production descriptor modules and runtime/control stack metadata import and expose this protocol. Import the target API from the lean `@prisma-next/target-postgres/codec-descriptor` subpath, and import `ProjectionExpr` from `@prisma-next/sql-relational-core/ast`.
+
+Change a PostgreSQL-bound descriptor that extends `CodecDescriptorImpl<P>` to extend `PostgresCodecDescriptor<P>`. Keep its codec id, traits, target types, `paramsSchema`, factory, output renderer, transitional `meta` / `metaFor`, and column helpers unchanged. Add `protected override nativeType(params: P): string` returning the same trusted PostgreSQL native type spelling the extension already uses, and add `protected override jsonProjection(expression: ProjectionExpr, params: P): ProjectionExpr`. Use `return expression` for the 0.17 behavior-preserving migration unless the extension already has an equivalent AST projection to preserve; production JSON renderers do not invoke `projectJson()` in this transition, so do not use this migration to change SQL output, wire encoding, `encodeJson`, or `decodeJson`.
+
+When the extension contributes a reusable target-neutral SQL descriptor instead of owning its descriptor class, keep the generic descriptor unchanged and wrap it with `postgresCodec(genericDescriptor, { nativeType, jsonProjection })`. Supply the same current native type and behavior-preserving scalar projection as above. The wrapper preserves the generic descriptor's codec id, parameter schema, factory, renderers, target types, and metadata while adding the PostgreSQL protocol.
+
+Replace broad exported descriptor arrays such as `readonly AnyCodecDescriptor[]` with `definePostgresCodecs([...])`. Use the resulting canonical target-typed set in both runtime and control `types.codecTypes.codecDescriptors`, and return that same set from runtime `codecs()` when the runtime extension SPI requires it. Do not construct independently maintained generic and PostgreSQL descriptor collections. Update exact-type tests that expected `readonly AnyCodecDescriptor[]` to accept `readonly AnyPostgresCodecDescriptor[]`; ordinary descriptors still satisfy `AnyCodecDescriptor` individually.
+
+Review every `CodecRef` construction for a parameterized descriptor, including parameter refs, contract/storage fixtures, and test-created refs. Supply `typeParams` with every field required by the target descriptor `paramsSchema`; for example, a `pg/vector@1` ref for a three-element vector must include `typeParams: { length: 3 }`. Do not make a required descriptor parameter optional merely to preserve an invalid unparameterized ref.
+
+When a parameterized descriptor intentionally supports an unparameterized column or contract reference, make its parameter type and Standard Schema accept the empty validated parameter object used during representative materialization. Express only genuinely absent fields as optional and preserve the existing unparameterized factory behavior; do not add a hidden default or change the codec encoded representation.
+
+After the migration, run the extension package's typecheck, lint, and tests. Verify its public codec ids, factories, column helpers, rendered types, SQL/wire behavior, `encodeJson` / `decodeJson`, runtime/control descriptor membership, and emitted contract behavior are unchanged apart from the descriptor types becoming PostgreSQL-specific.
