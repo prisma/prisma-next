@@ -190,6 +190,27 @@ describe('phase 1 — hash pairing (prefix-only rename)', () => {
     ]);
   });
 
+  it('a body edit under the same name plans only the create under an additive-only policy', async () => {
+    const contract = buildContract([
+      {
+        name: 'items_email_eq_11111111',
+        prefix: 'items_email_eq',
+        expression: 'eql_v3.eq_term(lower(email))',
+        unique: false,
+      },
+    ]);
+    const schema = actualSchema([
+      {
+        name: 'items_email_eq_00000000',
+        prefix: 'items_email_eq',
+        expression: 'eql_v3.eq_term(email)',
+      },
+    ]);
+
+    const opIds = await planOpIds(contract, schema, ADDITIVE_ONLY_POLICY);
+    expect(opIds).toEqual([`index.${TABLE_NAME}.items_email_eq_11111111`]);
+  });
+
   it('multi-candidate groups pair deterministically by sorted name', async () => {
     const contract = buildContract([
       managedIndex('a_new', 'ab12cd34'),
