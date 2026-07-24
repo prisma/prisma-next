@@ -261,7 +261,6 @@ describe('inferPostgresPslContract', () => {
               name: 'post_user_id_idx',
               prefix: undefined,
               columns: ['user_id'],
-              expression: undefined,
               where: undefined,
               unique: false,
               partial: false,

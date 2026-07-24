@@ -281,11 +281,9 @@ function convertIndex(
   tableName: string,
   tableColumns: readonly string[],
 ): SqlIndexIRInput {
-  return {
+  const base = {
     name: index.name,
     prefix: index.prefix,
-    columns: index.columns,
-    expression: index.expression,
     where: index.where,
     unique: index.unique,
     partial: index.where !== undefined,
@@ -299,6 +297,9 @@ function convertIndex(
     // over-approximation keeps drops ordered without a SQL parser.
     dependsOn: flatColumnDependsOn(tableName, index.columns ?? tableColumns),
   };
+  return index.expression !== undefined
+    ? { ...base, expression: index.expression }
+    : { ...base, columns: index.columns ?? [] };
 }
 
 /**

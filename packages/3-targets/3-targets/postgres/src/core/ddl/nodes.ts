@@ -314,14 +314,14 @@ export class PostgresCreateIndex extends PostgresDdlNode {
   readonly where: string | undefined;
 
   constructor(options: {
-    readonly schema?: string;
+    readonly schema: string | undefined;
     readonly table: string;
     readonly name: string;
     readonly unique: boolean;
     readonly elements: DdlIndexElements;
-    readonly type?: string;
-    readonly options?: Record<string, unknown>;
-    readonly where?: string;
+    readonly type: string | undefined;
+    readonly options: Record<string, unknown> | undefined;
+    readonly where: string | undefined;
   }) {
     super();
     this.schema = options.schema;
@@ -349,7 +349,7 @@ export class PostgresDropIndex extends PostgresDdlNode {
   readonly schema: string | undefined;
   readonly name: string;
 
-  constructor(options: { readonly schema?: string; readonly name: string }) {
+  constructor(options: { readonly schema: string | undefined; readonly name: string }) {
     super();
     this.schema = options.schema;
     this.name = options.name;
@@ -368,7 +368,11 @@ export class PostgresAlterIndexRename extends PostgresDdlNode {
   readonly from: string;
   readonly to: string;
 
-  constructor(options: { readonly schema?: string; readonly from: string; readonly to: string }) {
+  constructor(options: {
+    readonly schema: string | undefined;
+    readonly from: string;
+    readonly to: string;
+  }) {
     super();
     this.schema = options.schema;
     this.from = options.from;

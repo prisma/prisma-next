@@ -987,7 +987,6 @@ describe('PostgresControlAdapter', () => {
           name: 'user_name_idx',
           prefix: undefined,
           columns: ['name'],
-          expression: undefined,
           where: undefined,
           unique: false,
           partial: false,
@@ -1064,7 +1063,6 @@ describe('PostgresControlAdapter', () => {
           name: 'user_email_tenant_idx',
           prefix: undefined,
           columns: ['email', 'tenant_id'],
-          expression: undefined,
           where: undefined,
           unique: false,
           partial: false,
@@ -1167,7 +1165,6 @@ describe('PostgresControlAdapter', () => {
         new SqlIndexIR({
           name: 'user_idx',
           prefix: undefined,
-          columns: undefined,
           expression: 'lower(email), id',
           where: '(id > 0)',
           unique: false,

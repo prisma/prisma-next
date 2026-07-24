@@ -433,7 +433,6 @@ describe('planNodeIssues — dependency-graph ordering', () => {
             name: 'account_legacy_idx',
             prefix: undefined,
             columns: ['legacy'],
-            expression: undefined,
             where: undefined,
             unique: false,
             partial: false,

@@ -161,14 +161,14 @@ export function alterPolicyRename(options: {
  * names unqualified (the unbound namespace).
  */
 export function createIndex(options: {
-  readonly schema?: string;
+  readonly schema: string | undefined;
   readonly table: string;
   readonly name: string;
   readonly unique: boolean;
   readonly elements: DdlIndexElements;
-  readonly type?: string;
-  readonly options?: Record<string, unknown>;
-  readonly where?: string;
+  readonly type: string | undefined;
+  readonly options: Record<string, unknown> | undefined;
+  readonly where: string | undefined;
 }): PostgresCreateIndex {
   return new PostgresCreateIndex(options);
 }
@@ -178,7 +178,7 @@ export function createIndex(options: {
  * schema) are quoted by the renderer.
  */
 export function dropIndex(options: {
-  readonly schema?: string;
+  readonly schema: string | undefined;
   readonly name: string;
 }): PostgresDropIndex {
   return new PostgresDropIndex(options);
@@ -189,7 +189,7 @@ export function dropIndex(options: {
  * quoted by the renderer.
  */
 export function alterIndexRename(options: {
-  readonly schema?: string;
+  readonly schema: string | undefined;
   readonly from: string;
   readonly to: string;
 }): PostgresAlterIndexRename {

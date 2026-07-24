@@ -65,7 +65,6 @@ describe('PostgresMigrationPlanner - unique constraints vs indexes (structural n
               indexes: (table.indexes ?? []).map((i) => ({
                 ...i,
                 prefix: undefined,
-                expression: undefined,
                 where: undefined,
                 partial: false,
                 type: undefined,

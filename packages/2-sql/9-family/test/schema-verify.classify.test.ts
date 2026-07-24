@@ -27,7 +27,6 @@ const index = new SqlIndexIR({
   name: 't_c_idx',
   prefix: undefined,
   columns: ['c'],
-  expression: undefined,
   where: undefined,
   unique: false,
   partial: false,

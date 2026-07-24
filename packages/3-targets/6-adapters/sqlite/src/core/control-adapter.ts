@@ -616,7 +616,6 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
             name: idx.name,
             prefix: undefined,
             columns: Object.freeze([...idxColumns]) as readonly string[],
-            expression: undefined,
             where: undefined,
             unique: idx.unique === 1,
             partial: idx.partial === 1,

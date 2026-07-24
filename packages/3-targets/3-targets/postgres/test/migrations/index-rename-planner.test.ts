@@ -36,7 +36,19 @@ const ALL_CLASSES_POLICY = {
 const NO_DESTRUCTIVE_POLICY = { allowedOperationClasses: ['additive', 'widening'] as const };
 const ADDITIVE_ONLY_POLICY = { allowedOperationClasses: ['additive'] as const };
 
-function buildContract(indexes: readonly IndexInput[]): Contract<SqlStorage> {
+type LooseIndexInput = {
+  readonly name: string;
+  readonly prefix?: string;
+  readonly columns?: readonly string[];
+  readonly expression?: string;
+  readonly where?: string;
+  readonly unique?: boolean;
+  readonly type?: string;
+  readonly options?: Record<string, unknown>;
+};
+
+function buildContract(looseIndexes: readonly LooseIndexInput[]): Contract<SqlStorage> {
+  const indexes = looseIndexes.map((i) => ({ unique: false, ...i }) as IndexInput);
   const schema = new PostgresSchema({
     id: 'public',
     entries: {
@@ -71,7 +83,7 @@ function buildContract(indexes: readonly IndexInput[]): Contract<SqlStorage> {
   };
 }
 
-type LiveIndex = Pick<SqlIndexIRInput, 'name'> & Partial<SqlIndexIRInput>;
+type LiveIndex = LooseIndexInput;
 
 function actualSchema(indexes: readonly LiveIndex[]): PostgresDatabaseSchemaNode {
   return new PostgresDatabaseSchemaNode({
@@ -89,19 +101,22 @@ function actualSchema(indexes: readonly LiveIndex[]): PostgresDatabaseSchemaNode
             primaryKey: { columns: ['id'] },
             foreignKeys: [],
             uniques: [],
-            indexes: indexes.map((idx) => ({
-              name: idx.name,
-              prefix: idx.prefix,
-              columns: idx.columns ?? (idx.expression !== undefined ? undefined : ['email']),
-              expression: idx.expression,
-              where: idx.where,
-              unique: idx.unique ?? false,
-              partial: idx.where !== undefined,
-              type: idx.type,
-              options: idx.options,
-              annotations: undefined,
-              dependsOn: undefined,
-            })),
+            indexes: indexes.map(
+              (idx) =>
+                ({
+                  name: idx.name,
+                  prefix: idx.prefix,
+                  columns: idx.columns ?? (idx.expression !== undefined ? undefined : ['email']),
+                  expression: idx.expression,
+                  where: idx.where,
+                  unique: idx.unique ?? false,
+                  partial: idx.where !== undefined,
+                  type: idx.type,
+                  options: idx.options,
+                  annotations: undefined,
+                  dependsOn: undefined,
+                }) as SqlIndexIRInput,
+            ),
             rlsEnabled: false,
           }),
         },
@@ -134,7 +149,11 @@ async function planOpIds(
   return ops.map((op) => op.id);
 }
 
-function managedIndex(prefix: string, hash: string, rest?: Partial<IndexInput>): IndexInput {
+function managedIndex(
+  prefix: string,
+  hash: string,
+  rest?: Partial<LooseIndexInput>,
+): LooseIndexInput {
   return {
     name: `${prefix}_${hash}`,
     prefix,

@@ -122,7 +122,6 @@ export function index(
     name: overrides.name ?? `idx_${columns.join('_')}`,
     prefix: undefined,
     columns,
-    expression: undefined,
     where: undefined,
     unique: overrides.unique ?? false,
     partial: false,

@@ -1186,15 +1186,11 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         // columns included) is carried as one opaque reprinted string.
         const isExpression = idx.elements.some((el) => el.attname === null);
         const columnNames = idx.elements.flatMap((el) => (el.attname !== null ? [el.attname] : []));
-        return {
+        const base = {
           name: idx.name,
           // Rename-pass grouping only, like policy introspection: undefined
           // when the live name does not follow the wire-name shape.
           prefix: parseWireName(idx.name)?.prefix,
-          columns: isExpression ? undefined : Object.freeze([...columnNames]),
-          expression: isExpression
-            ? idx.elements.map((el) => el.elementDef ?? '').join(', ')
-            : undefined,
           where: idx.where ?? undefined,
           unique: idx.unique,
           partial: idx.where !== null,
@@ -1210,6 +1206,9 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
             isExpression ? Object.keys(columns) : columnNames,
           ),
         };
+        return isExpression
+          ? { ...base, expression: idx.elements.map((el) => el.elementDef ?? '').join(', ') }
+          : { ...base, columns: Object.freeze([...columnNames]) };
       });
 
       // Process check constraints — parse each predicate into column + value set.

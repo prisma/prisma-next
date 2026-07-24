@@ -127,7 +127,6 @@ describe('PostgresTableSchemaNode', () => {
           name: 'orders_status_idx',
           prefix: undefined,
           columns: ['status'],
-          expression: undefined,
           where: undefined,
           unique: false,
           partial: false,
