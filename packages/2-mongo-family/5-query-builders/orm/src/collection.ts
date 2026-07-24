@@ -32,7 +32,7 @@ import {
 } from '@prisma-next/mongo-query-ast/execution';
 import type { MongoValue } from '@prisma-next/mongo-value';
 import { MongoParamRef } from '@prisma-next/mongo-value';
-import { castAs } from '@prisma-next/utils/casts';
+import { blindCast, castAs } from '@prisma-next/utils/casts';
 import { InternalError } from '@prisma-next/utils/internal-error';
 import type { MongoIncludeExpr } from './collection-state';
 import { emptyCollectionState, type MongoCollectionState } from './collection-state';
@@ -106,7 +106,7 @@ export interface MongoCollection<
     data: ReadonlyArray<ResolvedCreateInput<TContract, ModelName, TVariant>>,
   ): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>>;
   /** Inserts multiple documents and returns the number inserted. */
-  createCount(
+  createAndCount(
     data: ReadonlyArray<ResolvedCreateInput<TContract, ModelName, TVariant>>,
   ): Promise<number>;
   /** Updates one matching document via `findOneAndUpdate`. Returns the updated document or `null`. Requires `.where()`. */
@@ -126,9 +126,9 @@ export interface MongoCollection<
     callback: (u: FieldAccessor<TContract, ModelName>) => FieldOperation[],
   ): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>>;
   /** Updates all matching documents and returns the number modified. Requires `.where()`. */
-  updateCount(data: Partial<DefaultModelRow<TContract, ModelName>>): Promise<number>;
+  updateAndCount(data: Partial<DefaultModelRow<TContract, ModelName>>): Promise<number>;
   /** Updates all matching documents using field operations and returns the number modified. Requires `.where()`. */
-  updateCount(
+  updateAndCount(
     callback: (u: FieldAccessor<TContract, ModelName>) => FieldOperation[],
   ): Promise<number>;
   /** Deletes one matching document via `findOneAndDelete`. Returns the deleted document or `null`. Requires `.where()`. */
@@ -136,7 +136,7 @@ export interface MongoCollection<
   /** Non-atomic: reads matching docs then deletes them. Concurrent writes may cause stale results. Requires `.where()`. */
   deleteAll(): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>>;
   /** Deletes all matching documents and returns the number deleted. Requires `.where()`. */
-  deleteCount(): Promise<number>;
+  deleteAndCount(): Promise<number>;
   /**
    * On insert: `update` fields are applied via `$set`, remaining `create` fields via `$setOnInsert`.
    * This means `update` values take precedence over `create` for overlapping fields on insert.
@@ -157,6 +157,10 @@ function resolveCollectionName(model: MongoModelDefinition, modelName: string): 
   return model.storage.collection ?? modelName;
 }
 
+function isUnknownRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 class MongoCollectionImpl<
   TContract extends MongoContractWithTypeMaps<MongoContract, AnyMongoTypeMaps>,
   ModelName extends string & keyof MongoModelsMap<TContract>,
@@ -175,9 +179,10 @@ class MongoCollectionImpl<
     this.#contract = contract;
     this.#modelName = modelName;
     this.#executor = executor;
-    const model = domainModelsAtDefaultNamespace(contract.domain)[
-      modelName
-    ] as MongoModelDefinition;
+    const model = blindCast<
+      MongoModelDefinition,
+      'modelName is constrained to Mongo contract model keys but namespace lookup erases storage type'
+    >(domainModelsAtDefaultNamespace(contract.domain)[modelName]);
     this.#collectionName = resolveCollectionName(model, modelName);
     this.#state = emptyCollectionState();
   }
@@ -185,29 +190,33 @@ class MongoCollectionImpl<
   variant<V extends VariantNames<TContract, ModelName>>(
     variantName: V,
   ): MongoCollection<TContract, ModelName, TIncludes, V> {
-    const model = domainModelsAtDefaultNamespace(this.#contract.domain)[this.#modelName] as
-      | MongoModelDefinition
-      | undefined;
+    const model = blindCast<
+      MongoModelDefinition | undefined,
+      'Mongo contract model lookup preserves target storage metadata erased by the namespace helper'
+    >(domainModelsAtDefaultNamespace(this.#contract.domain)[this.#modelName]);
     if (!model?.discriminator || !model.variants) {
       // No polymorphism metadata on this model — return unchanged. Cast required
       // because TS cannot verify TVariant (the current variant) is assignable to V.
-      return this as unknown as MongoCollection<TContract, ModelName, TIncludes, V>;
+      return blindCast<
+        MongoCollection<TContract, ModelName, TIncludes, V>,
+        'no-op variant refinement preserves runtime state while changing only the type-level variant'
+      >(this);
     }
 
-    const variantEntry = model.variants[variantName as string];
+    const variantEntry = model.variants[variantName];
     if (!variantEntry) {
       // Unknown variant name at runtime — return unchanged. Same cast rationale.
-      return this as unknown as MongoCollection<TContract, ModelName, TIncludes, V>;
+      return blindCast<
+        MongoCollection<TContract, ModelName, TIncludes, V>,
+        'unknown variant fallback preserves runtime state while changing only the type-level variant'
+      >(this);
     }
 
     const filter = MongoFieldFilter.eq(
       model.discriminator.field,
       new MongoParamRef(variantEntry.value),
     );
-    return this.#cloneWithVariant<V>(
-      { filters: [...this.#state.filters, filter] },
-      variantName as string,
-    );
+    return this.#cloneWithVariant<V>({ filters: [...this.#state.filters, filter] }, variantName);
   }
 
   where(
@@ -216,7 +225,12 @@ class MongoCollectionImpl<
     if (isMongoFilterExpr(filter)) {
       return this.#clone({ filters: [...this.#state.filters, filter] });
     }
-    const compiled = this.#compileWhereObject(filter as Record<string, unknown>);
+    const compiled = this.#compileWhereObject(
+      blindCast<
+        Record<string, unknown>,
+        'typed Mongo where input is a model-field value record after filter-expression narrowing'
+      >(filter),
+    );
     return this.#clone({ filters: [...this.#state.filters, ...compiled] });
   }
 
@@ -229,9 +243,10 @@ class MongoCollectionImpl<
   include<K extends ReferenceRelationKeys<TContract, ModelName> & string>(
     relationName: K,
   ): MongoCollection<TContract, ModelName, TIncludes & Record<K, true>, TVariant> {
-    const model = domainModelsAtDefaultNamespace(this.#contract.domain)[
-      this.#modelName
-    ] as MongoModelDefinition;
+    const model = blindCast<
+      MongoModelDefinition,
+      'modelName is constrained to Mongo contract model keys but namespace lookup erases storage type'
+    >(domainModelsAtDefaultNamespace(this.#contract.domain)[this.#modelName]);
     const relation = model.relations?.[relationName];
     if (!relation) {
       throw ormError(
@@ -249,7 +264,7 @@ class MongoCollectionImpl<
       );
     }
 
-    const ref = relation as ContractReferenceRelation;
+    const ref: ContractReferenceRelation = relation;
     const localField = ref.on.localFields[0];
     const foreignField = ref.on.targetFields[0];
     if (
@@ -283,20 +298,20 @@ class MongoCollectionImpl<
       cardinality: ref.cardinality,
     };
 
-    return this.#clone({
-      includes: [...this.#state.includes, includeExpr],
-    }) as unknown as MongoCollectionImpl<
-      TContract,
-      ModelName,
-      TIncludes & Record<K, true>,
-      TVariant
-    >;
+    return blindCast<
+      MongoCollection<TContract, ModelName, TIncludes & Record<K, true>, TVariant>,
+      'include clone state contains the appended relation but the generic include refinement is not inferred'
+    >(
+      this.#clone({
+        includes: [...this.#state.includes, includeExpr],
+      }),
+    );
   }
 
   orderBy(
     spec: Partial<Record<ModelFieldKeys<TContract, ModelName>, 1 | -1>>,
   ): MongoCollection<TContract, ModelName, TIncludes, TVariant> {
-    const merged = { ...this.#state.orderBy, ...(spec as Readonly<Record<string, 1 | -1>>) };
+    const merged: Readonly<Record<string, 1 | -1>> = { ...this.#state.orderBy, ...spec };
     return this.#clone({ orderBy: merged });
   }
 
@@ -326,17 +341,24 @@ class MongoCollectionImpl<
   ): Promise<IncludedRow<TContract, ModelName, TIncludes>> {
     this.#rejectIncludes('create');
     const normalized = this.#injectDiscriminator(
-      this.#stripUndefined(data as Record<string, unknown>),
+      this.#stripUndefined(
+        blindCast<
+          Record<string, unknown>,
+          'resolved Mongo create input is a model-field value record'
+        >(data),
+      ),
     );
     const document = this.#toDocument(normalized);
     const command = new InsertOneCommand(this.#collectionName, document);
     const results = await this.#drainPlan(command);
-    const insertedId = (results[0] as { insertedId: unknown }).insertedId;
-    return { _id: insertedId, ...normalized } as unknown as IncludedRow<
-      TContract,
-      ModelName,
-      TIncludes
-    >;
+    const insertedId = blindCast<
+      { insertedId: unknown },
+      'InsertOneCommand runtime result exposes the server-assigned insertedId'
+    >(results[0]).insertedId;
+    return blindCast<
+      IncludedRow<TContract, ModelName, TIncludes>,
+      'created row combines resolved model input with the server-assigned _id'
+    >({ _id: insertedId, ...normalized });
   }
 
   createAll(
@@ -346,33 +368,52 @@ class MongoCollectionImpl<
     const self = this;
     async function* gen(): AsyncGenerator<IncludedRow<TContract, ModelName, TIncludes>> {
       const normalizedRows = data.map((d) =>
-        self.#injectDiscriminator(self.#stripUndefined(d as Record<string, unknown>)),
+        self.#injectDiscriminator(
+          self.#stripUndefined(
+            blindCast<
+              Record<string, unknown>,
+              'resolved Mongo create-all input is a model-field value record'
+            >(d),
+          ),
+        ),
       );
       const documents = normalizedRows.map((d) => self.#toDocument(d));
       const command = new InsertManyCommand(self.#collectionName, documents);
       const results = await self.#drainPlan(command);
-      const insertedIds = (results[0] as { insertedIds: readonly unknown[] }).insertedIds;
+      const insertedIds = blindCast<
+        { insertedIds: readonly unknown[] },
+        'InsertManyCommand runtime result exposes insertedIds in input order'
+      >(results[0]).insertedIds;
       for (let i = 0; i < normalizedRows.length; i++) {
-        yield { _id: insertedIds[i], ...normalizedRows[i] } as unknown as IncludedRow<
-          TContract,
-          ModelName,
-          TIncludes
-        >;
+        yield blindCast<
+          IncludedRow<TContract, ModelName, TIncludes>,
+          'created row combines resolved model input with its server-assigned _id'
+        >({ _id: insertedIds[i], ...normalizedRows[i] });
       }
     }
     return new AsyncIterableResult(gen());
   }
 
-  async createCount(
+  async createAndCount(
     data: ReadonlyArray<ResolvedCreateInput<TContract, ModelName, TVariant>>,
   ): Promise<number> {
-    this.#rejectIncludes('createCount');
+    this.#rejectIncludes('createAndCount');
     const documents = data.map((d) =>
-      this.#toDocument(this.#injectDiscriminator(d as Record<string, unknown>)),
+      this.#toDocument(
+        this.#injectDiscriminator(
+          blindCast<
+            Record<string, unknown>,
+            'resolved Mongo create-and-count input is a model-field value record'
+          >(d),
+        ),
+      ),
     );
     const command = new InsertManyCommand(this.#collectionName, documents);
     const results = await this.#drainPlan(command);
-    return (results[0] as { insertedCount: number }).insertedCount;
+    return blindCast<
+      { insertedCount: number },
+      'InsertManyCommand runtime result exposes insertedCount'
+    >(results[0]).insertedCount;
   }
 
   async update(
@@ -387,7 +428,13 @@ class MongoCollectionImpl<
     const updateDoc = this.#resolveUpdateDoc(dataOrCallback);
     const command = new FindOneAndUpdateCommand(this.#collectionName, filter, updateDoc, false);
     const results = await this.#drainPlan(command);
-    return (results[0] as IncludedRow<TContract, ModelName, TIncludes>) ?? null;
+    const result = results[0];
+    return result === undefined
+      ? null
+      : blindCast<
+          IncludedRow<TContract, ModelName, TIncludes>,
+          'FindOneAndUpdateCommand plan has no resultShape; collection update exposes its raw driver document as IncludedRow'
+        >(result);
   }
 
   updateAll(
@@ -416,19 +463,22 @@ class MongoCollectionImpl<
     return new AsyncIterableResult(gen());
   }
 
-  async updateCount(
+  async updateAndCount(
     dataOrCallback:
       | Partial<DefaultModelRow<TContract, ModelName>>
       | ((u: FieldAccessor<TContract, ModelName>) => FieldOperation[]),
   ): Promise<number> {
-    this.#requireFilters('updateCount');
-    this.#rejectWindowing('updateCount');
-    this.#rejectIncludes('updateCount');
+    this.#requireFilters('updateAndCount');
+    this.#rejectWindowing('updateAndCount');
+    this.#rejectIncludes('updateAndCount');
     const filter = this.#mergeFilters();
     const updateDoc = this.#resolveUpdateDoc(dataOrCallback);
     const command = new UpdateManyCommand(this.#collectionName, filter, updateDoc);
     const results = await this.#drainPlan(command);
-    return (results[0] as { modifiedCount: number }).modifiedCount;
+    return blindCast<
+      { modifiedCount: number },
+      'UpdateManyCommand runtime result exposes modifiedCount'
+    >(results[0]).modifiedCount;
   }
 
   async delete(): Promise<IncludedRow<TContract, ModelName, TIncludes> | null> {
@@ -438,7 +488,13 @@ class MongoCollectionImpl<
     const filter = this.#mergeFilters();
     const command = new FindOneAndDeleteCommand(this.#collectionName, filter);
     const results = await this.#drainPlan(command);
-    return (results[0] as IncludedRow<TContract, ModelName, TIncludes>) ?? null;
+    const result = results[0];
+    return result === undefined
+      ? null
+      : blindCast<
+          IncludedRow<TContract, ModelName, TIncludes>,
+          'FindOneAndDeleteCommand plan has no resultShape; collection delete exposes its raw driver document as IncludedRow'
+        >(result);
   }
 
   deleteAll(): AsyncIterableResult<IncludedRow<TContract, ModelName, TIncludes>> {
@@ -458,14 +514,17 @@ class MongoCollectionImpl<
     return new AsyncIterableResult(gen());
   }
 
-  async deleteCount(): Promise<number> {
-    this.#requireFilters('deleteCount');
-    this.#rejectWindowing('deleteCount');
-    this.#rejectIncludes('deleteCount');
+  async deleteAndCount(): Promise<number> {
+    this.#requireFilters('deleteAndCount');
+    this.#rejectWindowing('deleteAndCount');
+    this.#rejectIncludes('deleteAndCount');
     const filter = this.#mergeFilters();
     const command = new DeleteManyCommand(this.#collectionName, filter);
     const results = await this.#drainPlan(command);
-    return (results[0] as { deletedCount: number }).deletedCount;
+    return blindCast<
+      { deletedCount: number },
+      'DeleteManyCommand runtime result exposes deletedCount'
+    >(results[0]).deletedCount;
   }
 
   async upsert(input: {
@@ -480,7 +539,12 @@ class MongoCollectionImpl<
     const filter = this.#mergeFilters();
 
     const allCreateFields = this.#toDocument(
-      this.#injectDiscriminator(input.create as Record<string, unknown>),
+      this.#injectDiscriminator(
+        blindCast<
+          Record<string, unknown>,
+          'resolved Mongo upsert create input is a model-field value record'
+        >(input.create),
+      ),
     );
 
     let updateDoc: Record<string, Record<string, MongoValue>>;
@@ -507,7 +571,12 @@ class MongoCollectionImpl<
         this.#wrapFieldOpValue(field, value, operator),
       );
     } else {
-      const setFields = this.#toSetFields(input.update as Record<string, unknown>);
+      const setFields = this.#toSetFields(
+        blindCast<
+          Record<string, unknown>,
+          'resolved Mongo upsert update input is a partial model-field value record'
+        >(input.update),
+      );
       updateDoc = {};
       if (Object.keys(setFields).length > 0) {
         updateDoc['$set'] = setFields;
@@ -532,7 +601,10 @@ class MongoCollectionImpl<
 
     const command = new FindOneAndUpdateCommand(this.#collectionName, filter, updateDoc, true);
     const results = await this.#drainPlan(command);
-    return results[0] as IncludedRow<TContract, ModelName, TIncludes>;
+    return blindCast<
+      IncludedRow<TContract, ModelName, TIncludes>,
+      'FindOneAndUpdateCommand upsert plan has no resultShape; collection upsert exposes its raw driver document as IncludedRow'
+    >(results[0]);
   }
 
   async #readMatchingIds(): Promise<unknown[]> {
@@ -552,7 +624,11 @@ class MongoCollectionImpl<
     // re-read flow depends on it.
     const { resultShape: _rs, ...planWithoutShape } = idQuery.#compile();
     for await (const row of this.#executor.execute(planWithoutShape)) {
-      ids.push((row as Record<string, unknown>)['_id']);
+      const storageRow = blindCast<
+        Record<string, unknown>,
+        'Mongo id-prefetch plan without resultShape yields a raw storage row containing _id'
+      >(row);
+      ids.push(storageRow['_id']);
     }
     return ids;
   }
@@ -563,9 +639,10 @@ class MongoCollectionImpl<
   }
 
   #compile(): MongoQueryPlan<IncludedRow<TContract, ModelName, TIncludes>> {
-    const model = domainModelsAtDefaultNamespace(this.#contract.domain)[this.#modelName] as
-      | MongoModelDefinition
-      | undefined;
+    const model = blindCast<
+      MongoModelDefinition | undefined,
+      'Mongo contract model lookup preserves target storage metadata erased by the namespace helper'
+    >(domainModelsAtDefaultNamespace(this.#contract.domain)[this.#modelName]);
     if (!model) {
       throw ormError('ORM.MODEL_UNKNOWN', `Unknown model: "${this.#modelName}".`, {
         meta: { model: this.#modelName },
@@ -579,7 +656,7 @@ class MongoCollectionImpl<
     );
   }
 
-  #wrapCommand(command: AnyMongoCommand): MongoQueryPlan {
+  #wrapCommand(command: AnyMongoCommand): MongoQueryPlan<unknown> {
     return { collection: this.#collectionName, command, meta: this.#planMeta() };
   }
 
@@ -594,9 +671,10 @@ class MongoCollectionImpl<
   }
 
   #modelFields(): Record<string, ContractField> {
-    const model = domainModelsAtDefaultNamespace(this.#contract.domain)[this.#modelName] as
-      | MongoModelDefinition
-      | undefined;
+    const model = blindCast<
+      MongoModelDefinition | undefined,
+      'Mongo contract model lookup preserves target storage metadata erased by the namespace helper'
+    >(domainModelsAtDefaultNamespace(this.#contract.domain)[this.#modelName]);
     return model?.fields ?? {};
   }
 
@@ -625,10 +703,22 @@ class MongoCollectionImpl<
 
       if (field.many && Array.isArray(value)) {
         return value.map((item) =>
-          this.#wrapValueObject(item as Record<string, unknown>, voDef),
-        ) as unknown as MongoValue;
+          this.#wrapValueObject(
+            blindCast<
+              Record<string, unknown>,
+              'contract-typed value-object array elements are field-value records'
+            >(item),
+            voDef,
+          ),
+        );
       }
-      return this.#wrapValueObject(value as Record<string, unknown>, voDef);
+      return this.#wrapValueObject(
+        blindCast<
+          Record<string, unknown>,
+          'contract-typed value-object input is a field-value record'
+        >(value),
+        voDef,
+      );
     }
 
     return new MongoParamRef(value);
@@ -709,7 +799,12 @@ class MongoCollectionImpl<
         this.#wrapFieldOpValue(field, value, operator),
       );
     }
-    return this.#toUpdateDocument(dataOrCallback as Record<string, unknown>);
+    return this.#toUpdateDocument(
+      blindCast<
+        Record<string, unknown>,
+        'partial Mongo update input is a model-field value record after callback narrowing'
+      >(dataOrCallback),
+    );
   }
 
   #wrapFieldOpValue(field: string, value: MongoValue, operator?: string): MongoValue {
@@ -730,11 +825,11 @@ class MongoCollectionImpl<
 
     if (contractField.type.kind === 'valueObject' && value instanceof MongoParamRef) {
       const raw = value.value;
-      if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+      if (isUnknownRecord(raw)) {
         const voName = contractField.type.name;
         const voDef = domainValueObjectsAtDefaultNamespace(this.#contract.domain)?.[voName];
         if (voDef) {
-          return this.#wrapValueObject(raw as Record<string, unknown>, voDef);
+          return this.#wrapValueObject(raw, voDef);
         }
       }
     }
@@ -762,11 +857,11 @@ class MongoCollectionImpl<
 
     if (currentField?.type.kind === 'valueObject' && value instanceof MongoParamRef) {
       const raw = value.value;
-      if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+      if (isUnknownRecord(raw)) {
         const voName = currentField.type.name;
         const voDef = domainValueObjectsAtDefaultNamespace(this.#contract.domain)?.[voName];
         if (voDef) {
-          return this.#wrapValueObject(raw as Record<string, unknown>, voDef);
+          return this.#wrapValueObject(raw, voDef);
         }
       }
     }
@@ -826,9 +921,10 @@ class MongoCollectionImpl<
 
   #injectDiscriminator(data: Record<string, unknown>): Record<string, unknown> {
     if (!this.#variantName) return data;
-    const model = domainModelsAtDefaultNamespace(this.#contract.domain)[this.#modelName] as
-      | MongoModelDefinition
-      | undefined;
+    const model = blindCast<
+      MongoModelDefinition | undefined,
+      'Mongo contract model lookup preserves target storage metadata erased by the namespace helper'
+    >(domainModelsAtDefaultNamespace(this.#contract.domain)[this.#modelName]);
     if (!model?.discriminator || !model.variants) return data;
     const variantEntry = model.variants[this.#variantName];
     if (!variantEntry) return data;

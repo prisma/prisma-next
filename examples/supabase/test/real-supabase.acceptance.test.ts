@@ -220,7 +220,7 @@ describe.skipIf(!process.env['DATABASE_URL'] || !process.env['SUPABASE_JWT_SECRE
           const db = await createDb(connectionString);
 
           try {
-            const created = await db.asServiceRole().orm.public.Profile.createCount([
+            const created = await db.asServiceRole().orm.public.Profile.createAndCount([
               { userId: userAId, username: 'alice' },
               { userId: userBId, username: 'bob' },
             ]);
@@ -241,12 +241,12 @@ describe.skipIf(!process.env['DATABASE_URL'] || !process.env['SUPABASE_JWT_SECRE
             const userADb = await db.asUser(jwtA);
             const updatedCount = await userADb.orm.public.Profile.where({
               userId: userAId,
-            }).updateCount({ username: 'alice-updated' });
+            }).updateAndCount({ username: 'alice-updated' });
             expect(updatedCount).toBe(1);
 
             const crossUpdatedCount = await userADb.orm.public.Profile.where({
               userId: userBId,
-            }).updateCount({ username: 'should-not-change' });
+            }).updateAndCount({ username: 'should-not-change' });
             expect(crossUpdatedCount).toBe(0);
 
             const bobRows = await db
@@ -258,7 +258,7 @@ describe.skipIf(!process.env['DATABASE_URL'] || !process.env['SUPABASE_JWT_SECRE
             expect(bobRows).toEqual([{ username: 'bob', userId: userBId }]);
 
             await expect(
-              userADb.orm.public.Profile.where({ userId: userAId }).updateCount({
+              userADb.orm.public.Profile.where({ userId: userAId }).updateAndCount({
                 userId: userBId,
               }),
             ).rejects.toThrow(/row-level security/);

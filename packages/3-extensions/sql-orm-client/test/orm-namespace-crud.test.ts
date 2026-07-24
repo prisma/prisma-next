@@ -57,9 +57,9 @@ type CrudCollection = {
   all(): { toArray(): Promise<Record<string, unknown>[]> };
   select(...fields: string[]): CrudCollection;
   where(filter: Record<string, unknown>): CrudCollection;
-  createCount(rows: readonly Record<string, unknown>[]): Promise<number>;
-  updateCount(values: Record<string, unknown>): Promise<number>;
-  deleteCount(): Promise<number>;
+  createAndCount(rows: readonly Record<string, unknown>[]): Promise<number>;
+  updateAndCount(values: Record<string, unknown>): Promise<number>;
+  deleteAndCount(): Promise<number>;
 };
 type TwoNamespaceOrm = { public: { User: CrudCollection }; auth: { User: CrudCollection } };
 
@@ -115,25 +115,25 @@ describe('namespaced orm CRUD execution', () => {
 
   it('inserts within the namespace target table', async () => {
     const { db, runtime } = setup();
-    expect(await db.public.User.createCount([{ email: 'a@example.com' }])).toBe(1);
+    expect(await db.public.User.createAndCount([{ email: 'a@example.com' }])).toBe(1);
     expect(lastPlanTable(runtime).namespaceId).toBe('public');
     expect(lastPlanTable(runtime).name).toBe('users');
 
-    expect(await db.auth.User.createCount([{ token: 'tok' }])).toBe(1);
+    expect(await db.auth.User.createAndCount([{ token: 'tok' }])).toBe(1);
     expect(lastPlanTable(runtime).name).toBe('auth_users');
   });
 
   it('updates within the namespace target table', async () => {
     const { db, runtime } = setup();
     runtime.setNextResults([[{ id: 1 }], []]);
-    await db.auth.User.where({ token: 'tok' }).updateCount({ token: 'new' });
+    await db.auth.User.where({ token: 'tok' }).updateAndCount({ token: 'new' });
     expect(lastPlanTable(runtime).name).toBe('auth_users');
   });
 
   it('deletes within the namespace target table', async () => {
     const { db, runtime } = setup();
     runtime.setNextResults([[]]);
-    await db.public.User.where({ email: 'a@example.com' }).deleteCount();
+    await db.public.User.where({ email: 'a@example.com' }).deleteAndCount();
     expect(lastPlanTable(runtime).name).toBe('users');
   });
 });

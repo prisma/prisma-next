@@ -1631,7 +1631,7 @@ export class Collection<
    * compiled plan skips `RETURNING`).
    *
    * ```typescript
-   * const inserted = await db.orm.User.createCount([
+   * const inserted = await db.orm.User.createAndCount([
    *   { email: 'a@example.com' },
    *   { email: 'b@example.com' },
    * ]);
@@ -1640,7 +1640,7 @@ export class Collection<
    *
    * Not supported on MTI variants — use `createAll(...)` instead.
    */
-  async createCount(
+  async createAndCount(
     data: readonly ResolvedCreateInput<TContract, ModelName, State['variantName']>[],
     configure?: (meta: MetaBuilder<'write'>) => void,
   ): Promise<number> {
@@ -1648,12 +1648,12 @@ export class Collection<
       return 0;
     }
 
-    this.#assertNotMtiVariant('createCount()');
-    const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'write', 'createCount');
+    this.#assertNotMtiVariant('createAndCount()');
+    const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'write', 'createAndCount');
 
     const rows = blindCast<
       readonly Record<string, unknown>[],
-      'resolved create-count inputs are model-field records for storage mapping'
+      'resolved create-and-count inputs are model-field records for storage mapping'
     >(data);
     const mappedRows = this.#mapCreateRows(rows);
     applyCreateDefaults(this.ctx, this.namespaceId, this.tableName, mappedRows);
@@ -2006,10 +2006,10 @@ export class Collection<
    * ```typescript
    * const count = await db.orm.Post
    *   .where({ published: false })
-   *   .updateCount({ published: true });
+   *   .updateAndCount({ published: true });
    * ```
    */
-  async updateCount(
+  async updateAndCount(
     data: State['hasWhere'] extends true
       ? Partial<DefaultModelRow<TContract, ModelName, State['nsId']>>
       : never,
@@ -2028,7 +2028,7 @@ export class Collection<
     applyUpdateDefaults(this.ctx, this.namespaceId, this.tableName, mappedData);
 
     // Annotations attach to the write, not the matching read.
-    const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'write', 'updateCount');
+    const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'write', 'updateAndCount');
 
     const primaryKeyColumn = resolvePrimaryKeyColumn(
       this.contract,
@@ -2234,15 +2234,15 @@ export class Collection<
    * this when you only need the affected-row count.
    *
    * ```typescript
-   * const removed = await db.orm.Post.where({ archived: true }).deleteCount();
+   * const removed = await db.orm.Post.where({ archived: true }).deleteAndCount();
    * ```
    */
-  async deleteCount(
+  async deleteAndCount(
     this: State['hasWhere'] extends true ? Collection<TContract, ModelName, Row, State> : never,
     configure?: (meta: MetaBuilder<'write'>) => void,
   ): Promise<number> {
     // Annotations attach to the write, not the matching read.
-    const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'write', 'deleteCount');
+    const annotationsMap = this.#collectAnnotationsFromMeta(configure, 'write', 'deleteAndCount');
 
     const primaryKeyColumn = resolvePrimaryKeyColumn(
       this.contract,

@@ -591,11 +591,11 @@ describe('MongoCollection write methods', () => {
     });
   });
 
-  describe('createCount()', () => {
+  describe('createAndCount()', () => {
     it('returns the count of inserted documents', async () => {
       const executor = createMockExecutor([{ insertedIds: ['a', 'b'], insertedCount: 2 }]);
       const col = createMongoCollection(contract, 'User', executor);
-      const count = await col.createCount([
+      const count = await col.createAndCount([
         defaultUserData,
         { ...defaultUserData, name: 'Bob', email: 'b@b.c' },
       ]);
@@ -772,13 +772,13 @@ describe('MongoCollection write methods', () => {
     });
   });
 
-  describe('updateCount() with callback', () => {
+  describe('updateAndCount() with callback', () => {
     it('produces correct update doc from field operations', async () => {
       const executor = createMockExecutor([{ modifiedCount: 1 }]);
       const col = createMongoCollection(contract, 'User', executor);
       const count = await col
         .where(MongoFieldFilter.eq('email', 'a'))
-        .updateCount((u) => [u.name.set('X')]);
+        .updateAndCount((u) => [u.name.set('X')]);
       expect(count).toBe(1);
     });
   });
@@ -811,17 +811,19 @@ describe('MongoCollection write methods', () => {
     });
   });
 
-  describe('updateCount()', () => {
+  describe('updateAndCount()', () => {
     it('throws without .where()', async () => {
       const executor = createMockExecutor();
       const col = createMongoCollection(contract, 'User', executor);
-      await expect(col.updateCount({ name: 'X' })).rejects.toThrow('requires a .where()');
+      await expect(col.updateAndCount({ name: 'X' })).rejects.toThrow('requires a .where()');
     });
 
     it('returns the modified count', async () => {
       const executor = createMockExecutor([{ matchedCount: 3, modifiedCount: 3 }]);
       const col = createMongoCollection(contract, 'User', executor);
-      const count = await col.where(MongoFieldFilter.eq('email', 'a')).updateCount({ name: 'X' });
+      const count = await col
+        .where(MongoFieldFilter.eq('email', 'a'))
+        .updateAndCount({ name: 'X' });
       expect(count).toBe(3);
     });
   });
@@ -860,17 +862,17 @@ describe('MongoCollection write methods', () => {
     });
   });
 
-  describe('deleteCount()', () => {
+  describe('deleteAndCount()', () => {
     it('throws without .where()', async () => {
       const executor = createMockExecutor();
       const col = createMongoCollection(contract, 'User', executor);
-      await expect(col.deleteCount()).rejects.toThrow('requires a .where()');
+      await expect(col.deleteAndCount()).rejects.toThrow('requires a .where()');
     });
 
     it('returns the deleted count', async () => {
       const executor = createMockExecutor([{ deletedCount: 2 }]);
       const col = createMongoCollection(contract, 'User', executor);
-      const count = await col.where(MongoFieldFilter.eq('email', 'x')).deleteCount();
+      const count = await col.where(MongoFieldFilter.eq('email', 'x')).deleteAndCount();
       expect(count).toBe(2);
     });
   });
@@ -920,9 +922,9 @@ describe('MongoCollection write methods', () => {
       );
     });
 
-    it('updateCount() throws with skip', async () => {
+    it('updateAndCount() throws with skip', async () => {
       const executor = createMockExecutor();
-      await expect(withFilter(executor).skip(2).updateCount({ name: 'X' })).rejects.toThrow(
+      await expect(withFilter(executor).skip(2).updateAndCount({ name: 'X' })).rejects.toThrow(
         'orderBy/skip/take',
       );
     });
@@ -939,9 +941,11 @@ describe('MongoCollection write methods', () => {
       );
     });
 
-    it('deleteCount() throws with skip', async () => {
+    it('deleteAndCount() throws with skip', async () => {
       const executor = createMockExecutor();
-      await expect(withFilter(executor).skip(3).deleteCount()).rejects.toThrow('orderBy/skip/take');
+      await expect(withFilter(executor).skip(3).deleteAndCount()).rejects.toThrow(
+        'orderBy/skip/take',
+      );
     });
 
     it('upsert() throws with take', async () => {
@@ -1066,11 +1070,11 @@ describe('MongoCollection write methods', () => {
       ).rejects.toThrow('_id');
     });
 
-    it('updateCount() throws when _id is in update data', async () => {
+    it('updateAndCount() throws when _id is in update data', async () => {
       const executor = createMockExecutor();
       const col = createMongoCollection(contract, 'User', executor);
       await expect(
-        col.where(MongoFieldFilter.eq('_id', 'id-1')).updateCount({ _id: 'new-id' }),
+        col.where(MongoFieldFilter.eq('_id', 'id-1')).updateAndCount({ _id: 'new-id' }),
       ).rejects.toThrow('_id');
     });
 

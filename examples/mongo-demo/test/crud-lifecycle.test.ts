@@ -128,10 +128,10 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
     expect(remaining[0]).toMatchObject({ name: 'Carol' });
   });
 
-  it('createCount returns inserted count', async () => {
+  it('createAndCount returns inserted count', async () => {
     const orm = mongoOrm({ contract, executor: runtime });
 
-    const count = await orm.users.createCount([
+    const count = await orm.users.createAndCount([
       { name: 'Alice', email: 'alice@example.com', bio: null, role: 'reader', address: null },
       { name: 'Bob', email: 'bob@example.com', bio: null, role: 'reader', address: null },
     ]);
@@ -142,7 +142,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
     expect(allUsers).toHaveLength(2);
   });
 
-  it('updateCount returns modified count', async () => {
+  it('updateAndCount returns modified count', async () => {
     const orm = mongoOrm({ contract, executor: runtime });
 
     await orm.users.createAll([
@@ -153,12 +153,12 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
 
     const count = await orm.users
       .where(MongoFieldFilter.eq('bio', null))
-      .updateCount({ bio: 'filled' });
+      .updateAndCount({ bio: 'filled' });
 
     expect(count).toBe(2);
   });
 
-  it('deleteCount returns deleted count', async () => {
+  it('deleteAndCount returns deleted count', async () => {
     const orm = mongoOrm({ contract, executor: runtime });
 
     await orm.users.createAll([
@@ -167,7 +167,7 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
       { name: 'Carol', email: 'carol@example.com', bio: 'keep', role: 'reader', address: null },
     ]);
 
-    const count = await orm.users.where(MongoFieldFilter.eq('bio', null)).deleteCount();
+    const count = await orm.users.where(MongoFieldFilter.eq('bio', null)).deleteAndCount();
 
     expect(count).toBe(2);
 

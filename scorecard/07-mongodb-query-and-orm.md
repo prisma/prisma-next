@@ -33,13 +33,13 @@ Legend:
 | `$expr` cross-field / computed filter | — | — | ✅ | `test/integration/test/mongo/expr-filter.test.ts` |
 | ORM `create` | — | — | 🟡 | |
 | ORM `createAll` | — | — | 🟡 | |
-| ORM `createCount` | — | — | 🟡 | |
+| ORM `createAndCount` | — | — | 🟡 | |
 | ORM `update` | — | — | 🟡 | |
 | ORM `updateAll` | — | — | 🟡 | |
-| ORM `updateCount` | — | — | 🟡 | |
+| ORM `updateAndCount` | — | — | 🟡 | |
 | ORM `delete` | — | — | 🟡 | |
 | ORM `deleteAll` | — | — | 🟡 | |
-| ORM `deleteCount` | — | — | 🟡 | |
+| ORM `deleteAndCount` | — | — | 🟡 | |
 | ORM `upsert` | — | — | 🟡 | |
 | Update operator `set` | — | — | 🟡 | |
 | Update operator `unset` | — | — | 🟡 | |

@@ -10,7 +10,7 @@ import { seedPosts, seedUsers } from './runtime-helpers';
 
 describe('integration/update', () => {
   it(
-    'updateCount() returns matched row count and updates data',
+    'updateAndCount() returns matched row count and updates data',
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const users = createUsersCollection(runtime);
@@ -21,7 +21,7 @@ describe('integration/update', () => {
           { id: 3, name: 'Fresh', email: 'c@example.com' },
         ]);
 
-        const count = await users.where({ name: 'Stale' }).updateCount({ name: 'Updated' });
+        const count = await users.where({ name: 'Stale' }).updateAndCount({ name: 'Updated' });
         expect(count).toBe(2);
 
         const rows = await runtime.query<{ id: number; name: string }>(
@@ -199,14 +199,14 @@ describe('integration/update', () => {
   );
 
   it(
-    'updateAll({}) and updateCount({}) are no-ops',
+    'updateAll({}) and updateAndCount({}) are no-ops',
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const users = createReturningUsersCollection(runtime);
 
         runtime.resetExecutions();
         const updated = await users.where({ id: 1 }).updateAll({});
-        const count = await users.where({ id: 1 }).updateCount({});
+        const count = await users.where({ id: 1 }).updateAndCount({});
 
         expect(updated).toEqual([]);
         expect(count).toBe(0);

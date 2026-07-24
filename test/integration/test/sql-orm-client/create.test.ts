@@ -216,13 +216,13 @@ describe('integration/create', () => {
   );
 
   it(
-    'createCount() inserts multiple rows and returns inserted count',
+    'createAndCount() inserts multiple rows and returns inserted count',
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const users = createUsersCollection(runtime);
 
         runtime.resetExecutions();
-        const count = await users.createCount([
+        const count = await users.createAndCount([
           { id: 20, name: 'Cara', email: 'cara@example.com', invitedById: null },
           { id: 21, name: 'Dan', email: 'dan@example.com' },
         ]);
@@ -353,12 +353,12 @@ describe('integration/create', () => {
     );
 
     it(
-      'createCount() generates ids for rows without returning them',
+      'createAndCount() generates ids for rows without returning them',
       async () => {
         await withCollectionRuntime(async (runtime) => {
           const tags = createReturningTagsCollection(runtime);
 
-          const count = await tags.createCount([{ name: 'elixir' }, { name: 'haskell' }]);
+          const count = await tags.createAndCount([{ name: 'elixir' }, { name: 'haskell' }]);
           expect(count).toBe(2);
 
           const all = await tags.orderBy((t) => t.name.asc()).all();

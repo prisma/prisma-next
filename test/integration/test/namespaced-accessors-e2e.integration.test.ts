@@ -218,8 +218,8 @@ describe('explicit namespaced accessors end-to-end (PGlite)', () => {
             token: 'auth-tok',
           });
 
-          await orm.public.User.where({ id: 10 }).updateCount({ email: 'alice2@x.io' });
-          await orm.auth.User.where({ id: 20 }).updateCount({ token: 'auth-tok-2' });
+          await orm.public.User.where({ id: 10 }).updateAndCount({ email: 'alice2@x.io' });
+          await orm.auth.User.where({ id: 20 }).updateAndCount({ token: 'auth-tok-2' });
           expect((await orm.public.User.where({ id: 10 }).first())?.email).toBe('alice2@x.io');
           expect((await orm.auth.User.where({ id: 20 }).first())?.token).toBe('auth-tok-2');
 
@@ -232,7 +232,7 @@ describe('explicit namespaced accessors end-to-end (PGlite)', () => {
             user: { id: 20, token: 'auth-tok-2' },
           });
 
-          await orm.public.User.where({ id: 10 }).deleteCount();
+          await orm.public.User.where({ id: 10 }).deleteAndCount();
           expect(await orm.public.User.where({ id: 10 }).first()).toBeNull();
         } finally {
           await db.close();

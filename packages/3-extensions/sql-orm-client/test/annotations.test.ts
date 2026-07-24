@@ -315,12 +315,12 @@ describe('Collection.createAll annotations', () => {
   });
 });
 
-describe('Collection.createCount annotations', () => {
+describe('Collection.createAndCount annotations', () => {
   it('writes the applied annotation onto the executed plan', async () => {
     const { collection, runtime } = createReturningCollectionFor('User');
     runtime.setNextResults([[]]);
 
-    await collection.createCount([{ id: 1, name: 'A', email: 'a@b.com' }], (meta) =>
+    await collection.createAndCount([{ id: 1, name: 'A', email: 'a@b.com' }], (meta) =>
       meta.annotate(auditAnnotation({ actor: 'system' })),
     );
 
@@ -417,7 +417,7 @@ describe('Collection.updateAll annotations', () => {
   });
 });
 
-describe('Collection.updateCount annotations', () => {
+describe('Collection.updateAndCount annotations', () => {
   it('writes the applied annotation onto the update statement (not the matching read)', async () => {
     const { collection, runtime } = createReturningCollectionFor('User');
     // Two execute calls: matching select first, then the update.
@@ -425,7 +425,7 @@ describe('Collection.updateCount annotations', () => {
 
     await collection
       .where({ id: 1 })
-      .updateCount({ name: 'Alice' }, (meta) =>
+      .updateAndCount({ name: 'Alice' }, (meta) =>
         meta.annotate(auditAnnotation({ actor: 'system' })),
       );
 
@@ -487,7 +487,7 @@ describe('Collection.deleteAll annotations', () => {
   });
 });
 
-describe('Collection.deleteCount annotations', () => {
+describe('Collection.deleteAndCount annotations', () => {
   it('writes the applied annotation onto the delete statement (not the matching read)', async () => {
     const { collection, runtime } = createReturningCollectionFor('User');
     // Two execute calls: matching select first, then the delete.
@@ -495,7 +495,7 @@ describe('Collection.deleteCount annotations', () => {
 
     await collection
       .where({ id: 1 })
-      .deleteCount((meta) => meta.annotate(auditAnnotation({ actor: 'system' })));
+      .deleteAndCount((meta) => meta.annotate(auditAnnotation({ actor: 'system' })));
 
     expect(runtime.executions).toHaveLength(2);
     const matchingPlan = runtime.executions[0]!.plan;

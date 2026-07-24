@@ -58,13 +58,13 @@ export type IncludeRefinementTerminals =
   | 'groupBy'
   | 'create'
   | 'createAll'
-  | 'createCount'
+  | 'createAndCount'
   | 'update'
   | 'updateAll'
-  | 'updateCount'
+  | 'updateAndCount'
   | 'delete'
   | 'deleteAll'
-  | 'deleteCount'
+  | 'deleteAndCount'
   | 'upsert';
 
 export type IncludeRefinementScalarMethods = 'count' | 'sum' | 'avg' | 'min' | 'max' | 'combine';

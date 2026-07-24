@@ -245,7 +245,7 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
 
       try {
         // service_role can INSERT (BYPASSRLS)
-        const created = await db.asServiceRole().orm.public.Profile.createCount([
+        const created = await db.asServiceRole().orm.public.Profile.createAndCount([
           { userId: userAId, username: 'alice' },
           { userId: userBId, username: 'bob' },
         ]);
@@ -268,13 +268,13 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
         const userADb = await db.asUser(jwtA);
         const updatedCount = await userADb.orm.public.Profile.where({
           userId: userAId,
-        }).updateCount({ username: 'alice-updated' });
+        }).updateAndCount({ username: 'alice-updated' });
         expect(updatedCount).toBe(1);
 
         // asUser(A) update targeting user B's row affects 0 rows (RLS filters it out)
         const crossUpdatedCount = await userADb.orm.public.Profile.where({
           userId: userBId,
-        }).updateCount({ username: 'should-not-change' });
+        }).updateAndCount({ username: 'should-not-change' });
         expect(crossUpdatedCount).toBe(0);
 
         // Confirm B's username is still 'bob'
@@ -288,7 +288,7 @@ describe('RLS — role-bound Supabase runtime acceptance', () => {
 
         // profile_owner_write WITH CHECK rejects reassigning the row to another owner
         await expect(
-          userADb.orm.public.Profile.where({ userId: userAId }).updateCount({ userId: userBId }),
+          userADb.orm.public.Profile.where({ userId: userAId }).updateAndCount({ userId: userBId }),
         ).rejects.toThrow(/row-level security/);
       } finally {
         await db.close();

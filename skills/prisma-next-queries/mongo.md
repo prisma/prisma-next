@@ -114,7 +114,7 @@ await db.orm.users.where({ email: 'alice@example.com' }).upsert({
 });
 ```
 
-**Count-only terminals.** `.createCount(...)`, `.updateCount(...)`, `.deleteCount()` return numbers without re-reading full documents — useful for bulk operations where you only need the modified count.
+**Count-only terminals.** `.createAndCount(...)`, `.updateAndCount(...)`, `.deleteAndCount()` return numbers without re-reading full documents — useful for bulk operations where you only need the modified count.
 
 **Upsert + dot-path.** The upsert `update` callback cannot use dot-path field operations — use top-level field replacement in the upsert branch or a separate `.update((u) => [...])` call.
 

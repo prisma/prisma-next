@@ -10,7 +10,7 @@ import { seedPosts, seedUsers } from './runtime-helpers';
 
 describe('integration/delete', () => {
   it(
-    'deleteCount() returns matched row count and deletes data',
+    'deleteAndCount() returns matched row count and deletes data',
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const users = createUsersCollection(runtime);
@@ -21,7 +21,7 @@ describe('integration/delete', () => {
           { id: 3, name: 'Keep', email: 'c@example.com' },
         ]);
 
-        const count = await users.where({ name: 'Remove' }).deleteCount();
+        const count = await users.where({ name: 'Remove' }).deleteAndCount();
         expect(count).toBe(2);
 
         const rows = await runtime.query<{ id: number; name: string }>(

@@ -15,9 +15,9 @@ import type { TestContract } from './helpers';
  *  - Read terminals (`all`, `first`, `aggregate`) accept a configurator
  *    callback whose `meta.annotate(...)` admits read-applicable
  *    annotations and rejects write-only ones at the type level.
- *  - Write terminals (`create`, `createAll`, `createCount`, `upsert`,
- *    `update`, `updateAll`, `updateCount`, `delete`, `deleteAll`,
- *    `deleteCount`) accept a configurator whose `meta.annotate(...)`
+ *  - Write terminals (`create`, `createAll`, `createAndCount`, `upsert`,
+ *    `update`, `updateAll`, `updateAndCount`, `delete`, `deleteAll`,
+ *    `deleteAndCount`) accept a configurator whose `meta.annotate(...)`
  *    admits write-applicable annotations and rejects read-only ones.
  *  - The configurator does not widen the terminal's return type.
  *  - `first(filter, configure?)` overloads dispatch by argument shape;
@@ -253,22 +253,22 @@ describe('Collection.createAll (write-typed)', () => {
   });
 });
 
-describe('Collection.createCount (write-typed)', () => {
+describe('Collection.createAndCount (write-typed)', () => {
   test('accepts a configurator that applies a write-only annotation', () => {
-    userCollection.createCount([{ id: 1, name: 'Alice', email: 'a@b.com' }], (meta) =>
+    userCollection.createAndCount([{ id: 1, name: 'Alice', email: 'a@b.com' }], (meta) =>
       meta.annotate(auditAnnotation({ actor: 'system' })),
     );
   });
 
   test('rejects a configurator that applies a read-only annotation (negative)', () => {
-    userCollection.createCount([{ id: 1, name: 'Alice', email: 'a@b.com' }], (meta) =>
+    userCollection.createAndCount([{ id: 1, name: 'Alice', email: 'a@b.com' }], (meta) =>
       // @ts-expect-error - cache declares applicableTo: ['read'], not 'write'
       meta.annotate(cacheAnnotation({ ttl: 60 })),
     );
   });
 
   test('the return type is Promise<number>', () => {
-    const result = userCollection.createCount(
+    const result = userCollection.createAndCount(
       [{ id: 1, name: 'Alice', email: 'a@b.com' }],
       (meta) => meta.annotate(auditAnnotation({ actor: 'system' })),
     );
@@ -301,7 +301,7 @@ describe('Collection.upsert (write-typed)', () => {
   });
 });
 
-describe('Collection.update / .updateAll / .updateCount (write-typed)', () => {
+describe('Collection.update / .updateAll / .updateAndCount (write-typed)', () => {
   // Update terminals require the receiver to satisfy the
   // `State['hasWhere'] extends true` gate, so we use a separately-
   // declared `userCollectionWithWhere` whose State is post-where.
@@ -331,28 +331,28 @@ describe('Collection.update / .updateAll / .updateCount (write-typed)', () => {
     );
   });
 
-  test('updateCount accepts a configurator that applies a write-only annotation', () => {
-    userCollectionWithWhere.updateCount({ name: 'Alice' }, (meta) =>
+  test('updateAndCount accepts a configurator that applies a write-only annotation', () => {
+    userCollectionWithWhere.updateAndCount({ name: 'Alice' }, (meta) =>
       meta.annotate(auditAnnotation({ actor: 'system' })),
     );
   });
 
-  test('updateCount rejects a configurator that applies a read-only annotation (negative)', () => {
-    userCollectionWithWhere.updateCount({ name: 'Alice' }, (meta) =>
+  test('updateAndCount rejects a configurator that applies a read-only annotation (negative)', () => {
+    userCollectionWithWhere.updateAndCount({ name: 'Alice' }, (meta) =>
       // @ts-expect-error - cache declares applicableTo: ['read'], not 'write'
       meta.annotate(cacheAnnotation({ ttl: 60 })),
     );
   });
 
-  test('updateCount returns Promise<number>', () => {
-    const result = userCollectionWithWhere.updateCount({ name: 'Alice' }, (meta) =>
+  test('updateAndCount returns Promise<number>', () => {
+    const result = userCollectionWithWhere.updateAndCount({ name: 'Alice' }, (meta) =>
       meta.annotate(auditAnnotation({ actor: 'system' })),
     );
     expectTypeOf(result).resolves.toBeNumber();
   });
 });
 
-describe('Collection.delete / .deleteAll / .deleteCount (write-typed)', () => {
+describe('Collection.delete / .deleteAll / .deleteAndCount (write-typed)', () => {
   test('delete accepts a configurator that applies a write-only annotation', () => {
     userCollectionWithWhere.delete((meta) => meta.annotate(auditAnnotation({ actor: 'system' })));
   });
@@ -377,14 +377,14 @@ describe('Collection.delete / .deleteAll / .deleteCount (write-typed)', () => {
     );
   });
 
-  test('deleteCount accepts a configurator that applies a write-only annotation', () => {
-    userCollectionWithWhere.deleteCount((meta) =>
+  test('deleteAndCount accepts a configurator that applies a write-only annotation', () => {
+    userCollectionWithWhere.deleteAndCount((meta) =>
       meta.annotate(auditAnnotation({ actor: 'system' })),
     );
   });
 
-  test('deleteCount rejects a configurator that applies a read-only annotation (negative)', () => {
-    userCollectionWithWhere.deleteCount((meta) =>
+  test('deleteAndCount rejects a configurator that applies a read-only annotation (negative)', () => {
+    userCollectionWithWhere.deleteAndCount((meta) =>
       // @ts-expect-error - cache declares applicableTo: ['read'], not 'write'
       meta.annotate(cacheAnnotation({ ttl: 60 })),
     );

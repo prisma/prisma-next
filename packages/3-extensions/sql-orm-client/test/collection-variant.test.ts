@@ -91,9 +91,9 @@ interface FeaturePredicate {
 interface FeatureCountCollection {
   where(predicate: (task: FeaturePredicate) => unknown): FeatureCountCollection;
   include(relation: 'assignee'): FeatureCountCollection;
-  updateCount(data: { title: string }): Promise<number>;
+  updateAndCount(data: { title: string }): Promise<number>;
   deleteAll(): { toArray(): Promise<Record<string, unknown>[]> };
-  deleteCount(): Promise<number>;
+  deleteAndCount(): Promise<number>;
 }
 
 interface MixedPolyCountCollection {
@@ -400,7 +400,7 @@ describe('Mixed STI+MTI polymorphic query pipeline', () => {
     expect(included.state.includes[0]?.nested.variantName).toBeUndefined();
   });
 
-  it('updateCount after variant(Feature) scopes MTI scalar predicates through the write subquery', async () => {
+  it('updateAndCount after variant(Feature) scopes MTI scalar predicates through the write subquery', async () => {
     const { collection, runtime } = createMixedPolyCollection();
     runtime.setNextResults([[{ id: 2 }], []]);
 
@@ -411,7 +411,7 @@ describe('Mixed STI+MTI polymorphic query pipeline', () => {
     const count = await mixedPoly
       .variant('Feature')
       .where((task) => task.priority.gt(1))
-      .updateCount({ title: 'Queued' });
+      .updateAndCount({ title: 'Queued' });
 
     expect(count).toBe(1);
     expect(runtime.executions).toHaveLength(2);
@@ -431,7 +431,7 @@ describe('Mixed STI+MTI polymorphic query pipeline', () => {
     ).toHaveLength(1);
   });
 
-  it('deleteCount after variant(Feature) scopes MTI relation predicates through the write subquery', async () => {
+  it('deleteAndCount after variant(Feature) scopes MTI relation predicates through the write subquery', async () => {
     const { collection, runtime } = createMixedPolyCollection();
     runtime.setNextResults([[{ id: 2 }], []]);
 
@@ -442,7 +442,7 @@ describe('Mixed STI+MTI polymorphic query pipeline', () => {
     const count = await mixedPoly
       .variant('Feature')
       .where((task) => task.assignee.some())
-      .deleteCount();
+      .deleteAndCount();
 
     expect(count).toBe(1);
     expect(runtime.executions).toHaveLength(2);
@@ -549,11 +549,11 @@ describe('STI variant create (discriminator auto-injection)', () => {
 });
 
 describe('MTI variant mutation guards', () => {
-  it('createCount() throws for MTI variants', async () => {
+  it('createAndCount() throws for MTI variants', async () => {
     const { collection } = createReturningMixedPolyCollection();
     const narrowed = collection.variant('Feature' as never) as typeof collection;
-    await expect(narrowed.createCount([{ title: 'X', priority: 1 } as never])).rejects.toThrow(
-      /createCount\(\) is not supported for MTI variant/,
+    await expect(narrowed.createAndCount([{ title: 'X', priority: 1 } as never])).rejects.toThrow(
+      /createAndCount\(\) is not supported for MTI variant/,
     );
   });
 

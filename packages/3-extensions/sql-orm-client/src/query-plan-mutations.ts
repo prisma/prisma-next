@@ -288,8 +288,8 @@ export function compileInsertCountSplit(
   rows: readonly Record<string, unknown>[],
 ): ReadonlyArray<SqlQueryPlan<Record<string, unknown>>> {
   if (rows.length === 0) {
-    throw ormError('ORM.MUTATION_DATA_MISSING', 'createCount() requires at least one row', {
-      meta: { method: 'createCount', namespaceId, tableName },
+    throw ormError('ORM.MUTATION_DATA_MISSING', 'createAndCount() requires at least one row', {
+      meta: { method: 'createAndCount', namespaceId, tableName },
     });
   }
   return groupRowsByColumnSignature(rows).map((group) =>
