@@ -26,6 +26,7 @@ import { assertDefined } from '@prisma-next/utils/assertions';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PG_ENUM_CODEC_ID } from './codec-ids';
+import { postgresError } from './errors';
 import { PostgresNativeEnum } from './postgres-native-enum';
 import { PostgresRlsEnablement, type PostgresRlsEnablementInput } from './postgres-rls-enablement';
 import { PostgresRlsPolicy, type RlsPolicyOperation } from './postgres-rls-policy';
@@ -723,12 +724,16 @@ function requireLocalTarget(
     return { namespaceId: target.namespaceId, tableName: target.tableName };
   }
   if (target !== undefined && target.kind === 'cross-space') {
-    throw new Error(
+    throw postgresError(
+      'CONTRACT.POLICY_INVALID',
       `defineContract: ${subject} targets model "${target.modelName ?? target.tableName}", which lives in another contract space. Policies and rlsEnabled entries must target a model declared in this contract.`,
+      { meta: { model: target.modelName ?? target.tableName, reason: 'cross-space-target' } },
     );
   }
-  throw new Error(
+  throw postgresError(
+    'CONTRACT.MODEL_UNKNOWN',
     `defineContract: ${subject} targets model "${target?.modelName ?? '<anonymous>'}", which is not in the contract's models. Add the model to \`models\`.`,
+    { meta: { model: target?.modelName ?? '<anonymous>' } },
   );
 }
 
@@ -780,8 +785,10 @@ export function postgresLowerEntityHandles(
           'role handles are constructed only by the postgres contract-builder role() constructor, which enforces this shape'
         >(handle);
         if (roles.has(roleHandle.name)) {
-          throw new Error(
+          throw postgresError(
+            'CONTRACT.ROLE_INVALID',
             `defineContract: role "${roleHandle.name}" is declared more than once in the entities list.`,
+            { meta: { role: roleHandle.name, reason: 'duplicate' } },
           );
         }
         // Roles are cluster-scoped in Postgres, so they always land in the
@@ -804,8 +811,10 @@ export function postgresLowerEntityHandles(
         break;
       }
       default:
-        throw new Error(
+        throw postgresError(
+          'CONTRACT.ENTITY_KIND_INVALID',
           `defineContract: the postgres pack does not lower "${handle.entityKind}" handles from the entities list.`,
+          { meta: { entityKind: handle.entityKind } },
         );
     }
   }
@@ -816,21 +825,33 @@ export function postgresLowerEntityHandles(
   for (const { handle: policy, refs } of policies) {
     const prefix = policy.name;
     if (prefix.length > RLS_POLICY_PREFIX_MAX_LENGTH) {
-      throw new Error(
+      throw postgresError(
+        'CONTRACT.POLICY_INVALID',
         `defineContract: policy prefix "${prefix}" exceeds the ${RLS_POLICY_PREFIX_MAX_LENGTH}-character maximum (Postgres identifiers cap at 63 characters and the wire name appends a 9-character hash suffix).`,
+        { meta: { prefix, reason: 'prefix-too-long' } },
       );
     }
     const coordinate = requireLocalTarget(refs, `policy "${prefix}"`);
     if (!enablements.has(coordinateKey(coordinate))) {
       const target = refs['target'];
-      throw new Error(
+      throw postgresError(
+        'CONTRACT.POLICY_INVALID',
         `defineContract: policy "${prefix}" targets model "${target?.modelName ?? coordinate.tableName}", whose table is not RLS-enabled. Add rlsEnabled(<model>) to the entities list.`,
+        {
+          meta: {
+            prefix,
+            model: target?.modelName ?? coordinate.tableName,
+            reason: 'target-not-rls-enabled',
+          },
+        },
       );
     }
     const prefixKey = `${coordinate.namespaceId} ${prefix}`;
     if (seenPrefixes.has(prefixKey)) {
-      throw new Error(
+      throw postgresError(
+        'CONTRACT.POLICY_INVALID',
         `defineContract: policy prefix "${prefix}" is declared more than once in namespace "${coordinate.namespaceId}". Policy prefixes must be unique per namespace.`,
+        { meta: { prefix, namespaceId: coordinate.namespaceId, reason: 'duplicate-prefix' } },
       );
     }
     seenPrefixes.add(prefixKey);

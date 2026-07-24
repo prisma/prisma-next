@@ -18,9 +18,11 @@ import type { SqlControlDriverInstance, SqlStorage } from '@prisma-next/sql-cont
 import type { SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok, okVoid } from '@prisma-next/utils/result';
 import { MARKER_TABLE_NAME } from '../control-tables';
+import { sqliteError } from '../errors';
 import { verifySqliteDatabaseSchema } from './diff-database-schema';
 import type { SqlitePlanTargetDetails } from './planner-target-details';
 
@@ -44,8 +46,10 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
   ): Promise<SqlMigrationRunnerResult> {
     const driver = options.driver;
     if (options.space !== undefined && options.space !== options.plan.spaceId) {
-      throw new Error(
+      throw sqliteError(
+        'MIGRATION.CONTRACT_SPACE_VIOLATION',
         `SqlMigrationRunner: options.space (${options.space}) does not match plan.spaceId (${options.plan.spaceId})`,
+        { meta: { space: options.space, planSpaceId: options.plan.spaceId } },
       );
     }
     const space = options.plan.spaceId;
@@ -616,7 +620,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     const edges = options.migrationEdges;
     const totalEdgeOps = edges.reduce((sum, edge) => sum + edge.operationCount, 0);
     if (totalEdgeOps !== plan.operations.length) {
-      throw new Error(
+      throw new InternalError(
         `Ledger write: plan.operations length (${plan.operations.length}) does not match sum of migrationEdges operationCount (${totalEdgeOps})`,
       );
     }

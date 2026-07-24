@@ -12,6 +12,7 @@ import {
   relationalNodeGranularity,
 } from '@prisma-next/sql-schema-ir/types';
 import { sqliteTargetDescriptorMeta } from './descriptor-meta';
+import { sqliteError } from './errors';
 import { diffSqliteSchema, sqliteContractToSchema } from './migrations/diff-database-schema';
 import { createSqliteMigrationPlanner } from './migrations/planner';
 import type { SqlitePlanTargetDetails } from './migrations/planner-target-details';
@@ -49,7 +50,8 @@ const sqliteControlTargetDescriptor: SqlControlTargetDescriptor<'sqlite', Sqlite
         // encodes that invariant at runtime + narrows the generic
         // to `Contract<SqlStorage>` without a blind cast.
         if (!isSqlContract(contract)) {
-          throw new Error(
+          throw sqliteError(
+            'CONTRACT.TARGET_MISMATCH',
             'sqliteControlTargetDescriptor.contractToSchema received a non-SQL contract; expected Contract<SqlStorage>',
           );
         }

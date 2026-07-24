@@ -7,6 +7,7 @@
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';
+import { postgresError } from './errors';
 
 export function renderLength(
   typeName: string,
@@ -17,8 +18,10 @@ export function renderLength(
     return undefined;
   }
   if (typeof length !== 'number' || !Number.isFinite(length) || !Number.isInteger(length)) {
-    throw new Error(
+    throw postgresError(
+      'RUNTIME.TYPE_PARAMS_INVALID',
       `renderOutputType: expected integer "length" in typeParams for ${typeName}, got ${String(length)}`,
+      { meta: { nativeType: typeName, param: 'length', received: String(length) } },
     );
   }
   return `${typeName}<${length}>`;
@@ -34,8 +37,10 @@ export function renderPrecision(typeName: string, typeParams: Record<string, unk
     !Number.isFinite(precision) ||
     !Number.isInteger(precision)
   ) {
-    throw new Error(
+    throw postgresError(
+      'RUNTIME.TYPE_PARAMS_INVALID',
       `renderOutputType: expected integer "precision" in typeParams for ${typeName}, got ${String(precision)}`,
+      { meta: { nativeType: typeName, param: 'precision', received: String(precision) } },
     );
   }
   return `${typeName}<${precision}>`;
@@ -57,15 +62,19 @@ export const pgNumericRenderOutputType = (typeParams: {
     !Number.isFinite(precision) ||
     !Number.isInteger(precision)
   ) {
-    throw new Error(
+    throw postgresError(
+      'RUNTIME.TYPE_PARAMS_INVALID',
       `renderOutputType: expected integer "precision" in typeParams for Numeric, got ${String(precision)}`,
+      { meta: { nativeType: 'Numeric', param: 'precision', received: String(precision) } },
     );
   }
   const scale = typeParams.scale;
   if (scale === undefined) return `Numeric<${precision}>`;
   if (typeof scale !== 'number' || !Number.isFinite(scale) || !Number.isInteger(scale)) {
-    throw new Error(
+    throw postgresError(
+      'RUNTIME.TYPE_PARAMS_INVALID',
       `renderOutputType: expected integer "scale" in typeParams for Numeric, got ${String(scale)}`,
+      { meta: { nativeType: 'Numeric', param: 'scale', received: String(scale) } },
     );
   }
   return `Numeric<${precision}, ${scale}>`;
@@ -78,14 +87,26 @@ const ISO_8601_TIMESTAMPTZ =
 export const pgTimestampEncodeJson = (value: Date): JsonValue => value.toISOString().slice(0, -1);
 export const pgTimestampDecodeJson = (json: JsonValue): Date => {
   if (typeof json !== 'string') {
-    throw new Error(`Expected ISO date string for pg/timestamp@1, got ${typeof json}`);
+    throw postgresError(
+      'RUNTIME.DECODE_FAILED',
+      `Expected ISO date string for pg/timestamp@1, got ${typeof json}`,
+      { meta: { codecId: 'pg/timestamp@1', received: typeof json } },
+    );
   }
   if (!ISO_8601_TIMESTAMP.test(json)) {
-    throw new Error(`Invalid ISO date string for pg/timestamp@1: ${json}`);
+    throw postgresError(
+      'RUNTIME.DECODE_FAILED',
+      `Invalid ISO date string for pg/timestamp@1: ${json}`,
+      { meta: { codecId: 'pg/timestamp@1', received: json } },
+    );
   }
   const date = new Date(`${json}Z`);
   if (Number.isNaN(date.getTime())) {
-    throw new Error(`Invalid ISO date string for pg/timestamp@1: ${json}`);
+    throw postgresError(
+      'RUNTIME.DECODE_FAILED',
+      `Invalid ISO date string for pg/timestamp@1: ${json}`,
+      { meta: { codecId: 'pg/timestamp@1', received: json } },
+    );
   }
   return date;
 };
@@ -94,14 +115,26 @@ export const pgTimestamptzEncodeJson = (value: Date): JsonValue =>
   value.toISOString().replace(/Z$/, '+00:00');
 export const pgTimestamptzDecodeJson = (json: JsonValue): Date => {
   if (typeof json !== 'string') {
-    throw new Error(`Expected ISO date string for pg/timestamptz@1, got ${typeof json}`);
+    throw postgresError(
+      'RUNTIME.DECODE_FAILED',
+      `Expected ISO date string for pg/timestamptz@1, got ${typeof json}`,
+      { meta: { codecId: 'pg/timestamptz@1', received: typeof json } },
+    );
   }
   if (!ISO_8601_TIMESTAMPTZ.test(json)) {
-    throw new Error(`Invalid ISO date string for pg/timestamptz@1: ${json}`);
+    throw postgresError(
+      'RUNTIME.DECODE_FAILED',
+      `Invalid ISO date string for pg/timestamptz@1: ${json}`,
+      { meta: { codecId: 'pg/timestamptz@1', received: json } },
+    );
   }
   const date = new Date(json);
   if (Number.isNaN(date.getTime())) {
-    throw new Error(`Invalid ISO date string for pg/timestamptz@1: ${json}`);
+    throw postgresError(
+      'RUNTIME.DECODE_FAILED',
+      `Invalid ISO date string for pg/timestamptz@1: ${json}`,
+      { meta: { codecId: 'pg/timestamptz@1', received: json } },
+    );
   }
   return date;
 };
@@ -141,11 +174,17 @@ export const pgDateEncodeJson = (value: Date): JsonValue => pgDateEncode(value);
 
 export const pgDateDecodeJson = (json: JsonValue): Date => {
   if (typeof json !== 'string') {
-    throw new Error(`Expected date string for pg/date@1, got ${typeof json}`);
+    throw postgresError(
+      'RUNTIME.DECODE_FAILED',
+      `Expected date string for pg/date@1, got ${typeof json}`,
+      { meta: { codecId: 'pg/date@1', received: typeof json } },
+    );
   }
   const match = ISO_8601_DATE.exec(json);
   if (!match) {
-    throw new Error(`Invalid date string for pg/date@1: ${json}`);
+    throw postgresError('RUNTIME.DECODE_FAILED', `Invalid date string for pg/date@1: ${json}`, {
+      meta: { codecId: 'pg/date@1', received: json },
+    });
   }
   const [, yearText, monthText, dayText] = match;
   const year = Number(yearText);
@@ -153,7 +192,9 @@ export const pgDateDecodeJson = (json: JsonValue): Date => {
   const day = Number(dayText);
   const date = new Date(Date.UTC(year, month, day));
   if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month || date.getUTCDate() !== day) {
-    throw new Error(`Invalid date string for pg/date@1: ${json}`);
+    throw postgresError('RUNTIME.DECODE_FAILED', `Invalid date string for pg/date@1: ${json}`, {
+      meta: { codecId: 'pg/date@1', received: json },
+    });
   }
   return date;
 };
@@ -168,19 +209,31 @@ export const pgByteaEncodeJson = (value: Uint8Array): JsonValue =>
 
 export const pgByteaDecodeJson = (value: JsonValue): Uint8Array => {
   if (typeof value !== 'string' || !value.startsWith('\\x')) {
-    throw new Error(`Expected Postgres bytea hex text to start with "\\x"`);
+    throw postgresError(
+      'RUNTIME.DECODE_FAILED',
+      `Expected Postgres bytea hex text to start with "\\x"`,
+      { meta: { codecId: 'pg/bytea@1' } },
+    );
   }
 
   const hex = value.slice(2);
   if (hex.length % 2 !== 0) {
-    throw new Error(`Invalid Postgres bytea hex text length: ${hex.length}`);
+    throw postgresError(
+      'RUNTIME.DECODE_FAILED',
+      `Invalid Postgres bytea hex text length: ${hex.length}`,
+      { meta: { codecId: 'pg/bytea@1', received: hex.length } },
+    );
   }
 
   const bytes = new Uint8Array(hex.length / 2);
   for (let offset = 0; offset < hex.length; offset += 2) {
     const pair = hex.slice(offset, offset + 2);
     if (!/^[0-9a-fA-F]{2}$/.test(pair)) {
-      throw new Error(`Invalid Postgres bytea hex pair "${pair}" at offset ${offset}`);
+      throw postgresError(
+        'RUNTIME.DECODE_FAILED',
+        `Invalid Postgres bytea hex pair "${pair}" at offset ${offset}`,
+        { meta: { codecId: 'pg/bytea@1', received: pair } },
+      );
     }
     bytes[offset / 2] = Number.parseInt(pair, 16);
   }

@@ -10,6 +10,7 @@ import {
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { postgresError } from '../errors';
 import type { PostgresRlsPolicy } from '../postgres-rls-policy';
 import type { PostgresContract } from '../postgres-schema';
 import { isPostgresSchema } from '../postgres-schema';
@@ -232,14 +233,25 @@ export function contractToPostgresDatabaseSchemaNode(
     for (const [tableName, tablePolicies] of policiesByTable) {
       if (!(tableName in tables)) {
         const policyName = tablePolicies[0]?.name ?? '(unknown)';
-        throw new Error(
+        throw postgresError(
+          'CONTRACT.POLICY_INVALID',
           `contract-to-postgres-database-schema-node: policy "${policyName}" references table "${tableName}" not present in namespace "${ddlSchema}"`,
+          { meta: { policyName, tableName, namespaceId: ddlSchema, reason: 'table-missing' } },
         );
       }
       if (!Object.hasOwn(ns.rls, tableName)) {
         const policyPrefix = tablePolicies[0]?.prefix ?? '(unknown)';
-        throw new Error(
+        throw postgresError(
+          'CONTRACT.POLICY_INVALID',
           `contract-to-postgres-database-schema-node: policy "${policyPrefix}" targets table "${tableName}" in namespace "${ddlSchema}", which is not RLS-controlled. Mark the model with @@rls (entries.rls["${tableName}"]) or remove the policy.`,
+          {
+            meta: {
+              policyName: policyPrefix,
+              tableName,
+              namespaceId: ddlSchema,
+              reason: 'table-not-rls-controlled',
+            },
+          },
         );
       }
     }

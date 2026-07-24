@@ -2,6 +2,7 @@ import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import type { StorageColumn, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { isPgEnumParams } from '../codecs';
+import { postgresError } from '../errors';
 import { escapeLiteral, quoteIdentifier, quoteQualifiedName } from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
 import { resolveColumnTypeMetadata } from './planner-type-resolution';
@@ -15,9 +16,11 @@ const SAFE_NATIVE_TYPE_PATTERN = /^[a-zA-Z][a-zA-Z0-9_ ]*(\[\])?$/;
 
 function assertSafeNativeType(nativeType: string): void {
   if (!SAFE_NATIVE_TYPE_PATTERN.test(nativeType)) {
-    throw new Error(
+    throw postgresError(
+      'CONTRACT.NATIVE_TYPE_INVALID',
       `Unsafe native type name in contract: "${nativeType}". ` +
         'Native type names must match /^[a-zA-Z][a-zA-Z0-9_ ]*(\\[\\])?$/',
+      { meta: { nativeType } },
     );
   }
 }
@@ -29,9 +32,11 @@ function assertSafeNativeType(nativeType: string): void {
  */
 function assertSafeDefaultExpression(expression: string): void {
   if (expression.includes(';') || /--|\/\*|\$\$|\bSELECT\b/i.test(expression)) {
-    throw new Error(
+    throw postgresError(
+      'CONTRACT.DEFAULT_INVALID',
       `Unsafe default expression in contract: "${expression}". ` +
         'Default expressions must not contain semicolons, SQL comment tokens, dollar-quoting, or subqueries.',
+      { meta: { expression } },
     );
   }
 }
@@ -99,9 +104,11 @@ function expandParameterizedTypeSql(
   }
 
   if (!column.codecId) {
-    throw new Error(
+    throw postgresError(
+      'CONTRACT.CODEC_DESCRIPTOR_MISSING',
       `Column declares typeParams for nativeType "${column.nativeType}" but has no codecId. ` +
         'Ensure the column is associated with a codec.',
+      { meta: { nativeType: column.nativeType } },
     );
   }
 
@@ -110,10 +117,12 @@ function expandParameterizedTypeSql(
     if (hooks?.planTypeOperations) {
       return null;
     }
-    throw new Error(
+    throw postgresError(
+      'CONTRACT.PACK_CONTRIBUTION_INVALID',
       `Column declares typeParams for nativeType "${column.nativeType}" ` +
         `but no expandNativeType hook is registered for codecId "${column.codecId}". ` +
         'Ensure the extension providing this codec is included in extensions.',
+      { meta: { codecId: column.codecId, nativeType: column.nativeType } },
     );
   }
 

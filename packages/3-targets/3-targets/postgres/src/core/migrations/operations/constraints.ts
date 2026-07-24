@@ -1,5 +1,6 @@
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import { REFERENTIAL_ACTION_SQL } from '@prisma-next/sql-contract/referential-action-sql';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import { constraintExistsAst } from '../../../contract-free/checks';
 import { escapeLiteral, quoteIdentifier } from '../../sql-utils';
 import { qualifyTableName } from '../planner-sql-checks';
@@ -29,14 +30,14 @@ REFERENCES ${qualifyTableName(fk.references.schema, fk.references.table)} (${fk.
   if (fk.onDelete !== undefined) {
     const action = REFERENTIAL_ACTION_SQL[fk.onDelete];
     if (!action) {
-      throw new Error(`Unknown referential action for onDelete: ${String(fk.onDelete)}`);
+      throw new InternalError(`Unknown referential action for onDelete: ${String(fk.onDelete)}`);
     }
     sql += `\nON DELETE ${action}`;
   }
   if (fk.onUpdate !== undefined) {
     const action = REFERENTIAL_ACTION_SQL[fk.onUpdate];
     if (!action) {
-      throw new Error(`Unknown referential action for onUpdate: ${String(fk.onUpdate)}`);
+      throw new InternalError(`Unknown referential action for onUpdate: ${String(fk.onUpdate)}`);
     }
     sql += `\nON UPDATE ${action}`;
   }

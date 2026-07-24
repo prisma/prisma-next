@@ -10,6 +10,7 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlColumnIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
+import { assertNever, InternalError } from '@prisma-next/utils/internal-error';
 import type { SqliteColumnSpec } from './operations/shared';
 import { buildColumnDefaultSql, buildColumnTypeSql } from './planner-ddl-builders';
 
@@ -28,7 +29,7 @@ function columnLike(
   column: SqlColumnIR,
 ): Pick<StorageColumn, 'nativeType' | 'codecId' | 'nullable' | 'many' | 'typeParams' | 'default'> {
   if (column.codecRef === undefined || column.codecBaseNativeType === undefined) {
-    throw new Error(
+    throw new InternalError(
       `columnLike: expected column "${column.name}" carries no codec identity — the expected tree must be derived via contractToSchemaIR for planning`,
     );
   }
@@ -69,7 +70,8 @@ function sqliteDefaultToDdlColumnDefault(
       return new FunctionColumnDefault(columnDefault.expression);
     default: {
       const exhaustive: never = columnDefault;
-      throw new Error(
+      return assertNever(
+        exhaustive,
         `sqliteDefaultToDdlColumnDefault: unhandled kind "${blindCast<{ kind: string }, 'exhaustiveness: surface the unhandled default kind'>(exhaustive).kind}"`,
       );
     }

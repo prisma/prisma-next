@@ -58,6 +58,14 @@ describe('CreateTableCall', () => {
     const call = new CreateTableCall('public', 'user', [col('id', 'integer')]);
     await expect(async () => call.toOp()).rejects.toThrow('createPostgresMigrationPlanner');
   });
+
+  it('toOp() without a lowerer reports MIGRATION.POSTGRES_CONTROL_STACK_MISSING', async () => {
+    const call = new CreateTableCall('public', 'user', [col('id', 'integer')]);
+    await expect(call.toOp()).rejects.toMatchObject({
+      code: 'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
+      meta: { factory: 'CreateTableCall' },
+    });
+  });
 });
 
 const pkeyChecks = () =>

@@ -13,6 +13,7 @@ import type {
   StorageTable,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import { sqliteError } from '../errors';
 import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 
 type SqliteColumnDefault = StorageColumn['default'];
@@ -21,18 +22,22 @@ const SAFE_NATIVE_TYPE_PATTERN = /^[a-zA-Z][a-zA-Z0-9_ ]*$/;
 
 function assertSafeNativeType(nativeType: string): void {
   if (!SAFE_NATIVE_TYPE_PATTERN.test(nativeType)) {
-    throw new Error(
+    throw sqliteError(
+      'CONTRACT.NATIVE_TYPE_INVALID',
       `Unsafe native type name in contract: "${nativeType}". ` +
         'Native type names must match /^[a-zA-Z][a-zA-Z0-9_ ]*$/',
+      { meta: { nativeType } },
     );
   }
 }
 
 function assertSafeDefaultExpression(expression: string): void {
   if (expression.includes(';') || /--|\/\*|\bSELECT\b/i.test(expression)) {
-    throw new Error(
+    throw sqliteError(
+      'CONTRACT.DEFAULT_INVALID',
       `Unsafe default expression in contract: "${expression}". ` +
         'Default expressions must not contain semicolons, SQL comment tokens, or subqueries.',
+      { meta: { expression } },
     );
   }
 }
@@ -130,8 +135,10 @@ export function resolveColumnTypeMetadata(
   }
   const referencedType = storageTypes[column.typeRef];
   if (!referencedType) {
-    throw new Error(
+    throw sqliteError(
+      'CONTRACT.TYPE_UNKNOWN',
       `Storage type "${column.typeRef}" referenced by column is not defined in storage.types.`,
+      { meta: { typeRef: column.typeRef } },
     );
   }
   return {

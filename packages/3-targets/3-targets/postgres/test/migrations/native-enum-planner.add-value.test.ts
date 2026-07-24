@@ -25,7 +25,6 @@ import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-da
 import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-namespace-schema-node';
 import { PostgresNativeEnumSchemaNode } from '../../src/core/schema-ir/postgres-native-enum-schema-node';
 import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
-import { SqlEscapeError } from '../../src/core/sql-utils';
 
 const EXPECTED_MEMBERS = ['draft', 'review', 'done'] as const;
 
@@ -302,7 +301,7 @@ describe('AddNativeEnumValueCall op', () => {
   it('throws when constructed with a value exceeding the 63-byte enum label limit', () => {
     const tooLong = 'x'.repeat(64);
     expect(() => new AddNativeEnumValueCall('sales', 'order_status', tooLong)).toThrow(
-      SqlEscapeError,
+      'byte label limit',
     );
   });
 

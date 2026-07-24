@@ -6,6 +6,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { blindCast } from '@prisma-next/utils/casts';
 import { isThenable } from '@prisma-next/utils/promise';
+import { postgresError } from '../errors';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
@@ -23,8 +24,10 @@ function assertPostgresOp(op: MigrationPlanOperation, callFactoryName: string): 
     'op.target is present on concrete SqlMigrationPlanOperation but absent on the framework MigrationPlanOperation base'
   >(op).target?.id;
   if (targetId !== 'postgres') {
-    throw new Error(
+    throw postgresError(
+      'MIGRATION.TARGET_MISMATCH',
       `renderOps: expected postgres op but got target.id="${String(targetId)}" for op.id="${op.id}" (factoryName="${callFactoryName}"). An OpFactoryCall produced an op for a different target on the postgres planner path; check the call's target binding.`,
+      { meta: { opId: op.id, targetId: String(targetId), factoryName: callFactoryName } },
     );
   }
 }

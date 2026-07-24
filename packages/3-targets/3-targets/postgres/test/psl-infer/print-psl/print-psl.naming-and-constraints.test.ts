@@ -1,4 +1,5 @@
 import { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { isStructuredError } from '@prisma-next/utils/structured-error';
 import { describe, expect, it } from 'vitest';
 import { printPslFromFlat as printPslFromSql } from '../fixtures';
 
@@ -411,9 +412,17 @@ describe('printPsl', () => {
     });
 
     expect(() => printPslFromSql(schemaIR)).toThrowErrorMatchingInlineSnapshot(`
-      [Error: PSL model name collisions detected:
+      [StructuredError: PSL model name collisions detected:
       - model "UserProfile" from tables "user_profile", "UserProfile"]
     `);
+    let caught: unknown;
+    try {
+      printPslFromSql(schemaIR);
+    } catch (error) {
+      caught = error;
+    }
+    expect(isStructuredError(caught)).toBe(true);
+    expect(caught).toMatchObject({ code: 'CONTRACT.NAME_DUPLICATE' });
   });
 
   it('renames an adopted enum away from a same-named model, @@map carrying the type name', () => {

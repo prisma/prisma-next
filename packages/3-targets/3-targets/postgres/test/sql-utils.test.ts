@@ -1,12 +1,21 @@
+import { isStructuredError } from '@prisma-next/utils/structured-error';
 import { describe, expect, it, vi } from 'vitest';
 import {
   escapeLiteral,
   qualifyName,
   quoteIdentifier,
   quoteQualifiedName,
-  SqlEscapeError,
   validateEnumValueLength,
 } from '../src/core/sql-utils';
+
+function catchStructured(fn: () => unknown): unknown {
+  try {
+    fn();
+  } catch (error) {
+    return error;
+  }
+  throw new Error('expected function to throw');
+}
 
 describe('quoteIdentifier', () => {
   it('quotes simple identifiers', () => {
@@ -26,24 +35,29 @@ describe('quoteIdentifier', () => {
     expect(quoteIdentifier('table;DROP TABLE users;--')).toBe('"table;DROP TABLE users;--"');
   });
 
-  it('throws SqlEscapeError for null bytes', () => {
-    expect(() => quoteIdentifier('table\0name')).toThrow(SqlEscapeError);
-    expect(() => quoteIdentifier('table\0name')).toThrow('Identifier cannot contain null bytes');
+  it('throws CONTRACT.IDENTIFIER_INVALID for null bytes', () => {
+    const error = catchStructured(() => quoteIdentifier('table\0name'));
+    expect(isStructuredError(error)).toBe(true);
+    expect(error).toMatchObject({
+      code: 'CONTRACT.IDENTIFIER_INVALID',
+      message: 'Identifier cannot contain null bytes',
+    });
   });
 
-  it('throws SqlEscapeError for empty identifiers', () => {
-    expect(() => quoteIdentifier('')).toThrow(SqlEscapeError);
-    expect(() => quoteIdentifier('')).toThrow('Identifier cannot be empty');
+  it('throws CONTRACT.IDENTIFIER_INVALID for empty identifiers', () => {
+    const error = catchStructured(() => quoteIdentifier(''));
+    expect(isStructuredError(error)).toBe(true);
+    expect(error).toMatchObject({
+      code: 'CONTRACT.IDENTIFIER_INVALID',
+      message: 'Identifier cannot be empty',
+    });
   });
 
-  it('includes sanitized value in error', () => {
-    try {
-      quoteIdentifier('table\0name');
-    } catch (error) {
-      expect(error).toBeInstanceOf(SqlEscapeError);
-      expect((error as SqlEscapeError).value).toBe('table\\0name');
-      expect((error as SqlEscapeError).kind).toBe('identifier');
-    }
+  it('includes sanitized value in error meta', () => {
+    const error = catchStructured(() => quoteIdentifier('table\0name'));
+    expect(error).toMatchObject({
+      meta: { value: 'table\\0name', context: 'identifier' },
+    });
   });
 
   it('warns when identifier exceeds length limit', () => {
@@ -88,19 +102,20 @@ describe('escapeLiteral', () => {
     expect(escapeLiteral('col1\tcol2')).toBe('col1\tcol2');
   });
 
-  it('throws SqlEscapeError for null bytes', () => {
-    expect(() => escapeLiteral('value\0test')).toThrow(SqlEscapeError);
-    expect(() => escapeLiteral('value\0test')).toThrow('Literal value cannot contain null bytes');
+  it('throws CONTRACT.IDENTIFIER_INVALID for null bytes', () => {
+    const error = catchStructured(() => escapeLiteral('value\0test'));
+    expect(isStructuredError(error)).toBe(true);
+    expect(error).toMatchObject({
+      code: 'CONTRACT.IDENTIFIER_INVALID',
+      message: 'Literal value cannot contain null bytes',
+    });
   });
 
-  it('includes sanitized value in error', () => {
-    try {
-      escapeLiteral('value\0test');
-    } catch (error) {
-      expect(error).toBeInstanceOf(SqlEscapeError);
-      expect((error as SqlEscapeError).value).toBe('value\\0test');
-      expect((error as SqlEscapeError).kind).toBe('literal');
-    }
+  it('includes sanitized value in error meta', () => {
+    const error = catchStructured(() => escapeLiteral('value\0test'));
+    expect(error).toMatchObject({
+      meta: { value: 'value\\0test', context: 'literal' },
+    });
   });
 });
 
@@ -115,8 +130,12 @@ describe('qualifyName', () => {
   });
 
   it('propagates null byte errors', () => {
-    expect(() => qualifyName('schema\0name', 'table')).toThrow(SqlEscapeError);
-    expect(() => qualifyName('schema', 'table\0name')).toThrow(SqlEscapeError);
+    expect(() => qualifyName('schema\0name', 'table')).toThrow(
+      'Identifier cannot contain null bytes',
+    );
+    expect(() => qualifyName('schema', 'table\0name')).toThrow(
+      'Identifier cannot contain null bytes',
+    );
   });
 });
 
@@ -156,7 +175,7 @@ describe('enum value security scenarios', () => {
 
   it('rejects enum values with null bytes', () => {
     const maliciousValue = 'active\0';
-    expect(() => escapeLiteral(maliciousValue)).toThrow(SqlEscapeError);
+    expect(() => escapeLiteral(maliciousValue)).toThrow('Literal value cannot contain null bytes');
   });
 
   it('handles unicode enum values safely', () => {
@@ -183,9 +202,14 @@ describe('validateEnumValueLength', () => {
     expect(() => validateEnumValueLength('ok', 'Status')).not.toThrow();
   });
 
-  it('throws when value exceeds the limit', () => {
+  it('throws CONTRACT.IDENTIFIER_INVALID when value exceeds the limit', () => {
     const longValue = 'a'.repeat(64);
-    expect(() => validateEnumValueLength(longValue, 'Status')).toThrow(SqlEscapeError);
+    const error = catchStructured(() => validateEnumValueLength(longValue, 'Status'));
+    expect(isStructuredError(error)).toBe(true);
+    expect(error).toMatchObject({
+      code: 'CONTRACT.IDENTIFIER_INVALID',
+      meta: { value: longValue, context: 'enum-label' },
+    });
   });
 
   it('measures the limit in UTF-8 bytes, not characters — a 63-byte multibyte label passes', () => {
@@ -199,6 +223,6 @@ describe('validateEnumValueLength', () => {
     // 22 chars = 66 UTF-8 bytes — under the 63-CHARACTER count, over the 63-BYTE limit.
     const label = '€'.repeat(22);
     expect(label.length).toBe(22);
-    expect(() => validateEnumValueLength(label, 'Status')).toThrow(SqlEscapeError);
+    expect(() => validateEnumValueLength(label, 'Status')).toThrow('byte label limit');
   });
 });
