@@ -1,5 +1,5 @@
 /**
- * Scenario J: a unique index and a redundant plain index on the identical
+ * A unique index and a redundant plain index on the identical
  * column tuple are two distinct name-identified siblings. Both introspect,
  * and a contract declaring both verifies clean — the pre-name-identity
  * introspection dedup ("keep only the unique one per column tuple") is gone.
@@ -57,7 +57,7 @@ function buildPairContract(): Contract<SqlStorage> {
   };
 }
 
-describe.sequential('scenario J — same-tuple twin indexes verify', () => {
+describe.sequential('same-tuple twin indexes coexist and verify', () => {
   let database: Awaited<ReturnType<typeof createTestDatabase>>;
   let driver: PostgresControlDriver | undefined;
 

@@ -185,7 +185,7 @@ export function buildChildRelationField(
       fk.columns,
       // Only indexes the inferrer actually emits can back the FK in the
       // emitted contract: partial indexes (and expression indexes, which
-      // carry no column tuple) are skipped at emission until slice 4, so
+      // carry no column tuple) are not emitted yet, so
       // they must not suppress the explicit `index: false`.
       backingIndexColumnKeys({
         indexes: hostTable.indexes.filter((i) => i.where === undefined),

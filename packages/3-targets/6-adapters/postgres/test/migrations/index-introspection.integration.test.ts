@@ -219,7 +219,7 @@ describe.sequential('Postgres index introspection — type and options', () => {
     expect(indexes.find((i) => i.name === 'doc_email_plain')?.prefix).toBeUndefined();
   });
 
-  it('preserves same-tuple twins as distinct siblings (scenario J)', {
+  it('preserves same-tuple twins as distinct siblings', {
     timeout: testTimeout,
   }, async () => {
     await driver!.query('CREATE TABLE pair (id int PRIMARY KEY, email text NOT NULL)');

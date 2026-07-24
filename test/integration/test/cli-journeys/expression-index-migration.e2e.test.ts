@@ -1,8 +1,8 @@
 /**
- * Expression / partial / unique index migration journey (slice DoD stand-in
- * for the ciphers scenario: the PSL/TS authoring halves land in slice 2, so
- * the contract is authored through the factory layer — the only surface that
- * can express these indexes today).
+ * Expression / partial / unique index migration journey (a stand-in for the
+ * Cipherstash encrypted-search case: the PSL/TS authoring surfaces are not
+ * built yet, so the contract is authored through the factory layer — the
+ * only surface that can express these indexes today).
  *
  * A contract carrying an expression index, a partial index, and a unique
  * expression index is planned onto a fresh database (`migration plan`, DDL
