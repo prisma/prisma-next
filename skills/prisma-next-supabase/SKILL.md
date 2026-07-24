@@ -72,14 +72,14 @@ The concept: your models live in your namespaces (`public`); Supabase's live in 
 
 ```prisma
 types {
-  Uuid = String @db.Uuid
+  AuthUserId = Uuid
 }
 
 namespace public {
   model Profile {
-    id       Uuid   @id @default(uuid())
+    id       Uuid       @id @default(uuid())
     username String
-    userId   Uuid   @unique
+    userId   AuthUserId @unique
     user     supabase:auth.AuthUser @relation(fields: [userId], references: [id], onDelete: Cascade)
     @@map("profile")
     @@rls
@@ -109,6 +109,8 @@ namespace public {
   }
 }
 ```
+
+The `Uuid` constructor selects native UUID storage in type position. The legacy `@db.Uuid` spelling is removed; rewrite any `String @db.Uuid` alias or field as `Uuid` before emitting.
 
 The pieces:
 
