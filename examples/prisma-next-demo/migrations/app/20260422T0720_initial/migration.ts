@@ -145,7 +145,7 @@ export default class M extends Migration<never, End> {
       this.createIndex({
         schema: 'public',
         table: 'post',
-        index: 'post_userId_idx',
+        index: 'post_userId_idx_a489d58a',
         columns: ['userId'],
       }),
       this.addForeignKey({
@@ -160,7 +160,7 @@ export default class M extends Migration<never, End> {
       this.createIndex({
         schema: 'public',
         table: 'task',
-        index: 'task_userId_idx',
+        index: 'task_userId_idx_a489d58a',
         columns: ['userId'],
       }),
       this.addForeignKey({
@@ -186,13 +186,13 @@ export default class M extends Migration<never, End> {
       this.createIndex({
         schema: 'public',
         table: 'post_tag',
-        index: 'post_tag_postId_idx',
+        index: 'post_tag_postId_idx_a7a72715',
         columns: ['postId'],
       }),
       this.createIndex({
         schema: 'public',
         table: 'post_tag',
-        index: 'post_tag_tagId_idx',
+        index: 'post_tag_tagId_idx_86854244',
         columns: ['tagId'],
       }),
       this.addForeignKey({
