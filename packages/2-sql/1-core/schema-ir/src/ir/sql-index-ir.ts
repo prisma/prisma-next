@@ -3,29 +3,51 @@ import { freezeNode } from '@prisma-next/framework-components/ir';
 import { isArrayEqual } from '@prisma-next/utils/array-equal';
 import { blindCast } from '@prisma-next/utils/casts';
 import { InternalError } from '@prisma-next/utils/internal-error';
+import { normalizeIndexOptionValue } from '../naming';
 import { RelationalSchemaNodeKind } from './schema-node-kinds';
 import type { SqlAnnotations } from './sql-column-ir';
 import { assertNode, defineNonEnumerable, SqlSchemaIRNode } from './sql-schema-ir-node';
 
 /**
- * Every field is a required key. Values that may legitimately be absent
- * (an exact-named index's prefix, the btree→undefined type normalization)
- * are typed `| undefined` instead of optional, so each construction site
+ * An index's element structure — exactly one of a column tuple or an opaque
+ * expression, unrepresentable-otherwise at the type level. No discriminant
+ * is stored (the node keeps flat readonly accessors); the constructor's xor
+ * throw stays as the backstop for introspection rows and JSON-derived
+ * inputs that bypass this union.
+ */
+export type SqlIndexElements =
+  | {
+      /** Column-tuple elements. */
+      readonly columns: readonly string[];
+      readonly expression?: never;
+    }
+  | {
+      readonly columns?: never;
+      /**
+       * Opaque SQL: the entire element list between the parens of CREATE
+       * INDEX — one string, never parsed.
+       */
+      readonly expression: string;
+    };
+
+/**
+ * Every non-element field is a required key. Values that may legitimately
+ * be absent (an exact-named index's prefix, a default-method type) are
+ * typed `| undefined` instead of optional, so each construction site
  * states the absence explicitly rather than omitting the key silently.
  * Undefined values still produce an instance without the property.
  */
-export interface SqlIndexIRInput {
+export type SqlIndexIRInput = SqlIndexElements & {
   /** Full physical name — the node's identity. */
   readonly name: string;
-  /** Wire-name prefix. Present ⇔ managed; absent ⇔ exact-named. */
-  readonly prefix: string | undefined;
-  /** Column-tuple elements. Exactly one of `columns` / `expression` is set. */
-  readonly columns: readonly string[] | undefined;
   /**
-   * Opaque SQL: the entire element list between the parens of CREATE INDEX —
-   * one string, never parsed.
+   * The managed-mode name prefix — its PRESENCE is the naming-mode
+   * discriminator (there is no stored enum). Present ⇔ managed: the
+   * toolchain owns the physical name and `name === formatWireName(prefix,
+   * <8hex content hash>)`. Absent ⇔ exact: `name` is an adopted verbatim
+   * physical name whose identity the author owns entirely.
    */
-  readonly expression: string | undefined;
+  readonly prefix: string | undefined;
   /** Opaque SQL: partial-index predicate (WHERE body, without the keyword). */
   readonly where: string | undefined;
   readonly unique: boolean;
@@ -49,7 +71,7 @@ export interface SqlIndexIRInput {
    * compared by `isEqualTo` and never serialized.
    */
   readonly partial: boolean;
-}
+};
 
 /**
  * Schema IR node for a secondary index as observed by introspection.
@@ -66,13 +88,19 @@ export interface SqlIndexIRInput {
  * distinct siblings, and expression indexes need no column tuple at all.
  *
  * `isEqualTo` is selected by the receiver (the differ always calls
- * `expected.isEqualTo(actual)`): both modes compare `unique` strict, `type`
- * strict, `options` loosely, and `columns` ordered-strict when both sides
- * carry them; an exact-named receiver (`prefix === undefined`) additionally
- * byte-compares `expression`/`where` (both sides are reprints in the
- * supported flow — normalizing would only mask real drift); a managed
- * receiver never compares bodies (the wire-name hash already commits to
- * them).
+ * `expected.isEqualTo(actual)`) and delegates to {@link contentEquals} —
+ * the single node-owned content relation: both modes compare `unique`
+ * strict, `type` and option values through the named normalization seams,
+ * and `columns` ordered-strict when both sides carry them; an exact-named
+ * receiver (`prefix === undefined`) additionally byte-compares
+ * `expression`/`where` (both sides are reprints in the supported flow —
+ * normalizing would only mask real drift); a managed receiver never
+ * compares bodies (the wire-name hash already commits to them).
+ *
+ * `expression`, `where`, and `unique` are genuine SQL-family attributes —
+ * functional and partial indexes are standard SQL that any SQL target may
+ * introspect, so the family node must represent them; a target declining
+ * to author them is a capability decision, not target-specificity.
  */
 export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
   override readonly nodeKind = RelationalSchemaNodeKind.index;
@@ -125,12 +153,11 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
   }
 
   /**
-   * Mode-selected structural equality — see the class doc. `unique` and
-   * `type` compare strictly (`type` after the introspection-side
-   * btree→undefined normalization done at construction), `options` loosely
-   * (introspection stringifies reloptions), `columns` ordered-strict when
-   * both sides carry them. An exact receiver also byte-compares
-   * `expression ?? ''` and `where ?? ''`; a managed receiver never does.
+   * Mode-selected structural equality — see the class doc. Delegates to the
+   * single node-owned relation: `columns` compare ordered-strict when both
+   * sides carry them; an exact receiver (`prefix === undefined`)
+   * byte-compares `expression ?? ''` and `where ?? ''`; a managed receiver
+   * never compares bodies (the wire-name hash already commits to them).
    */
   isEqualTo(other: DiffableNode): boolean {
     const node = blindCast<
@@ -138,30 +165,80 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
       'every diff-tree node the differ pairs is a SqlSchemaIRNode'
     >(other);
     assertNode(node, 'SqlIndexIR', SqlIndexIR.is);
+    return this.contentEquals(node, {
+      columnPresence: 'when-both-defined',
+      bodies: this.prefix !== undefined ? 'ignored' : 'verbatim',
+    });
+  }
+
+  /**
+   * The single index content-equality relation — every comparer (the differ
+   * via {@link isEqualTo}, the planner's rename content-pairing) calls this
+   * with its mode-appropriate strictness rather than growing a parallel
+   * relation:
+   *
+   * - `columnPresence: 'when-both-defined'` (the differ's rule) compares
+   *   the tuples ordered-strict only when both sides carry them — a paired
+   *   node's identity already agreed, so a column node meeting an
+   *   expression node skips the tuple.
+   * - `columnPresence: 'matching'` (the rename-pairing rule) additionally
+   *   requires presence to agree: a column index never pairs an expression
+   *   index.
+   * - `bodies: 'verbatim'` byte-compares `expression ?? ''` / `where ?? ''`
+   *   (absent ≡ empty, no normalization — both sides are reprints in the
+   *   supported flow); `bodies: 'ignored'` skips them (managed identity —
+   *   the wire-name hash commits to the content).
+   *
+   * `unique` compares strictly; `type` and option VALUES compare through
+   * the named normalization seams below.
+   */
+  contentEquals(
+    other: SqlIndexIR,
+    strictness: {
+      readonly columnPresence: 'when-both-defined' | 'matching';
+      readonly bodies: 'verbatim' | 'ignored';
+    },
+  ): boolean {
+    const columnsEqual =
+      strictness.columnPresence === 'matching'
+        ? (this.columns === undefined) === (other.columns === undefined) &&
+          (this.columns === undefined || isArrayEqual(this.columns, other.columns ?? []))
+        : this.columns === undefined ||
+          other.columns === undefined ||
+          isArrayEqual(this.columns, other.columns);
     const structurallyEqual =
-      this.unique === node.unique &&
-      this.type === node.type &&
-      indexOptionsLooselyEqual(this.options, node.options) &&
-      (this.columns === undefined ||
-        node.columns === undefined ||
-        isArrayEqual(this.columns, node.columns));
+      this.unique === other.unique &&
+      normalizeIndexType(this.type) === normalizeIndexType(other.type) &&
+      indexOptionsEqual(this.options, other.options) &&
+      columnsEqual;
     if (!structurallyEqual) return false;
-    if (this.prefix !== undefined) return true;
+    if (strictness.bodies === 'ignored') return true;
     return (
-      (this.expression ?? '') === (node.expression ?? '') &&
-      (this.where ?? '') === (node.where ?? '')
+      (this.expression ?? '') === (other.expression ?? '') &&
+      (this.where ?? '') === (other.where ?? '')
     );
   }
 }
 
 /**
- * Option-bag equality ported from the relational walk: same key set, values
- * compared via `String()` coercion — Postgres introspection returns
- * reloptions values as raw strings (`'70'`, `'false'`) while contract option
- * leaves are typed (number, boolean, string). Exported for the planner's
- * rename content-pairing, which reuses this exact relation.
+ * Comparison-side normalization seam: the default access method (`btree` in
+ * every supported SQL target) compares as absent, so an authored
+ * `type: "btree"` and a default-method introspected index (whose type the
+ * adapter or constructor normalized away) are equal. Applied by
+ * {@link SqlIndexIR.contentEquals} only — the wire-name hash keeps the
+ * authored spelling.
  */
-export function indexOptionsLooselyEqual(
+function normalizeIndexType(type: string | undefined): string | undefined {
+  return type === 'btree' ? undefined : type;
+}
+
+/**
+ * Option-bag equality: same key set, values compared through
+ * {@link normalizeIndexOptionValue} — Postgres introspection returns
+ * reloptions values as catalog-reprint strings (`'70'`, `'on'`) while
+ * contract option leaves are typed (number, boolean, string).
+ */
+function indexOptionsEqual(
   a: Record<string, unknown> | undefined,
   b: Record<string, unknown> | undefined,
 ): boolean {
@@ -173,7 +250,7 @@ export function indexOptionsLooselyEqual(
   }
   if (aKeys.length === 0) return true;
   for (const key of aKeys) {
-    if (String(a?.[key]) !== String(b?.[key])) {
+    if (normalizeIndexOptionValue(a?.[key]) !== normalizeIndexOptionValue(b?.[key])) {
       return false;
     }
   }

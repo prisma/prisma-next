@@ -94,7 +94,13 @@ export function materializeForeignKeysAndIndexes(
       const key = reference.source.columns.join(',');
       if (!satisfiedIndexColumns.has(key)) {
         synthesizedIndexes.push(
-          lowerAuthoredIndex(tableName, { columns: reference.source.columns }),
+          lowerAuthoredIndex(tableName, {
+            columns: reference.source.columns,
+            map: undefined,
+            name: undefined,
+            type: undefined,
+            options: undefined,
+          }),
         );
         satisfiedIndexColumns.add(key);
       }

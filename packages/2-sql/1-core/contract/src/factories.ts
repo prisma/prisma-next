@@ -47,11 +47,12 @@ export function index(
 ): Index {
   return new Index({
     name,
+    prefix: opts?.prefix,
     columns,
+    where: undefined,
     unique: opts?.unique ?? false,
-    ...(opts?.prefix !== undefined && { prefix: opts.prefix }),
-    ...(opts?.type !== undefined && { type: opts.type }),
-    ...(opts?.options !== undefined && { options: opts.options }),
+    type: opts?.type,
+    options: opts?.options,
   });
 }
 

@@ -18,7 +18,6 @@ describe('flat tree diffability (SqlSchemaIR / SqlTableIR)', () => {
         name: 'users_email_idx',
         prefix: undefined,
         columns: ['email'],
-        expression: undefined,
         where: undefined,
         unique: false,
         partial: false,

@@ -2,10 +2,19 @@ import { describe, expect, it } from 'vitest';
 
 import { SqlIndexIR, type SqlIndexIRInput } from '../src/ir/sql-index-ir';
 
-function index(
-  input: Pick<SqlIndexIRInput, 'name' | 'unique' | 'partial'> & Partial<SqlIndexIRInput>,
-): SqlIndexIR {
-  return new SqlIndexIR({
+type LooseIndexInput = Pick<SqlIndexIRInput, 'name' | 'unique' | 'partial'> & {
+  readonly prefix?: string;
+  readonly columns?: readonly string[];
+  readonly expression?: string;
+  readonly where?: string;
+  readonly type?: string;
+  readonly options?: Record<string, unknown>;
+  readonly annotations?: SqlIndexIRInput['annotations'];
+  readonly dependsOn?: SqlIndexIRInput['dependsOn'];
+};
+
+function index(input: LooseIndexInput): SqlIndexIR {
+  const filled = {
     prefix: undefined,
     columns: input.columns !== undefined || input.expression !== undefined ? undefined : ['email'],
     expression: undefined,
@@ -15,14 +24,15 @@ function index(
     annotations: undefined,
     dependsOn: undefined,
     ...input,
-  });
+  };
+  return new SqlIndexIR(filled as SqlIndexIRInput);
 }
 
-function managed(input: Partial<SqlIndexIRInput> & Pick<SqlIndexIRInput, 'name'>): SqlIndexIR {
+function managed(input: Partial<LooseIndexInput> & Pick<SqlIndexIRInput, 'name'>): SqlIndexIR {
   return index({ unique: false, partial: false, prefix: 'user_email_idx', ...input });
 }
 
-function exact(input: Partial<SqlIndexIRInput> & Pick<SqlIndexIRInput, 'name'>): SqlIndexIR {
+function exact(input: Partial<LooseIndexInput> & Pick<SqlIndexIRInput, 'name'>): SqlIndexIR {
   return index({ unique: false, partial: false, ...input });
 }
 
@@ -50,22 +60,20 @@ describe('SqlIndexIR', () => {
         expression: 'lower(email)',
       }),
     ).toThrow(/exactly one of columns or expression/);
-    expect(
-      () =>
-        new SqlIndexIR({
-          name: 'x',
-          prefix: undefined,
-          columns: undefined,
-          expression: undefined,
-          where: undefined,
-          unique: false,
-          partial: false,
-          type: undefined,
-          options: undefined,
-          annotations: undefined,
-          dependsOn: undefined,
-        }),
-    ).toThrow(/exactly one of columns or expression/);
+    const neither = {
+      name: 'x',
+      prefix: undefined,
+      where: undefined,
+      unique: false,
+      partial: false,
+      type: undefined,
+      options: undefined,
+      annotations: undefined,
+      dependsOn: undefined,
+    };
+    expect(() => new SqlIndexIR(neither as SqlIndexIRInput)).toThrow(
+      /exactly one of columns or expression/,
+    );
   });
 
   it('nodeKind is the index kind and children is empty', () => {
@@ -93,6 +101,48 @@ describe('SqlIndexIR', () => {
       name: 'user_email_idx',
       columns: ['email'],
       unique: false,
+    });
+  });
+
+  describe('contentEquals — the single node-owned relation', () => {
+    it("a boolean option value equals its catalog reprint ('on'/'off')", () => {
+      const authored = managed({ name: NAME, columns: ['email'], options: { fastupdate: true } });
+      const reprint = exact({ name: NAME, columns: ['email'], options: { fastupdate: 'on' } });
+      expect(authored.isEqualTo(reprint)).toBe(true);
+
+      const authoredOff = managed({
+        name: NAME,
+        columns: ['email'],
+        options: { fastupdate: false },
+      });
+      const reprintOff = exact({ name: NAME, columns: ['email'], options: { fastupdate: 'off' } });
+      expect(authoredOff.isEqualTo(reprintOff)).toBe(true);
+      expect(authoredOff.isEqualTo(reprint)).toBe(false);
+    });
+
+    it("an authored type 'btree' equals a normalized-away type through the comparison seam", () => {
+      const authored = managed({ name: NAME, columns: ['email'], type: 'btree' });
+      const live = exact({ name: NAME, columns: ['email'] });
+      expect(authored.isEqualTo(live)).toBe(true);
+      expect(live.isEqualTo(authored)).toBe(true);
+    });
+
+    it("columnPresence 'matching' refuses a column node against an expression node", () => {
+      const columnsNode = managed({ name: NAME, columns: ['email'] });
+      const expressionNode = exact({ name: 'legacy_expr', expression: 'lower(email)' });
+      expect(
+        columnsNode.contentEquals(expressionNode, {
+          columnPresence: 'matching',
+          bodies: 'verbatim',
+        }),
+      ).toBe(false);
+      // The differ's rule skips the tuple when either side is an expression.
+      expect(
+        columnsNode.contentEquals(expressionNode, {
+          columnPresence: 'when-both-defined',
+          bodies: 'ignored',
+        }),
+      ).toBe(true);
     });
   });
 

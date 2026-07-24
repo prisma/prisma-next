@@ -923,10 +923,10 @@ export function buildSqlContractFromDefinition(
       const declaredIndexes = (semanticModel.indexes ?? []).map((i) =>
         lowerAuthoredIndex(tableName, {
           columns: i.columns,
-          ...ifDefined('map', i.map),
-          ...ifDefined('name', i.name),
-          ...ifDefined('type', i.type),
-          ...ifDefined('options', i.options),
+          map: i.map,
+          name: i.name,
+          type: i.type,
+          options: i.options,
         }),
       );
       const primaryKey = semanticModel.id
