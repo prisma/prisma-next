@@ -42,13 +42,15 @@ import {
   UNSPECIFIED_PSL_NAMESPACE_ID,
 } from '@prisma-next/framework-components/psl-ast';
 import type { SqlModelStorage } from '@prisma-next/sql-contract/types';
-import type { SqlColumnIR, SqlForeignKeyIR } from '@prisma-next/sql-schema-ir/types';
+import { computeIndexContentHash, parseWireName } from '@prisma-next/sql-schema-ir/naming';
+import type { SqlColumnIR, SqlForeignKeyIR, SqlIndexIR } from '@prisma-next/sql-schema-ir/types';
 import { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { InternalError } from '@prisma-next/utils/internal-error';
 import { postgresError } from '../errors';
 import type { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
+import type { PostgresPolicySchemaNode } from '../schema-ir/postgres-policy-schema-node';
 import { createPostgresDefaultMapping } from './postgres-default-mapping';
 import { createPostgresTypeMap } from './postgres-type-map';
 
@@ -373,6 +375,8 @@ export function inferPostgresPslContract(
   // unambiguous single-bucket model, so we throw rather than silently drop one.
   const tables: Record<string, SqlTableIR> = {};
   const tableNamespaceNames = new Set<string>();
+  const rlsEnabledTables = new Set<string>();
+  const policiesByTable = new Map<string, readonly PostgresPolicySchemaNode[]>();
   for (const namespace of namespaces) {
     const ownedEnumTypes = packOwnedEnumTypesByNamespace.get(namespace.schemaName);
     for (const [tableName, table] of Object.entries(namespace.tables)) {
@@ -414,16 +418,23 @@ export function inferPostgresPslContract(
       }
       tables[tableName] = new SqlTableIR(table);
       tableNamespaceNames.add(namespace.schemaName);
+      if (table.rlsEnabled) {
+        rlsEnabledTables.add(tableName);
+      }
+      if (table.policies.length > 0) {
+        policiesByTable.set(tableName, table.policies);
+      }
     }
   }
 
   // Namespace wrap (pinned during shaping): a `native_enum` block only lowers
   // inside an explicit `namespace { … }` block — the interpreter skips
   // extension entities in the unspecified top-level bucket — so enum-bearing
-  // output wraps everything in the introspected schema's name. Enum-free
-  // output stays flat and byte-identical to the prior inference.
+  // output wraps everything in the introspected schema's name; policy blocks
+  // wrap for the same reason. Block-free output stays flat and byte-identical
+  // to the prior inference.
   let wrapNamespaceName: string | undefined;
-  if (enumDefinitions.size > 0) {
+  if (enumDefinitions.size > 0 || policiesByTable.size > 0) {
     const contentNamespaces = new Set([...enumNamespaceNames, ...tableNamespaceNames]);
     if (contentNamespaces.size > 1) {
       throw postgresError(
@@ -479,7 +490,14 @@ export function inferPostgresPslContract(
       danglingForeignKeysByTable,
     },
     wrapNamespaceName,
+    { rlsEnabledTables, policiesByTable },
   );
+}
+
+/** Per-table RLS emission inputs collected from the Postgres schema tree. */
+export interface RlsEmissionExtras {
+  readonly rlsEnabledTables: ReadonlySet<string>;
+  readonly policiesByTable: ReadonlyMap<string, readonly PostgresPolicySchemaNode[]>;
 }
 
 export function buildPslDocumentAst(
@@ -490,6 +508,7 @@ export function buildPslDocumentAst(
     'extraRelationsByTable' | 'crossSpaceFieldNamesByTable' | 'danglingForeignKeysByTable'
   >,
   namespaceName?: string,
+  rlsExtras?: RlsEmissionExtras,
 ): PslDocumentAst {
   const { typeMap, defaultMapping, parseRawDefault: rawDefaultParser } = options;
   const { extraRelationsByTable, crossSpaceFieldNamesByTable, danglingForeignKeysByTable } =
@@ -534,6 +553,8 @@ export function buildPslDocumentAst(
   const { relationsByTable } = inferRelations(schemaIR.tables, modelNameMap);
   const namedTypes = seedNamedTypeRegistry(schemaIR, typeMap, enumNameMap, reservedNamedTypeNames);
 
+  const policyEmission = buildPolicyBlocks(rlsExtras?.policiesByTable ?? new Map(), modelNameMap);
+
   const models: PslModel[] = [];
   for (const table of Object.values(schemaIR.tables)) {
     models.push(
@@ -550,6 +571,8 @@ export function buildPslDocumentAst(
           ...(extraRelationsByTable.get(table.name) ?? []),
         ],
         danglingForeignKeysByTable.get(table.name) ?? [],
+        rlsExtras?.rlsEnabledTables.has(table.name) ?? false,
+        policyEmission.skipNotesByTable.get(table.name) ?? [],
       ),
     );
   }
@@ -582,7 +605,11 @@ export function buildPslDocumentAst(
       makePslNamespace({
         kind: 'namespace',
         name: namespaceName ?? UNSPECIFIED_PSL_NAMESPACE_ID,
-        entries: makePslNamespaceEntries(sortedModels, [], enumBlocks),
+        entries: makePslNamespaceEntries(
+          sortedModels,
+          [],
+          [...enumBlocks, ...policyEmission.blocks],
+        ),
         span: SYNTHETIC_SPAN,
       }),
     ],
@@ -685,6 +712,8 @@ function buildModel(
   rawDefaultParser: PslPrinterOptions['parseRawDefault'],
   relationFields: readonly RelationField[],
   danglingForeignKeys: readonly DanglingForeignKeyInfo[],
+  rlsEnabled = false,
+  policySkipNotes: readonly string[] = [],
 ): PslModel {
   const { name: modelName, map: mapName } = toModelName(table.name);
   const fieldNameMap = fieldNamesByTable.get(table.name);
@@ -748,24 +777,20 @@ function buildModel(
   }
 
   for (const index of table.indexes) {
-    // Expression indexes (no column tuple) and partial indexes (a where
-    // predicate) are not emitted yet — no authoring surface can carry their
-    // bodies, so adopting them name-only would fail its own verify (the
-    // exact-mode body compare). Their inference lands in slice 4.
-    if (index.columns === undefined || index.where !== undefined) continue;
-    if (!index.unique) {
-      const columns = index.columns;
-      const indexFieldNames = columns.map((columnName) =>
-        resolveColumnFieldName(fieldNamesByTable, table.name, columnName),
-      );
-      modelAttributes.push(
-        buildModelConstraintAttribute('index', indexFieldNames, index.name, index.type),
-      );
-    }
+    const indexFieldNames = index.columns?.map((columnName) =>
+      resolveColumnFieldName(fieldNamesByTable, table.name, columnName),
+    );
+    modelAttributes.push(buildIndexAttribute(index, indexFieldNames));
   }
 
   if (mapName) {
     modelAttributes.push(buildMapAttribute('model', mapName));
+  }
+
+  // `@@rls` records the live `ENABLE ROW LEVEL SECURITY` state; it goes last
+  // so the emitted line position matches the previous out-of-band appender.
+  if (rlsEnabled) {
+    modelAttributes.push(buildAttribute('model', 'rls', []));
   }
 
   // Surface introspection advisories the user would otherwise have no way to
@@ -784,7 +809,11 @@ function buildModel(
       buildDanglingForeignKeyWarning(danglingForeignKeys, fieldNamesByTable, table.name),
     );
   }
-  const comment = warnings.length > 0 ? `// WARNING: ${warnings.join(' ')}` : undefined;
+  const commentLines = [
+    ...(warnings.length > 0 ? [`// WARNING: ${warnings.join(' ')}`] : []),
+    ...policySkipNotes,
+  ];
+  const comment = commentLines.length > 0 ? commentLines.join('\n') : undefined;
 
   return {
     kind: 'model',
@@ -1012,28 +1041,202 @@ function buildRelationField(
   };
 }
 
-/**
- * `indexType` carries a non-default index access method (e.g. `hash`) —
- * `SqlIndexIR`'s constructor drops `btree` (the default) to `undefined`,
- * so this only ever fires for a real
- * non-default index, matching the same `@@index(type: "...")` argument
- * `contract-to-schema-ir.ts` reads back into the FK-backing-index
- * expectation `db verify` checks against the live database.
- */
 function buildModelConstraintAttribute(
-  name: 'id' | 'unique' | 'index',
+  name: 'id' | 'unique',
   fields: readonly string[],
   constraintName?: string,
-  indexType?: string,
 ): PslModelAttribute {
   const args: PslAttributeArgument[] = [positionalArg(`[${fields.join(', ')}]`)];
   if (constraintName !== undefined) {
     args.push(namedArg('map', `"${escapePslString(constraintName)}"`));
   }
-  if (indexType !== undefined) {
-    args.push(namedArg('type', `"${escapePslString(indexType)}"`));
-  }
   return buildAttribute('model', name, args);
+}
+
+/**
+ * Emits one `@@index` attribute at full fidelity. Identity is re-detected:
+ * when the live name parses as a wire name AND its hash recomputes from the
+ * introspected content, the index is managed and emits `name: "<prefix>"`;
+ * otherwise it adopts exactly with `map: "<live name>"` and the content
+ * verbatim. Known benign edge: an index authored `type: "btree"` hashed
+ * `'btree'` into its suffix but introspects type-normalized, so the
+ * recompute mismatches and it re-infers as `map:` — still a clean round
+ * trip, just exact rather than managed (no special case).
+ *
+ * `options:` always emits with a `type:` beside it (the pair the PSL surface
+ * requires): a default-method index carrying reloptions (type normalized
+ * away by introspection) emits an explicit `type: "btree"` — the expected
+ * node's constructor normalizes btree back to undefined, so verify compares
+ * clean.
+ */
+function buildIndexAttribute(
+  index: SqlIndexIR,
+  fieldNames: readonly string[] | undefined,
+): PslModelAttribute {
+  const args: PslAttributeArgument[] = [];
+  if (fieldNames !== undefined) {
+    args.push(positionalArg(`[${fieldNames.join(', ')}]`));
+  } else {
+    args.push(namedArg('expression', `"${escapePslString(index.expression ?? '')}"`));
+  }
+
+  const parsed = parseWireName(index.name);
+  const recomputed = computeIndexContentHash({
+    ...(index.columns !== undefined ? { columns: index.columns } : {}),
+    ...(index.expression !== undefined ? { expression: index.expression } : {}),
+    ...(index.where !== undefined ? { where: index.where } : {}),
+    unique: index.unique,
+    ...(index.type !== undefined ? { type: index.type } : {}),
+    ...(index.options !== undefined ? { options: index.options } : {}),
+  });
+  if (parsed !== undefined && parsed.hash === recomputed) {
+    args.push(namedArg('name', `"${escapePslString(parsed.prefix)}"`));
+  } else {
+    args.push(namedArg('map', `"${escapePslString(index.name)}"`));
+  }
+
+  if (index.where !== undefined) {
+    args.push(namedArg('where', `"${escapePslString(index.where)}"`));
+  }
+  if (index.unique) {
+    args.push(namedArg('unique', 'true'));
+  }
+  const hasOptions = index.options !== undefined && Object.keys(index.options).length > 0;
+  if (index.type !== undefined || hasOptions) {
+    args.push(namedArg('type', `"${escapePslString(index.type ?? 'btree')}"`));
+  }
+  if (hasOptions) {
+    const entries = Object.entries(index.options ?? {})
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([key, value]) => `${key}: "${escapePslString(String(value))}"`);
+    args.push(namedArg('options', `{ ${entries.join(', ')} }`));
+  }
+  return buildAttribute('model', 'index', args);
+}
+
+const POLICY_OPERATION_KEYWORD = {
+  select: 'policy_select',
+  insert: 'policy_insert',
+  update: 'policy_update',
+  delete: 'policy_delete',
+  all: 'policy_all',
+} as const;
+
+/** The PSL tokenizer's identifier grammar: leading letter/underscore, then letters/digits/`_`/`-`. */
+const PSL_IDENTIFIER = /^[\p{L}_][\p{L}\p{N}_-]*$/u;
+
+/** Replaces invalid character runs with `_`; prepends `_` when the first character is invalid. */
+function sanitizePolicyHead(raw: string): string {
+  let head = raw.replace(/[^\p{L}\p{N}_-]+/gu, '_');
+  if (!/^[\p{L}_]/u.test(head)) {
+    head = `_${head}`;
+  }
+  return head;
+}
+
+interface PolicyBlockEmission {
+  readonly blocks: readonly PslExtensionBlock[];
+  readonly skipNotesByTable: ReadonlyMap<string, readonly string[]>;
+}
+
+/**
+ * Builds one `policy_<operation>` block per introspected policy. The head is
+ * the wire prefix when the name parses, else the physical name — sanitized
+ * to the identifier grammar, with within-namespace collisions numeric-
+ * suffixed deterministically by sorted physical name. `@@map` ALWAYS carries
+ * the physical name: a body reprint never reliably re-hashes to the live
+ * suffix, so every adopted policy is exact. Bodies emit verbatim; a
+ * RESTRICTIVE row emits `permissive = false` (PERMISSIVE is the default and
+ * stays implicit). A policy referencing a role whose name fails the
+ * identifier grammar is unauthorable (role refs have no `@@map` escape): it
+ * skips with a comment note on its target model — the honest outcome is the
+ * live extra a strict verify then names.
+ */
+function buildPolicyBlocks(
+  policiesByTable: ReadonlyMap<string, readonly PostgresPolicySchemaNode[]>,
+  modelNameMap: ReadonlyMap<string, string>,
+): PolicyBlockEmission {
+  const all: { readonly policy: PostgresPolicySchemaNode; readonly tableName: string }[] = [];
+  for (const [tableName, policies] of policiesByTable) {
+    for (const policy of policies) {
+      all.push({ policy, tableName });
+    }
+  }
+  all.sort((a, b) => (a.policy.name < b.policy.name ? -1 : a.policy.name > b.policy.name ? 1 : 0));
+
+  const usedHeads = new Set<string>();
+  const blocks: PslExtensionBlock[] = [];
+  const skipNotesByTable = new Map<string, string[]>();
+  for (const { policy, tableName } of all) {
+    const modelName = modelNameMap.get(tableName);
+    if (modelName === undefined) continue;
+
+    const badRole = policy.roles.find((role) => !PSL_IDENTIFIER.test(role));
+    if (badRole !== undefined) {
+      const notes = skipNotesByTable.get(tableName) ?? [];
+      notes.push(
+        `// prisma-next: skipped policy "${policy.name}": role "${badRole}" is not a valid PSL identifier and role references cannot be escaped`,
+      );
+      skipNotesByTable.set(tableName, notes);
+      continue;
+    }
+
+    let head = sanitizePolicyHead(parseWireName(policy.name)?.prefix ?? policy.name);
+    if (usedHeads.has(head)) {
+      let n = 2;
+      while (usedHeads.has(`${head}_${n}`)) n += 1;
+      head = `${head}_${n}`;
+    }
+    usedHeads.add(head);
+
+    blocks.push({
+      kind: 'policy',
+      keyword: POLICY_OPERATION_KEYWORD[policy.operation],
+      name: head,
+      parameters: {
+        target: { kind: 'ref', identifier: modelName, span: SYNTHETIC_SPAN },
+        roles: {
+          kind: 'list',
+          items: policy.roles.map((role) => ({
+            kind: 'ref',
+            identifier: role,
+            span: SYNTHETIC_SPAN,
+          })),
+          span: SYNTHETIC_SPAN,
+        },
+        ...(policy.using !== undefined
+          ? { using: { kind: 'value', raw: JSON.stringify(policy.using), span: SYNTHETIC_SPAN } }
+          : {}),
+        ...(policy.withCheck !== undefined
+          ? {
+              withCheck: {
+                kind: 'value',
+                raw: JSON.stringify(policy.withCheck),
+                span: SYNTHETIC_SPAN,
+              },
+            }
+          : {}),
+        ...(policy.permissive
+          ? {}
+          : { permissive: { kind: 'value', raw: 'false', span: SYNTHETIC_SPAN } }),
+      },
+      blockAttributes: [
+        {
+          name: 'map',
+          args: [
+            {
+              kind: 'positional',
+              value: `"${escapePslString(policy.name)}"`,
+              span: SYNTHETIC_SPAN,
+            },
+          ],
+          span: SYNTHETIC_SPAN,
+        },
+      ],
+      span: SYNTHETIC_SPAN,
+    });
+  }
+  return { blocks, skipNotesByTable };
 }
 
 function buildSimpleConstraintFieldAttribute(
