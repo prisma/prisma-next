@@ -12,7 +12,12 @@ export const contract = defineContract({
     }).sql(({ cols, constraints }) => ({
       table: 'user',
       indexes: [
-        constraints.index({ expression: 'eql_v3.eq_term(email)', name: 'users_email_eq' }),
+        constraints.index({
+          expression: 'eql_v3.eq_term(email)',
+          name: 'users_email_eq',
+          type: 'btree',
+          options: {},
+        }),
         constraints.index([cols.email], {
           where: '(archived_at IS NULL)',
           name: 'users_email_active',

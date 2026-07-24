@@ -79,6 +79,49 @@ describe('index drift', () => {
     );
   });
 
+  describe("authored type: 'btree' is the default access method, not drift", () => {
+    it(
+      'verifies clean against a live index created with the default method',
+      async () => {
+        await withClient(getConnectionString(), async (client) => {
+          await client.query('DROP TABLE IF EXISTS "user"');
+          await client.query(`
+          CREATE TABLE "user" (
+            id INTEGER PRIMARY KEY,
+            email TEXT NOT NULL
+          )
+        `);
+          await client.query('CREATE INDEX "user_email_btree_73653512" ON "user" ("email")');
+        });
+
+        const contract = defineContract({}, ({ field: packField, model: packModel }) => ({
+          models: {
+            User: packModel('User', {
+              fields: {
+                id: packField.column(int4Column).id(),
+                email: packField.column(textColumn),
+              },
+            }).sql(({ cols, constraints }) => ({
+              table: 'user',
+              indexes: [
+                constraints.index([cols.email], {
+                  name: 'user_email_btree',
+                  type: 'btree',
+                  options: {},
+                }),
+              ],
+            })),
+          },
+        }));
+
+        const result = await runSchemaVerify(getConnectionString(), contract);
+        expect(result.schema.issues).toEqual([]);
+        expect(result.ok).toBe(true);
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
+
   describe('scenario H — out-of-band storage-parameter change on a managed index', () => {
     it(
       'verifies clean before the ALTER and reports the index not-equal after it',
