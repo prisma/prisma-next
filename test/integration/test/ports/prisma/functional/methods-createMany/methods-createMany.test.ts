@@ -12,7 +12,7 @@ import contractJson from './_fixture/generated/contract.json' with { type: 'json
 
 describe('ports/prisma/functional/methods-createMany', () => {
   it(
-    'should create many records',
+    'creates many records',
     () =>
       withPostgresPort<Contract>({ contractJson }, async ({ db }) => {
         const count = await db.public.User.createAndCount([
