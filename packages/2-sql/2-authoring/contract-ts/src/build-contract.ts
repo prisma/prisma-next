@@ -685,8 +685,9 @@ export function buildSqlContractFromDefinition(
   );
 
   const tablesByNamespace: Record<string, Record<string, StorageTableInput>> = {};
-  // D9 warnings collect across the whole build and flush once (threshold-
-  // batched) — an adopted contract carries map: + body on many objects.
+  // Exact-name body warnings collect across the whole build and flush once
+  // (threshold-batched) — an adopted contract carries map: + body on many
+  // objects.
   const exactNameBodyWarnings: ExactNameBodyWarning[] = [];
   const modelNameToNamespaceId = new Map<string, string>();
   const executionDefaults: ExecutionMutationDefault[] = [];

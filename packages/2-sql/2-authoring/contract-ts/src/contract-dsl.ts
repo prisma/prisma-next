@@ -830,15 +830,24 @@ export type UniqueConstraint<FieldNames extends readonly string[] = readonly str
   readonly name?: string;
 };
 
+/** An authored index constraint's element structure — field tuple xor expression. */
+export type IndexConstraintElements<FieldNames extends readonly string[] = readonly string[]> =
+  | {
+      /** Field-name tuple. */
+      readonly fields: FieldNames;
+      readonly expression?: never;
+    }
+  | {
+      readonly fields?: never;
+      /** Opaque SQL: the entire CREATE INDEX element list — never parsed. */
+      readonly expression: string;
+    };
+
 export type IndexConstraint<
   FieldNames extends readonly string[] = readonly string[],
   Name extends string | undefined = string | undefined,
-> = {
+> = IndexConstraintElements<FieldNames> & {
   readonly kind: 'index';
-  /** Field-name tuple. Exactly one of `fields` / `expression` is set. */
-  readonly fields?: FieldNames;
-  /** Opaque SQL: the entire CREATE INDEX element list — never parsed. */
-  readonly expression?: string;
   readonly where?: string;
   readonly unique?: boolean;
   readonly name?: Name;
@@ -1034,11 +1043,8 @@ function createConstraintsDsl<IndexTypes extends IndexTypeMap = Record<never, ne
       typeof fieldsOrOptions === 'object' &&
       'expression' in fieldsOrOptions;
     const opts = isExpressionForm ? fieldsOrOptions : options;
-    return {
-      kind: 'index',
-      ...(isExpressionForm
-        ? { expression: fieldsOrOptions.expression }
-        : { fields: normalizeFieldRefInput(fieldsOrOptions) }),
+    const carried = {
+      kind: 'index' as const,
       ...(opts?.name !== undefined ? { name: opts.name } : {}),
       ...(opts?.map !== undefined ? { map: opts.map } : {}),
       ...(opts?.where !== undefined ? { where: opts.where } : {}),
@@ -1046,6 +1052,9 @@ function createConstraintsDsl<IndexTypes extends IndexTypeMap = Record<never, ne
       ...(opts?.type !== undefined ? { type: opts.type } : {}),
       ...(opts?.options !== undefined ? { options: opts.options as Record<string, unknown> } : {}),
     };
+    return isExpressionForm
+      ? { ...carried, expression: fieldsOrOptions.expression }
+      : { ...carried, fields: normalizeFieldRefInput(fieldsOrOptions) };
   }
 
   function foreignKey<

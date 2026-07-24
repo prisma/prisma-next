@@ -1000,16 +1000,21 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         }
         columnNames = mapped;
       }
-      indexNodes.push({
-        ...ifDefined('columns', columnNames),
-        ...ifDefined('expression', parsed.expression),
-        ...ifDefined('where', parsed.where),
-        ...ifDefined('unique', parsed.unique),
-        ...ifDefined('name', parsed.name),
-        ...ifDefined('map', parsed.map),
-        ...ifDefined('type', parsed.type),
-        ...ifDefined('options', parsed.options),
-      });
+      indexNodes.push(
+        // The interpreter's own diagnostics pre-empt the neither/both
+        // element cases; the cast defers final enforcement to
+        // lowerAuthoredIndex's runtime guard.
+        blindCast<IndexNode, 'columns-xor-expression enforced by lowerAuthoredIndex'>({
+          ...ifDefined('columns', columnNames),
+          ...ifDefined('expression', parsed.expression),
+          where: parsed.where,
+          unique: parsed.unique,
+          name: parsed.name,
+          map: parsed.map,
+          type: parsed.type,
+          options: parsed.options,
+        }),
+      );
       continue;
     }
     const contributedModelAttribute = input.modelAttributesByName.get(modelAttribute.name);

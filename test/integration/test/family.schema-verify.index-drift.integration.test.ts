@@ -1,15 +1,15 @@
 /**
  * Index drift scenarios against a live database.
  *
- * Scenario G — documented degradation of `map:` with a SQL body: drift
+ * Documented degradation of `map:` with a SQL body: drift
  * detection byte-compares the authored text against Postgres's reprinted
  * form, so an exact-named expression index reports drift even when the live
  * object was created from exactly the authored text (Postgres reprints
  * `lower(email || 'x')` as `lower((email || 'x'::text))`). The authoring-time
- * warning half of this scenario is pinned in
+ * warning half of this behavior is pinned in
  * packages/2-sql/1-core/contract/test/index-naming.test.ts.
  *
- * Scenario H — an out-of-band `ALTER INDEX … SET (fillfactor = 70)` on a
+ * An out-of-band `ALTER INDEX … SET (fillfactor = 70)` on a
  * managed index is real drift: the live options bag no longer matches the
  * contract and verify reports the index not-equal.
  */
@@ -30,7 +30,7 @@ import {
 describe('index drift', () => {
   const { getConnectionString } = useDevDatabase();
 
-  describe('scenario G — map: with a SQL body byte-compares against the reprint', () => {
+  describe('map: with a SQL body byte-compares against the reprint', () => {
     it(
       'reports drift for an exact-named expression index created from the authored text',
       async () => {
@@ -122,7 +122,7 @@ describe('index drift', () => {
     );
   });
 
-  describe('scenario H — out-of-band storage-parameter change on a managed index', () => {
+  describe('out-of-band storage-parameter change on a managed index', () => {
     it(
       'verifies clean before the ALTER and reports the index not-equal after it',
       async () => {

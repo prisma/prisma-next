@@ -139,7 +139,7 @@ describe('@@index matrix threading at PSL lowering', () => {
     });
   });
 
-  it('map with an expression lowers exact and draws the D9 warning', () => {
+  it('map with an expression lowers exact and draws the exact-name body warning', () => {
     const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => {});
     try {
       const result = interpretMatrix(`model User {

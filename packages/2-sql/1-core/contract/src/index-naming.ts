@@ -53,7 +53,7 @@ function formatExactNameBodyWarning(warning: ExactNameBodyWarning): string {
 }
 
 /**
- * Flushes collected D9 warnings once per contract build: per-item warnings
+ * Flushes collected exact-name-body warnings once per contract build: per-item warnings
  * (each naming its object) up to the threshold, one summary with the name
  * list above it — an adopted contract re-emit (which carries `map:` + body
  * for every adopted object once infer emits them) must not wall-of-text.

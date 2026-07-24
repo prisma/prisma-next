@@ -1,10 +1,30 @@
 import { computeIndexContentHash } from '@prisma-next/sql-schema-ir/naming';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  type AuthoredIndexInput,
   type ExactNameBodyWarning,
   flushExactNameBodyWarnings,
-  lowerAuthoredIndex,
+  lowerAuthoredIndex as lowerAuthoredIndexStrict,
 } from '../src/index-naming';
+
+type LooseAuthoredIndexInput = {
+  readonly columns?: readonly string[];
+  readonly expression?: string;
+  readonly where?: string;
+  readonly unique?: boolean;
+  readonly map?: string;
+  readonly name?: string;
+  readonly type?: string;
+  readonly options?: Record<string, unknown>;
+};
+
+function lowerAuthoredIndex(
+  tableName: string,
+  authored: LooseAuthoredIndexInput,
+  warnings?: { push(warning: ExactNameBodyWarning): void },
+) {
+  return lowerAuthoredIndexStrict(tableName, authored as AuthoredIndexInput, warnings);
+}
 
 function captureWarnings(run: () => void) {
   const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => {});
@@ -177,7 +197,7 @@ describe('lowerAuthoredIndex — cross-field guards', () => {
   });
 });
 
-describe('lowerAuthoredIndex — D9 exact-name body warning collection', () => {
+describe('lowerAuthoredIndex — exact-name body warning collection', () => {
   it('pushes into a provided collector instead of emitting', () => {
     const collected: ExactNameBodyWarning[] = [];
     const warnings = captureWarnings(() => {
@@ -231,7 +251,7 @@ describe('flushExactNameBodyWarnings — threshold batching', () => {
   });
 });
 
-describe('lowerAuthoredIndex — D9 exact-name body warning', () => {
+describe('lowerAuthoredIndex — exact-name body warning', () => {
   const expectedMessage =
     'index "users_email_eq" uses map: with a SQL body. Drift detection compares the authored ' +
     "SQL text byte-for-byte against Postgres's reprinted form, which is only reliable when the " +
@@ -240,7 +260,7 @@ describe('lowerAuthoredIndex — D9 exact-name body warning', () => {
     'replace map: with name: (keeping the body text unchanged) and apply the resulting rename ' +
     'migration.';
 
-  it('fires for map + expression with the exact D9 wording and code', () => {
+  it('fires for map + expression with the pinned wording and code', () => {
     const warnings = captureWarnings(() => {
       lowerAuthoredIndex('user', { expression: 'lower(email)', map: 'users_email_eq' });
     });

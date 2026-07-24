@@ -256,7 +256,7 @@ describe('constraints.index — full matrix', () => {
     ]);
   });
 
-  it('map with an expression lowers exact and draws the D9 warning', () => {
+  it('map with an expression lowers exact and draws the exact-name body warning', () => {
     const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => {});
     try {
       const contract = defineTestContract({
