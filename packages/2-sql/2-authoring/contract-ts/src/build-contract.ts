@@ -36,7 +36,12 @@ import {
   type ForeignKeyAuthoringInput,
   materializeForeignKeysAndIndexes,
 } from '@prisma-next/sql-contract/foreign-key-materialization';
-import { type AuthoredIndexInput, lowerAuthoredIndex } from '@prisma-next/sql-contract/index-naming';
+import {
+  type AuthoredIndexInput,
+  type ExactNameBodyWarning,
+  flushExactNameBodyWarnings,
+  lowerAuthoredIndex,
+} from '@prisma-next/sql-contract/index-naming';
 import { validateIndexTypes } from '@prisma-next/sql-contract/index-type-validation';
 import {
   createIndexTypeRegistry,
@@ -680,6 +685,9 @@ export function buildSqlContractFromDefinition(
   );
 
   const tablesByNamespace: Record<string, Record<string, StorageTableInput>> = {};
+  // D9 warnings collect across the whole build and flush once (threshold-
+  // batched) — an adopted contract carries map: + body on many objects.
+  const exactNameBodyWarnings: ExactNameBodyWarning[] = [];
   const modelNameToNamespaceId = new Map<string, string>();
   const executionDefaults: ExecutionMutationDefault[] = [];
   const modelsByNamespace: Record<string, Record<string, ContractModel>> = {};
@@ -936,6 +944,7 @@ export function buildSqlContractFromDefinition(
             type: i.type,
             options: i.options,
           }),
+          exactNameBodyWarnings,
         ),
       );
       const primaryKey = semanticModel.id
@@ -1343,6 +1352,7 @@ export function buildSqlContractFromDefinition(
   };
 
   assertStorageSemantics(definition, contract);
+  flushExactNameBodyWarnings(exactNameBodyWarnings);
 
   return contract;
 }
