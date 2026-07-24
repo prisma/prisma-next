@@ -1642,6 +1642,22 @@ describe('@@index parameter matrix diagnostics', () => {
     expect(schema.slice(diagnostic?.span?.start.offset ?? 0)).toMatch(/^@@index/);
   });
 
+  it('two offending @@index attributes each anchor at their own span', () => {
+    const schema = `model Doc {
+  id Int @id
+  body String
+  @@index(expression: "lower(body)")
+  @@index([body], name: "doc_body_idx", map: "doc_body_exact")
+}`;
+    const diagnostics = indexDiagnosticsFor(schema);
+    const first = diagnostics.find((d) => d.code === 'PSL_INDEX_EXPRESSION_REQUIRES_NAME');
+    const second = diagnostics.find((d) => d.code === 'PSL_INDEX_NAME_XOR_MAP');
+    expect(first?.span).toBeDefined();
+    expect(second?.span).toBeDefined();
+    expect(first?.span?.start.offset).toBe(schema.indexOf('@@index'));
+    expect(second?.span?.start.offset).toBe(schema.lastIndexOf('@@index'));
+  });
+
   it('the existing options-requires-type refine still fires', () => {
     expectDiagnosticForSchema(
       `model Doc {

@@ -239,6 +239,17 @@ describe('flushExactNameBodyWarnings — threshold batching', () => {
     expect(warnings[0]?.options).toEqual({ code: 'PN_EXACT_NAME_BODY_COMPARISON' });
   });
 
+  it('exactly the threshold count (5) still emits per-item warnings', () => {
+    const items = ['a', 'b', 'c', 'd', 'e'].map((n) => item(`idx_${n}`));
+    const warnings = captureWarnings(() => flushExactNameBodyWarnings(items));
+    expect(warnings).toHaveLength(5);
+    for (const [i, entry] of items.entries()) {
+      expect(warnings[i]?.message).toContain(
+        `index "${entry.exactName}" uses map: with a SQL body.`,
+      );
+    }
+  });
+
   it('emits one summary with the name list above the threshold', () => {
     const items = ['a', 'b', 'c', 'd', 'e', 'f'].map((n) => item(`idx_${n}`));
     const warnings = captureWarnings(() => flushExactNameBodyWarnings(items));

@@ -122,7 +122,7 @@ describe('@@index matrix threading at PSL lowering', () => {
     });
   });
 
-  it('the ciphers index authors as specified (type: rides the registry, covered by the e2e)', () => {
+  it('the Cipherstash-style index authors as specified (type: rides the registry, covered by the e2e)', () => {
     const result = interpretMatrix(`model User {
   id    Int    @id
   email String

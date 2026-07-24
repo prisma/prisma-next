@@ -31,6 +31,16 @@ import type {
 } from '../shared/psl-extension-block';
 
 export interface PslDiagnostic {
+  /**
+   * The closed {@link PslDiagnosticCode} set exists for IDE completion and
+   * as documentation of the framework's own codes; the
+   * {@link ContributedPslDiagnosticCode} pattern arm is the seam for
+   * package-contributed codes, minted where the domain vocabulary lives
+   * (e.g. contract-psl). The two arms are extensionally equal — every
+   * framework code matches the pattern — and nothing switches
+   * exhaustively over the union, deliberately: consumers treat the code
+   * as an opaque identifier.
+   */
   readonly code: PslDiagnosticCode | ContributedPslDiagnosticCode;
   readonly message: string;
   readonly sourceId: string;

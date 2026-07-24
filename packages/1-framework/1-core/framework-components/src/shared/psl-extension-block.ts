@@ -122,7 +122,10 @@ export type PslDiagnosticCode =
  * attribute-spec refine in a family's authoring layer). The framework union
  * above stays the parser's own vocabulary; contributed codes share the
  * `PSL_` pattern but their names are owned by the contributing package —
- * no family or target vocabulary enters this module.
+ * no family or target vocabulary enters this module. Contributed codes
+ * must not reuse a framework code name; pick a domain-scoped prefix
+ * segment (e.g. `PSL_INDEX_`, `PSL_POLICY_`) to keep the namespaces
+ * collision-free.
  */
 export type ContributedPslDiagnosticCode = `PSL_${string}`;
 
