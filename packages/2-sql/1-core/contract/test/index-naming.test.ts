@@ -1,6 +1,10 @@
 import { computeIndexContentHash } from '@prisma-next/sql-schema-ir/naming';
 import { describe, expect, it, vi } from 'vitest';
-import { lowerAuthoredIndex } from '../src/index-naming';
+import {
+  type ExactNameBodyWarning,
+  flushExactNameBodyWarnings,
+  lowerAuthoredIndex,
+} from '../src/index-naming';
 
 function captureWarnings(run: () => void) {
   const emitWarning = vi.spyOn(process, 'emitWarning').mockImplementation(() => {});
@@ -170,6 +174,60 @@ describe('lowerAuthoredIndex — cross-field guards', () => {
       code: 'CONTRACT.ARGUMENT_INVALID',
       message: expect.stringContaining('map and name are mutually exclusive'),
     });
+  });
+});
+
+describe('lowerAuthoredIndex — D9 exact-name body warning collection', () => {
+  it('pushes into a provided collector instead of emitting', () => {
+    const collected: ExactNameBodyWarning[] = [];
+    const warnings = captureWarnings(() => {
+      lowerAuthoredIndex(
+        'user',
+        { expression: 'lower(email)', map: 'users_email_eq' },
+        { push: (w) => collected.push(w) },
+      );
+    });
+    expect(warnings).toEqual([]);
+    expect(collected).toEqual([{ subject: 'index', exactName: 'users_email_eq' }]);
+  });
+
+  it('a fields-only map pushes nothing into the collector', () => {
+    const collected: ExactNameBodyWarning[] = [];
+    lowerAuthoredIndex(
+      'user',
+      { columns: ['email'], map: 'users_email_exact' },
+      { push: (w) => collected.push(w) },
+    );
+    expect(collected).toEqual([]);
+  });
+});
+
+describe('flushExactNameBodyWarnings — threshold batching', () => {
+  const item = (name: string): ExactNameBodyWarning => ({ subject: 'index', exactName: name });
+
+  it('flushes nothing for an empty collection', () => {
+    expect(captureWarnings(() => flushExactNameBodyWarnings([]))).toEqual([]);
+  });
+
+  it('emits one warning per item up to the threshold, each naming its index', () => {
+    const warnings = captureWarnings(() =>
+      flushExactNameBodyWarnings([item('idx_a'), item('idx_b')]),
+    );
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]?.message).toContain('index "idx_a" uses map: with a SQL body.');
+    expect(warnings[1]?.message).toContain('index "idx_b" uses map: with a SQL body.');
+    expect(warnings[0]?.options).toEqual({ code: 'PN_EXACT_NAME_BODY_COMPARISON' });
+  });
+
+  it('emits one summary with the name list above the threshold', () => {
+    const items = ['a', 'b', 'c', 'd', 'e', 'f'].map((n) => item(`idx_${n}`));
+    const warnings = captureWarnings(() => flushExactNameBodyWarnings(items));
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]?.message).toContain('6 objects use map: with a SQL body.');
+    for (const entry of items) {
+      expect(warnings[0]?.message).toContain(`  - index "${entry.exactName}"`);
+    }
+    expect(warnings[0]?.options).toEqual({ code: 'PN_EXACT_NAME_BODY_COMPARISON' });
   });
 });
 

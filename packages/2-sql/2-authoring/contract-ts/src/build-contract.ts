@@ -36,7 +36,11 @@ import {
   type ForeignKeyAuthoringInput,
   materializeForeignKeysAndIndexes,
 } from '@prisma-next/sql-contract/foreign-key-materialization';
-import { lowerAuthoredIndex } from '@prisma-next/sql-contract/index-naming';
+import {
+  type ExactNameBodyWarning,
+  flushExactNameBodyWarnings,
+  lowerAuthoredIndex,
+} from '@prisma-next/sql-contract/index-naming';
 import { validateIndexTypes } from '@prisma-next/sql-contract/index-type-validation';
 import {
   createIndexTypeRegistry,
@@ -680,6 +684,9 @@ export function buildSqlContractFromDefinition(
   );
 
   const tablesByNamespace: Record<string, Record<string, StorageTableInput>> = {};
+  // D9 warnings collect across the whole build and flush once (threshold-
+  // batched) — an adopted contract carries map: + body on many objects.
+  const exactNameBodyWarnings: ExactNameBodyWarning[] = [];
   const modelNameToNamespaceId = new Map<string, string>();
   const executionDefaults: ExecutionMutationDefault[] = [];
   const modelsByNamespace: Record<string, Record<string, ContractModel>> = {};
@@ -921,16 +928,20 @@ export function buildSqlContractFromDefinition(
         ...ifDefined('name', u.name),
       }));
       const declaredIndexes = (semanticModel.indexes ?? []).map((i) =>
-        lowerAuthoredIndex(tableName, {
-          ...ifDefined('columns', i.columns),
-          ...ifDefined('expression', i.expression),
-          ...ifDefined('where', i.where),
-          ...ifDefined('unique', i.unique),
-          ...ifDefined('map', i.map),
-          ...ifDefined('name', i.name),
-          ...ifDefined('type', i.type),
-          ...ifDefined('options', i.options),
-        }),
+        lowerAuthoredIndex(
+          tableName,
+          {
+            ...ifDefined('columns', i.columns),
+            ...ifDefined('expression', i.expression),
+            ...ifDefined('where', i.where),
+            ...ifDefined('unique', i.unique),
+            ...ifDefined('map', i.map),
+            ...ifDefined('name', i.name),
+            ...ifDefined('type', i.type),
+            ...ifDefined('options', i.options),
+          },
+          exactNameBodyWarnings,
+        ),
       );
       const primaryKey = semanticModel.id
         ? { columns: semanticModel.id.columns, ...ifDefined('name', semanticModel.id.name) }
@@ -1337,6 +1348,7 @@ export function buildSqlContractFromDefinition(
   };
 
   assertStorageSemantics(definition, contract);
+  flushExactNameBodyWarnings(exactNameBodyWarnings);
 
   return contract;
 }
