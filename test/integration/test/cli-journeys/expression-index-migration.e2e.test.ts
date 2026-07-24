@@ -3,8 +3,10 @@
  * (scenario B), plus scenario D (name change → rename) and scenario E
  * (body edit under the same name → create + drop).
  *
- * A `.prisma` contract carries the ciphers index
- * (`@@index(expression: "eql_v3.eq_term(email)", name: "users_email_eq")`),
+ * A `.prisma` contract carries the ciphers index in its literal DoD spelling
+ * (`@@index(expression: "eql_v3.eq_term(email)", name: "users_email_eq",
+ * type: "btree")` — the default access method normalizes away in the schema
+ * IR, so the DDL carries no USING clause and verify is clean),
  * a partial index, a unique expression index, and a registry-typed
  * (`USING hash`) index; a `.ts` twin authors the same schema via
  * `constraints.index`. Both variants: emit → plan (DDL byte-asserted, the
@@ -39,7 +41,7 @@ const EQL_V3_SETUP = `
 
 const EXPECTED_INDEX_DDL = [
   'CREATE INDEX "users_email_active_0cd7caf9" ON "public"."user" ("email") WHERE ((archived_at IS NULL))',
-  'CREATE INDEX "users_email_eq_8b80d85b" ON "public"."user" (eql_v3.eq_term(email))',
+  'CREATE INDEX "users_email_eq_adef23ad" ON "public"."user" (eql_v3.eq_term(email))',
   'CREATE INDEX "users_email_hash_239baf6b" ON "public"."user" USING "hash" ("email")',
   'CREATE UNIQUE INDEX "users_email_lower_key_f84d49fd" ON "public"."user" (lower(email))',
 ];
@@ -80,18 +82,18 @@ async function runInitialFlow(ctx: JourneyContext, connectionString: string): Pr
   expect(verify.exitCode, `db verify clean\n${stripAnsi(verify.stderr)}`).toBe(0);
 
   await withClient(connectionString, (client) =>
-    client.query('DROP INDEX "public"."users_email_eq_8b80d85b"'),
+    client.query('DROP INDEX "public"."users_email_eq_adef23ad"'),
   );
   const verifyFail = await runDbVerify(ctx, ['--schema-only']);
   expect(verifyFail.exitCode, 'verify fails after out-of-band drop').toBe(1);
   expect(
     stripAnsi(verifyFail.stderr) + stripAnsi(verifyFail.stdout),
     'verify names the dropped index',
-  ).toContain('users_email_eq_8b80d85b');
+  ).toContain('users_email_eq_adef23ad');
 
   await withClient(connectionString, (client) =>
     client.query(
-      'CREATE INDEX "users_email_eq_8b80d85b" ON "public"."user" (eql_v3.eq_term(email))',
+      'CREATE INDEX "users_email_eq_adef23ad" ON "public"."user" (eql_v3.eq_term(email))',
     ),
   );
   const verifyRestored = await runDbVerify(ctx);
@@ -127,8 +129,8 @@ withTempDir(({ createTempDir }) => {
           'D: the widening plan is exactly one rename',
         ).toEqual([
           {
-            id: 'index.public.user.users_email_eq_8b80d85b.rename',
-            sql: 'ALTER INDEX "public"."users_email_eq_8b80d85b" RENAME TO "users_email_eq_v2_8b80d85b"',
+            id: 'index.public.user.users_email_eq_adef23ad.rename',
+            sql: 'ALTER INDEX "public"."users_email_eq_adef23ad" RENAME TO "users_email_eq_v2_adef23ad"',
           },
         ]);
         const applyRename = await runMigrate(ctx);
@@ -144,8 +146,8 @@ withTempDir(({ createTempDir }) => {
         const planEdit = await runMigrationPlanAndEmit(ctx, ['--name', 'edit-ciphers-body']);
         expect(planEdit.exitCode, `E: plan\n${stripAnsi(planEdit.stderr)}`).toBe(0);
         expect(indexSqlOf(readPlannedOps(ctx)).sort(), 'E: create + drop, byte-exact').toEqual([
-          'CREATE INDEX "users_email_eq_v2_b1fbd0db" ON "public"."user" (eql_v3.eq_term(lower(email)))',
-          'DROP INDEX "public"."users_email_eq_v2_8b80d85b"',
+          'CREATE INDEX "users_email_eq_v2_449c97be" ON "public"."user" (eql_v3.eq_term(lower(email)))',
+          'DROP INDEX "public"."users_email_eq_v2_adef23ad"',
         ]);
         const applyEdit = await runMigrate(ctx);
         expect(applyEdit.exitCode, `E: apply\n${stripAnsi(applyEdit.stderr)}`).toBe(0);

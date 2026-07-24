@@ -282,6 +282,16 @@ describe('phase 2 — content pairing (exact→managed convergence)', () => {
     ]);
   });
 
+  it("an authored 'btree' index content-pairs with a typeless live index", async () => {
+    const contract = buildContract([
+      managedIndex('items_email_idx', 'ab12cd34', { type: 'btree' }),
+    ]);
+    const schema = actualSchema([{ name: 'legacy_email_idx', columns: ['email'] }]);
+
+    const opIds = await planOpIds(contract, schema, ALL_CLASSES_POLICY);
+    expect(opIds).toEqual([`index.public.${TABLE_NAME}.legacy_email_idx.rename`]);
+  });
+
   it('an exact-named missing index never content-pairs (managed only)', async () => {
     const contract = buildContract([
       { name: 'items_email_exact', columns: ['email'], unique: false },

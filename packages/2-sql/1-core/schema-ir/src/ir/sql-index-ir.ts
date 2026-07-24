@@ -8,6 +8,18 @@ import type { SqlAnnotations } from './sql-column-ir';
 import { assertNode, defineNonEnumerable, SqlSchemaIRNode } from './sql-schema-ir-node';
 
 /**
+ * The default index access method (`btree` in every supported SQL target).
+ * The constructor normalizes `type === DEFAULT_INDEX_TYPE` to absent, so an
+ * authored `type: "btree"` and a default-method introspected index compare
+ * equal — both derivation paths construct through this class. The contract
+ * JSON and the wire-name content hash keep the authored spelling, so
+ * `@@index([a], type: "btree")` and `@@index([a])` are distinct wire names
+ * (a spelling change between them is a content edit — create + drop, not a
+ * rename).
+ */
+const DEFAULT_INDEX_TYPE = 'btree';
+
+/**
  * Every field is a required key. Values that may legitimately be absent
  * (an exact-named index's prefix, the btree→undefined type normalization)
  * are typed `| undefined` instead of optional, so each construction site
@@ -104,7 +116,7 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
     if (input.columns !== undefined) this.columns = input.columns;
     if (input.expression !== undefined) this.expression = input.expression;
     if (input.where !== undefined) this.where = input.where;
-    if (input.type !== undefined) this.type = input.type;
+    if (input.type !== undefined && input.type !== DEFAULT_INDEX_TYPE) this.type = input.type;
     if (input.options !== undefined) this.options = input.options;
     if (input.annotations !== undefined) this.annotations = input.annotations;
     defineNonEnumerable(this, 'dependsOn', input.dependsOn);
@@ -126,8 +138,9 @@ export class SqlIndexIR extends SqlSchemaIRNode implements DiffableNode {
 
   /**
    * Mode-selected structural equality — see the class doc. `unique` and
-   * `type` compare strictly (`type` after the introspection-side
-   * btree→undefined normalization done at construction), `options` loosely
+   * `type` compare strictly (`type` after the btree→undefined normalization
+   * the constructor applies to both sides — see {@link DEFAULT_INDEX_TYPE}),
+   * `options` loosely
    * (introspection stringifies reloptions), `columns` ordered-strict when
    * both sides carry them. An exact receiver also byte-compares
    * `expression ?? ''` and `where ?? ''`; a managed receiver never does.

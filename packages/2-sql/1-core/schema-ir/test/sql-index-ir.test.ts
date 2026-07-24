@@ -96,6 +96,32 @@ describe('SqlIndexIR', () => {
     });
   });
 
+  describe('btree normalization at construction', () => {
+    it("normalizes type 'btree' to absent (both derivation paths construct here)", () => {
+      const authored = managed({ name: NAME, columns: ['email'], type: 'btree' });
+      expect(authored.type).toBeUndefined();
+      expect(Object.hasOwn(authored, 'type')).toBe(false);
+    });
+
+    it('keeps non-default types', () => {
+      const hashTyped = managed({ name: NAME, columns: ['email'], type: 'hash' });
+      expect(hashTyped.type).toBe('hash');
+    });
+
+    it("an authored 'btree' node and a typeless live node are equal, both directions", () => {
+      const authored = managed({ name: NAME, columns: ['email'], type: 'btree' });
+      const live = exact({ name: NAME, columns: ['email'] });
+      expect(authored.isEqualTo(live)).toBe(true);
+      expect(live.isEqualTo(authored)).toBe(true);
+    });
+
+    it("two 'btree' nodes are equal", () => {
+      const a = managed({ name: NAME, columns: ['email'], type: 'btree' });
+      const b = exact({ name: NAME, columns: ['email'], type: 'btree' });
+      expect(a.isEqualTo(b)).toBe(true);
+    });
+  });
+
   describe('isEqualTo — both modes (structural attributes)', () => {
     it('true when unique/type/options/columns all match', () => {
       const a = managed({ name: NAME, columns: ['email'], unique: true, type: 'gin' });
