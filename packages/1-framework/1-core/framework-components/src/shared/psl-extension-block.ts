@@ -118,6 +118,15 @@ export type PslDiagnosticCode =
   | 'PSL_DUPLICATE_DECLARATION';
 
 /**
+ * A PSL diagnostic code contributed by a family or target package (e.g. an
+ * attribute-spec refine in a family's authoring layer). The framework union
+ * above stays the parser's own vocabulary; contributed codes share the
+ * `PSL_` pattern but their names are owned by the contributing package —
+ * no family or target vocabulary enters this module.
+ */
+export type ContributedPslDiagnosticCode = `PSL_${string}`;
+
+/**
  * Descriptor vocabulary for a single parameter on a declared block.
  *
  * Four kinds:
