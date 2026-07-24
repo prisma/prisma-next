@@ -259,9 +259,9 @@ changes:
       `contract.json` / `contract.d.ts` now carries `name` (the full physical name) and
       `unique`, plus `prefix` when the name is toolchain-managed; `columns` became optional
       (an index carries either `columns` or an opaque `expression` — never both). Contracts
-      emitted by 0.16 fail validation on load ("indexes[0].name must be a string (was
-      missing)"), and storage hashes move for every contract that declares indexes — re-emit
-      with `prisma-next contract emit`. Physical names change for managed indexes: an unnamed
+      emitted by 0.16 fail validation on load (the error message contains "indexes[0].name
+      must be a string (was missing)"), and storage hashes move for every contract that
+      declares indexes — re-emit with `prisma-next contract emit`. Physical names change for managed indexes: an unnamed
       PSL `@@index([a, b])` / TS `constraints.index([a, b])` and every FK-backing index now
       CREATE as `<default-prefix>_<8hex>` content-hash wire names (e.g.
       `user_email_idx_46df9cad`), and a TS `constraints.index([...], { name: "x" })` name is
@@ -269,10 +269,12 @@ changes:
       `@@index([...], map: "x")` is now an exact physical name whose identity is verified
       against the live catalog. Existing databases converge without rebuilds: after
       re-emitting, the first plan that allows the `widening` class (`db update`, or
-      `migration plan` + `migrate`) is `ALTER INDEX … RENAME TO` ops only. Under an
-      additive-only policy the rename pairing does not run — the new name is created and the
-      old index survives until a widening-allowed plan renames (or a destructive-allowed plan
-      drops) it. Update any code or tests that hard-code the old physical index names.
+      `migration plan` + `migrate`) is `ALTER INDEX … RENAME TO` ops only — renames happen
+      only when a widening plan runs FIRST. Under an additive-only policy the rename pairing
+      does not run: the new wire-named index is created beside the old one, and once both
+      exist a later plan can no longer pair them — the old index is removed only by a
+      destructive-allowed plan dropping it. Update any code or tests that hard-code the old
+      physical index names.
     detection:
       glob: "**/*.{prisma,ts,json}"
       contains:
@@ -356,7 +358,7 @@ Each entry in a table's `indexes` array in `contract.json` / `contract.d.ts` now
 - `prefix` — present when the name is toolchain-managed: the physical name is then `<prefix>_<8hex>`, where the suffix is a content hash of the index definition.
 - `columns` — now optional; an index carries either `columns` or an opaque `expression` string, never both. (Expression and partial indexes are representable in the contract from 0.17; authoring surfaces for them arrive in a later release.)
 
-A contract emitted by 0.16 fails validation when a 0.17 toolchain loads it (`indexes[0].name must be a string (was missing)`), and the storage hash moves for every contract that declares indexes. Re-emit:
+A contract emitted by 0.16 fails validation when a 0.17 toolchain loads it — a `Contract structural validation failed: storage.namespaces.<ns> …` error whose message contains `indexes[0].name must be a string (was missing)` and `indexes[0].unique must be boolean (was missing)` — and the storage hash moves for every contract that declares indexes. Re-emit:
 
 ```bash
 prisma-next contract emit
@@ -382,7 +384,7 @@ No index is rebuilt. After re-emitting the contract, the first plan that allows 
 
 Inspect the plan before applying — for a schema whose only drift is the index naming, it contains nothing but renames.
 
-Under an **additive-only** policy (e.g. `db init`'s class set) the rename pairing is skipped: the plan creates the new wire-named index and the old index survives live until a widening-allowed plan renames it (or a destructive-allowed plan drops it). This degradation is deliberate — an additive-only run never emits an op class it is not allowed to execute.
+Under an **additive-only** policy (e.g. `db init`'s class set) the rename pairing is skipped: the plan creates the new wire-named index beside the old one. Once both indexes exist, a later widening plan has nothing left to pair — the new name is already present, and the rename op's own precheck requires its target name to be absent — so after the additive create the old index is removed **only** by a destructive-allowed plan dropping it. A rename happens only when a widening-allowed plan is the *first* convergence, before any create. This degradation is deliberate — an additive-only run never emits an op class it is not allowed to execute; if you want renames instead of create-then-drop, run the widening plan first.
 
 ### Hard-coded names
 

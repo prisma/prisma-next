@@ -1647,3 +1647,50 @@ describe('SQL contract validators', () => {
     });
   });
 });
+
+describe('validateSqlContractFully — pre-name-identity index shape', () => {
+  // Pinned because the 0.16-to-0.17 upgrade instructions quote these
+  // substrings: a consumer loading a 0.16-emitted contract must be able to
+  // grep the documented text out of the real error.
+  it('rejects a 0.16-shaped index entry naming the missing name and unique fields', () => {
+    const contract: unknown = {
+      target: 'postgres',
+      targetFamily: 'sql',
+      profileHash: 'e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0',
+      storage: {
+        storageHash: 'e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0',
+        namespaces: {
+          public: {
+            id: 'public',
+            kind: 'postgres-schema',
+            entries: {
+              table: {
+                user: {
+                  columns: {
+                    id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+                    email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+                  },
+                  primaryKey: { columns: ['id'] },
+                  uniques: [],
+                  indexes: [{ columns: ['email'] }],
+                  foreignKeys: [],
+                },
+              },
+            },
+          },
+        },
+      },
+      domain: { namespaces: { __unbound__: { models: {} } } },
+      roots: {},
+      capabilities: {},
+      extensions: {},
+      meta: {},
+    };
+
+    const validate = () =>
+      validateSqlContractFully(contract as Parameters<typeof validateSqlContractFully>[0]);
+    expect(validate).toThrow('Contract structural validation failed');
+    expect(validate).toThrow('indexes[0].name must be a string (was missing)');
+    expect(validate).toThrow('indexes[0].unique must be boolean (was missing)');
+  });
+});
