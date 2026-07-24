@@ -50,19 +50,23 @@ import type {
   AddColumnAction,
   AlterTableActionVisitor,
   DropDefaultAction,
+  PostgresAlterIndexRename,
   PostgresAlterPolicyRename,
   PostgresAlterTable,
+  PostgresCreateIndex,
   PostgresCreatePolicy,
   PostgresCreateSchema,
   PostgresCreateTable,
   PostgresCreateType,
   PostgresDdlNode,
   PostgresDisableRowLevelSecurity,
+  PostgresDropIndex,
   PostgresDropPolicy,
   PostgresDropType,
   RlsPolicyOperation,
 } from '@prisma-next/target-postgres/ddl';
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
+import { postgresError } from '@prisma-next/target-postgres/errors';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import {
@@ -890,15 +894,20 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       // `element_def` is the per-position element text as Postgres reprints
       // it (`pg_get_indexdef` with pretty-printing); an expression element
       // has attnum 0 so its `attname` is null and the element text is the
-      // only faithful capture. `where_predicate` is the reprinted partial-
-      // index predicate, null for total indexes.
+      // only faithful capture. A mixed index (columns + expressions) carries
+      // the WHOLE element list as one opaque string, so the reprint must
+      // fire for every position of an expression-carrying index — the CASE
+      // bounds the per-element catalog reconstruction to those indexes,
+      // which keeps pure-column schemas free of the reprint cost.
+      // `where_predicate` is the reprinted partial-index predicate, null
+      // for total indexes.
       `SELECT
            i.tablename,
            i.indexname,
            ix.indisunique,
            pg_get_expr(ix.indpred, ix.indrelid) AS where_predicate,
            a.attname,
-           pg_get_indexdef(ix.indexrelid, k.ord::int, true) AS element_def,
+           CASE WHEN 0 = ANY(ix.indkey::int[]) THEN pg_get_indexdef(ix.indexrelid, k.ord::int, true) END AS element_def,
            k.ord AS index_position,
            am.amname,
            ic.reloptions
@@ -1998,6 +2007,65 @@ function pgRenderAlterPolicyRename(node: PostgresAlterPolicyRename): SqlExecuteR
   };
 }
 
+/**
+ * Renders one index reloption value: strings single-quote-escaped, finite
+ * numbers verbatim, booleans in the `on`/`off` catalog spelling (the
+ * canonical form the wire hash and the option equality commit to).
+ */
+function pgRenderIndexOptionValue(key: string, value: unknown): string {
+  if (typeof value === 'string') return `'${escapeLiteral(value)}'`;
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  if (typeof value === 'boolean') return value ? 'on' : 'off';
+  throw postgresError(
+    'CONTRACT.INDEX_INVALID',
+    `Index option "${key}" must be a string, finite number, or boolean; got ${typeof value}`,
+    { meta: { key, valueType: typeof value } },
+  );
+}
+
+/** Qualifies an object name; an absent schema renders it unqualified (unbound namespace). */
+function pgQualify(schema: string | undefined, name: string): string {
+  return schema === undefined
+    ? quoteIdentifier(name)
+    : `${quoteIdentifier(schema)}.${quoteIdentifier(name)}`;
+}
+
+function pgRenderCreateIndex(node: PostgresCreateIndex): SqlExecuteRequest {
+  const elementList =
+    'columns' in node.elements
+      ? node.elements.columns.map(quoteIdentifier).join(', ')
+      : node.elements.expression;
+  const unique = node.unique ? 'UNIQUE ' : '';
+  const using = node.type !== undefined ? ` USING ${quoteIdentifier(node.type)}` : '';
+  const withClause =
+    node.options !== undefined && Object.keys(node.options).length > 0
+      ? ` WITH (${Object.entries(node.options)
+          .map(
+            ([key, value]) => `${quoteIdentifier(key)} = ${pgRenderIndexOptionValue(key, value)}`,
+          )
+          .join(', ')})`
+      : '';
+  const whereClause = node.where !== undefined ? ` WHERE (${node.where})` : '';
+  return {
+    sql: `CREATE ${unique}INDEX ${quoteIdentifier(node.name)} ON ${pgQualify(node.schema, node.table)}${using} (${elementList})${withClause}${whereClause}`,
+    params: [],
+  };
+}
+
+function pgRenderDropIndex(node: PostgresDropIndex): SqlExecuteRequest {
+  return {
+    sql: `DROP INDEX ${pgQualify(node.schema, node.name)}`,
+    params: [],
+  };
+}
+
+function pgRenderAlterIndexRename(node: PostgresAlterIndexRename): SqlExecuteRequest {
+  return {
+    sql: `ALTER INDEX ${pgQualify(node.schema, node.from)} RENAME TO ${quoteIdentifier(node.to)}`,
+    params: [],
+  };
+}
+
 function pgRenderDisableRowLevelSecurity(node: PostgresDisableRowLevelSecurity): SqlExecuteRequest {
   const tableRef = `${quoteIdentifier(node.schema)}.${quoteIdentifier(node.table)}`;
   return {
@@ -2020,6 +2088,10 @@ async function pgRenderDdlExecuteRequest(
     dropPolicy: (node: PostgresDropPolicy) => Promise.resolve(pgRenderDropPolicy(node)),
     alterPolicyRename: (node: PostgresAlterPolicyRename) =>
       Promise.resolve(pgRenderAlterPolicyRename(node)),
+    createIndex: (node: PostgresCreateIndex) => Promise.resolve(pgRenderCreateIndex(node)),
+    dropIndex: (node: PostgresDropIndex) => Promise.resolve(pgRenderDropIndex(node)),
+    alterIndexRename: (node: PostgresAlterIndexRename) =>
+      Promise.resolve(pgRenderAlterIndexRename(node)),
     disableRowLevelSecurity: (node: PostgresDisableRowLevelSecurity) =>
       Promise.resolve(pgRenderDisableRowLevelSecurity(node)),
   };

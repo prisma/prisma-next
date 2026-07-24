@@ -1280,7 +1280,14 @@ export class RenameIndexCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `this.renameIndex({ schema: ${jsonToTsSource(this.schemaName)}, table: ${jsonToTsSource(this.tableName)}, from: ${jsonToTsSource(this.oldIndexName)}, to: ${jsonToTsSource(this.newIndexName)} })`;
+    const opts: string[] = [];
+    if (this.schemaName !== UNBOUND_NAMESPACE_ID) {
+      opts.push(`schema: ${jsonToTsSource(this.schemaName)}`);
+    }
+    opts.push(`table: ${jsonToTsSource(this.tableName)}`);
+    opts.push(`from: ${jsonToTsSource(this.oldIndexName)}`);
+    opts.push(`to: ${jsonToTsSource(this.newIndexName)}`);
+    return `this.renameIndex({ ${opts.join(', ')} })`;
   }
 
   override importRequirements(): readonly ImportRequirement[] {
