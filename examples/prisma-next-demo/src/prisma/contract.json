@@ -638,8 +638,7 @@
                 "id": {
                   "codecId": "pg/uuid@1",
                   "nativeType": "uuid",
-                  "nullable": false,
-                  "typeRef": "Uuid"
+                  "nullable": false
                 },
                 "severity": {
                   "codecId": "pg/text@1",
@@ -684,8 +683,7 @@
                 "id": {
                   "codecId": "pg/uuid@1",
                   "nativeType": "uuid",
-                  "nullable": false,
-                  "typeRef": "Uuid"
+                  "nullable": false
                 },
                 "priority": {
                   "codecId": "pg/text@1",
@@ -757,8 +755,7 @@
                 "id": {
                   "codecId": "pg/uuid@1",
                   "nativeType": "uuid",
-                  "nullable": false,
-                  "typeRef": "Uuid"
+                  "nullable": false
                 },
                 "priority": {
                   "codecId": "pg/text@1",
@@ -783,8 +780,7 @@
                 "userId": {
                   "codecId": "pg/uuid@1",
                   "nativeType": "uuid",
-                  "nullable": false,
-                  "typeRef": "Uuid"
+                  "nullable": false
                 }
               },
               "foreignKeys": [
@@ -825,14 +821,12 @@
                 "postId": {
                   "codecId": "pg/uuid@1",
                   "nativeType": "uuid",
-                  "nullable": false,
-                  "typeRef": "Uuid"
+                  "nullable": false
                 },
                 "tagId": {
                   "codecId": "pg/uuid@1",
                   "nativeType": "uuid",
-                  "nullable": false,
-                  "typeRef": "Uuid"
+                  "nullable": false
                 }
               },
               "foreignKeys": [
@@ -896,8 +890,7 @@
                 "id": {
                   "codecId": "pg/uuid@1",
                   "nativeType": "uuid",
-                  "nullable": false,
-                  "typeRef": "Uuid"
+                  "nullable": false
                 },
                 "label": {
                   "codecId": "pg/text@1",
@@ -939,8 +932,7 @@
                 "id": {
                   "codecId": "pg/uuid@1",
                   "nativeType": "uuid",
-                  "nullable": false,
-                  "typeRef": "Uuid"
+                  "nullable": false
                 },
                 "status": {
                   "codecId": "pg/text@1",
@@ -964,8 +956,7 @@
                 "userId": {
                   "codecId": "pg/uuid@1",
                   "nativeType": "uuid",
-                  "nullable": false,
-                  "typeRef": "Uuid"
+                  "nullable": false
                 }
               },
               "foreignKeys": [
@@ -1042,8 +1033,7 @@
                 "id": {
                   "codecId": "pg/uuid@1",
                   "nativeType": "uuid",
-                  "nullable": false,
-                  "typeRef": "Uuid"
+                  "nullable": false
                 },
                 "kind": {
                   "codecId": "pg/text@1",
@@ -1089,7 +1079,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "6174be7a847a05e291afa27baf77c68cde5bcd2280326a28479b98bc778ec11d",
+    "storageHash": "f1b45a089f1efaae976ed2c9b123826090a0de01866828278b589dd3937da74d",
     "types": {
       "Embedding1536": {
         "codecId": "pg/vector@1",
@@ -1098,11 +1088,6 @@
         "typeParams": {
           "length": 1536
         }
-      },
-      "Uuid": {
-        "codecId": "pg/uuid@1",
-        "kind": "codec-instance",
-        "nativeType": "uuid"
       }
     }
   },

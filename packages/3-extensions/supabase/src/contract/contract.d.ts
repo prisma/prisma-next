@@ -4583,12 +4583,6 @@ type ContractBase = Omit<
         readonly nativeType: 'int2';
         readonly typeParams: Record<string, never>;
       };
-      readonly Hash: {
-        readonly kind: 'codec-instance';
-        readonly codecId: 'sql/varchar@1';
-        readonly nativeType: 'character varying';
-        readonly typeParams: { readonly length: 40 };
-      };
       readonly Id: {
         readonly kind: 'codec-instance';
         readonly codecId: 'pg/uuid@1';
@@ -4600,6 +4594,18 @@ type ContractBase = Omit<
         readonly codecId: 'pg/inet@1';
         readonly nativeType: 'inet';
         readonly typeParams: Record<string, never>;
+      };
+      readonly Payload: {
+        readonly kind: 'codec-instance';
+        readonly codecId: 'pg/json@1';
+        readonly nativeType: 'json';
+        readonly typeParams: Record<string, never>;
+      };
+      readonly Hash: {
+        readonly kind: 'codec-instance';
+        readonly codecId: 'sql/varchar@1';
+        readonly nativeType: 'character varying';
+        readonly typeParams: { readonly length: 40 };
       };
       readonly IpAddress2: {
         readonly kind: 'codec-instance';
@@ -4618,12 +4624,6 @@ type ContractBase = Omit<
         readonly codecId: 'sql/varchar@1';
         readonly nativeType: 'character varying';
         readonly typeParams: { readonly length: 255 };
-      };
-      readonly Payload: {
-        readonly kind: 'codec-instance';
-        readonly codecId: 'pg/json@1';
-        readonly nativeType: 'json';
-        readonly typeParams: Record<string, never>;
       };
     };
     readonly storageHash: StorageHash;
