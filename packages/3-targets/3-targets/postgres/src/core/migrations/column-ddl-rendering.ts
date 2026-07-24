@@ -5,6 +5,7 @@ import * as contractFree from '@prisma-next/sql-relational-core/contract-free';
 import type { SqlColumnDefaultIR, SqlColumnIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import { postgresDefaultToDdlColumnDefault } from './op-factory-call';
 import { buildColumnDefaultSql, buildColumnTypeSql } from './planner-ddl-builders';
 import { resolveIdentityValue } from './planner-identity-values';
@@ -29,7 +30,7 @@ function columnLike(
   'nativeType' | 'codecId' | 'nullable' | 'many' | 'typeParams' | 'typeRef' | 'default'
 > {
   if (column.codecRef === undefined || column.codecBaseNativeType === undefined) {
-    throw new Error(
+    throw new InternalError(
       `columnLike: expected column "${column.name}" carries no codec identity — the expected tree must be derived via contractToSchemaIR for planning`,
     );
   }

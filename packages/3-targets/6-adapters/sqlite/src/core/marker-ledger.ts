@@ -12,6 +12,7 @@ import {
   sqliteTable,
   text,
 } from '@prisma-next/target-sqlite/contract-free';
+import { structuredError } from '@prisma-next/utils/structured-error';
 import { encodeControlQueryParams } from './control-codecs';
 
 export const marker = sqliteTable('_prisma_marker', {
@@ -100,7 +101,11 @@ export function decodeSqliteMarkerRow(row: unknown): unknown {
     parsed = JSON.parse(record.invariants);
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
-    throw new Error(`Invalid contract marker row: invariants is not valid JSON: ${detail}`);
+    throw structuredError(
+      'CONTRACT.MARKER_ROW_CORRUPT',
+      `Invalid contract marker row: invariants is not valid JSON: ${detail}`,
+      { meta: { detail }, cause: err },
+    );
   }
   return { ...record, invariants: parsed };
 }

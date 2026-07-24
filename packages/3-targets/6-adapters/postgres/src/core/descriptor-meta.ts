@@ -40,6 +40,7 @@ import {
 } from '@prisma-next/target-postgres/codec-ids';
 import { postgresCodecRegistry } from '@prisma-next/target-postgres/codecs';
 import type { QueryOperationTypes } from '../types/operation-types';
+import { adapterError } from './adapter-errors';
 
 // ============================================================================ Helper functions for reducing boilerplate ============================================================================
 
@@ -69,8 +70,10 @@ function expandLength({ nativeType, typeParams }: ExpandNativeTypeInput): string
   }
   const length = typeParams['length'];
   if (!isPositiveInteger(length)) {
-    throw new Error(
+    throw adapterError(
+      'RUNTIME.TYPE_PARAMS_INVALID',
       `Invalid "length" type parameter for "${nativeType}": expected a positive integer, got ${JSON.stringify(length)}`,
+      { meta: { nativeType, param: 'length', received: length } },
     );
   }
   return `${nativeType}(${length})`;
@@ -82,8 +85,10 @@ function expandPrecision({ nativeType, typeParams }: ExpandNativeTypeInput): str
   }
   const precision = typeParams['precision'];
   if (!isPositiveInteger(precision)) {
-    throw new Error(
+    throw adapterError(
+      'RUNTIME.TYPE_PARAMS_INVALID',
       `Invalid "precision" type parameter for "${nativeType}": expected a positive integer, got ${JSON.stringify(precision)}`,
+      { meta: { nativeType, param: 'precision', received: precision } },
     );
   }
   return `${nativeType}(${precision})`;
@@ -98,23 +103,29 @@ function expandNumeric({ nativeType, typeParams }: ExpandNativeTypeInput): strin
   }
 
   if (!hasPrecision && hasScale) {
-    throw new Error(
+    throw adapterError(
+      'RUNTIME.TYPE_PARAMS_INVALID',
       `Invalid type parameters for "${nativeType}": "scale" requires "precision" to be specified`,
+      { meta: { nativeType, param: 'scale' } },
     );
   }
 
   if (hasPrecision) {
     const precision = typeParams['precision'];
     if (!isPositiveInteger(precision)) {
-      throw new Error(
+      throw adapterError(
+        'RUNTIME.TYPE_PARAMS_INVALID',
         `Invalid "precision" type parameter for "${nativeType}": expected a positive integer, got ${JSON.stringify(precision)}`,
+        { meta: { nativeType, param: 'precision', received: precision } },
       );
     }
     if (hasScale) {
       const scale = typeParams['scale'];
       if (!isNonNegativeInteger(scale)) {
-        throw new Error(
+        throw adapterError(
+          'RUNTIME.TYPE_PARAMS_INVALID',
           `Invalid "scale" type parameter for "${nativeType}": expected a non-negative integer, got ${JSON.stringify(scale)}`,
+          { meta: { nativeType, param: 'scale', received: scale } },
         );
       }
       return `${nativeType}(${precision},${scale})`;

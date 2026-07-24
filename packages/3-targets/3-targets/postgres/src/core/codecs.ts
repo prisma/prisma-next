@@ -92,6 +92,7 @@ import {
   PG_VARBIT_CODEC_ID,
   PG_VARCHAR_CODEC_ID,
 } from './codec-ids';
+import { postgresError } from './errors';
 import { DEFAULT_NAMESPACE_ID } from './namespace-ids';
 import { PostgresNativeEnum } from './postgres-native-enum';
 
@@ -632,13 +633,21 @@ export class PgNumericCodec extends CodecImpl<
   encodeJson(value: string): JsonValue {
     const number = Number(value);
     if (!Number.isFinite(number)) {
-      throw new TypeError('pg/numeric@1 database JSON value must be a finite number');
+      throw postgresError(
+        'RUNTIME.ENCODE_FAILED',
+        'pg/numeric@1 database JSON value must be a finite number',
+        { meta: { codecId: 'pg/numeric@1', received: value } },
+      );
     }
     return number;
   }
   decodeJson(json: JsonValue): string {
     if (typeof json !== 'number') {
-      throw new TypeError('pg/numeric@1 database JSON value must be a number');
+      throw postgresError(
+        'RUNTIME.DECODE_FAILED',
+        'pg/numeric@1 database JSON value must be a number',
+        { meta: { codecId: 'pg/numeric@1', received: typeof json } },
+      );
     }
     return pgNumericDecode(json);
   }

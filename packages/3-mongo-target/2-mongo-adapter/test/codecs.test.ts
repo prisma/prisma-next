@@ -1,4 +1,5 @@
 import { createOperationRegistry } from '@prisma-next/operations';
+import { isStructuredError } from '@prisma-next/utils/structured-error';
 import { ObjectId } from 'bson';
 import { describe, expect, it } from 'vitest';
 import { MONGO_DOUBLE_CODEC_ID, MONGO_VECTOR_CODEC_ID } from '../src/core/codec-ids';
@@ -154,6 +155,18 @@ describe('mongoDateCodec', () => {
       'expected ISO date string',
     );
   });
+
+  it('decodeJson throws RUNTIME.DECODE_FAILED on non-string input', () => {
+    let caught: unknown;
+    try {
+      mongoDateCodec.decodeJson(123 as unknown as string);
+    } catch (err) {
+      caught = err;
+    }
+    expect(isStructuredError(caught)).toBe(true);
+    if (!isStructuredError(caught)) return;
+    expect(caught.code).toBe('RUNTIME.DECODE_FAILED');
+  });
 });
 
 describe('mongo vector descriptor renderOutputType', () => {
@@ -190,6 +203,18 @@ describe('mongo vector descriptor renderOutputType', () => {
 
   it('throws on negative length', () => {
     expect(() => renderVector?.({ length: -1 })).toThrow(/expected positive integer "length"/);
+  });
+
+  it('throws RUNTIME.TYPE_PARAMS_INVALID on invalid length', () => {
+    let caught: unknown;
+    try {
+      renderVector?.({ length: -1 });
+    } catch (err) {
+      caught = err;
+    }
+    expect(isStructuredError(caught)).toBe(true);
+    if (!isStructuredError(caught)) return;
+    expect(caught.code).toBe('RUNTIME.TYPE_PARAMS_INVALID');
   });
 });
 

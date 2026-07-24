@@ -25,6 +25,7 @@ import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-ne
 import { ifDefined } from '@prisma-next/utils/defined';
 import { columnExistsAst, indexExistsAst, tableExistsAst } from '../../contract-free/checks';
 import * as contractFreeDdl from '../../contract-free/ddl';
+import { sqliteError } from '../errors';
 import { quoteIdentifier } from '../sql-utils';
 import { addColumnExecuteSql, dropColumnExecuteSql } from './operations/columns';
 import type { SqliteColumnSpec, SqliteIndexSpec, SqliteTableSpec } from './operations/shared';
@@ -97,9 +98,11 @@ function renderDdlConstraintAsTsCall(constraint: DdlTableConstraint): string {
       return `unique(${jsonToTsSource(constraint.columns)}${nameOpt})`;
     }
     case 'check-expression':
-      throw new Error(
+      throw sqliteError(
+        'CONTRACT.CONSTRAINT_INVALID',
         `SQLite does not support expression CHECK constraints (constraint "${constraint.name}"). ` +
           'Scalar-array columns and their element-non-null checks are Postgres-only.',
+        { meta: { constraintName: constraint.name } },
       );
   }
 }
@@ -147,8 +150,10 @@ export class CreateTableCall extends SqliteOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw sqliteError(
+        'MIGRATION.SQLITE_CONTROL_STACK_MISSING',
         `CreateTableCall.toOp: a DDL lowerer is required on the SQLite planner path (table "${this.tableName}"). Pass the control adapter to createSqliteMigrationPlanner.`,
+        { meta: { factory: this.factoryName, tableName: this.tableName } },
       );
     }
     const ddlNode = contractFreeDdl.createTable({
@@ -223,8 +228,10 @@ export class DropTableCall extends SqliteOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw sqliteError(
+        'MIGRATION.SQLITE_CONTROL_STACK_MISSING',
         `DropTableCall.toOp: a lowerer is required on the SQLite planner path (table "${this.tableName}"). Pass the control adapter to createSqliteMigrationPlanner.`,
+        { meta: { factory: this.factoryName, tableName: this.tableName } },
       );
     }
     const checks = tableExistsAst(this.tableName);
@@ -287,8 +294,10 @@ export class RecreateTableCall extends SqliteOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw sqliteError(
+        'MIGRATION.SQLITE_CONTROL_STACK_MISSING',
         `RecreateTableCall.toOp: a lowerer is required on the SQLite planner path (table "${this.tableName}"). Pass the control adapter to createSqliteMigrationPlanner.`,
+        { meta: { factory: this.factoryName, tableName: this.tableName } },
       );
     }
     return recreateTable(
@@ -346,8 +355,16 @@ export class AddColumnCall extends SqliteOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw sqliteError(
+        'MIGRATION.SQLITE_CONTROL_STACK_MISSING',
         `AddColumnCall.toOp: a lowerer is required on the SQLite planner path (column "${this.column.name}" on table "${this.tableName}"). Pass the control adapter to createSqliteMigrationPlanner.`,
+        {
+          meta: {
+            factory: this.factoryName,
+            tableName: this.tableName,
+            columnName: this.column.name,
+          },
+        },
       );
     }
     const checks = columnExistsAst(this.tableName, this.column.name);
@@ -396,8 +413,16 @@ export class DropColumnCall extends SqliteOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw sqliteError(
+        'MIGRATION.SQLITE_CONTROL_STACK_MISSING',
         `DropColumnCall.toOp: a lowerer is required on the SQLite planner path (column "${this.columnName}" on table "${this.tableName}"). Pass the control adapter to createSqliteMigrationPlanner.`,
+        {
+          meta: {
+            factory: this.factoryName,
+            tableName: this.tableName,
+            columnName: this.columnName,
+          },
+        },
       );
     }
     const checks = columnExistsAst(this.tableName, this.columnName);
@@ -467,8 +492,12 @@ export class CreateIndexCall extends SqliteOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw sqliteError(
+        'MIGRATION.SQLITE_CONTROL_STACK_MISSING',
         `CreateIndexCall.toOp: a lowerer is required on the SQLite planner path (index "${this.indexName}" on table "${this.tableName}"). Pass the control adapter to createSqliteMigrationPlanner.`,
+        {
+          meta: { factory: this.factoryName, tableName: this.tableName, indexName: this.indexName },
+        },
       );
     }
     const checks = indexExistsAst(this.indexName);
@@ -520,8 +549,12 @@ export class DropIndexCall extends SqliteOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw sqliteError(
+        'MIGRATION.SQLITE_CONTROL_STACK_MISSING',
         `DropIndexCall.toOp: a lowerer is required on the SQLite planner path (index "${this.indexName}" on table "${this.tableName}"). Pass the control adapter to createSqliteMigrationPlanner.`,
+        {
+          meta: { factory: this.factoryName, tableName: this.tableName, indexName: this.indexName },
+        },
       );
     }
     const checks = indexExistsAst(this.indexName);

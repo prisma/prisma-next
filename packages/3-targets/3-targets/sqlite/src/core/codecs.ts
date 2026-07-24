@@ -38,6 +38,7 @@ import {
   SQLITE_REAL_CODEC_ID,
   SQLITE_TEXT_CODEC_ID,
 } from './codec-ids';
+import { sqliteError } from './errors';
 
 export class SqliteTextCodec extends CodecImpl<
   typeof SQLITE_TEXT_CODEC_ID,
@@ -170,7 +171,13 @@ export class SqliteBlobCodec extends CodecImpl<
   }
   decodeJson(json: JsonValue): Uint8Array {
     if (typeof json !== 'string') {
-      throw new TypeError('sqlite/blob@1 contract value must be a base64 string');
+      throw sqliteError(
+        'RUNTIME.DECODE_FAILED',
+        'sqlite/blob@1 contract value must be a base64 string',
+        {
+          meta: { codecId: SQLITE_BLOB_CODEC_ID, received: typeof json },
+        },
+      );
     }
     return new Uint8Array(Buffer.from(json, 'base64'));
   }
@@ -204,7 +211,11 @@ export class SqliteDatetimeCodec extends CodecImpl<
   private parseDate(value: string): Date {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {
-      throw new TypeError(`sqlite/datetime@1 value must be a valid ISO-8601 string: ${value}`);
+      throw sqliteError(
+        'RUNTIME.DECODE_FAILED',
+        `sqlite/datetime@1 value must be a valid ISO-8601 string: ${value}`,
+        { meta: { codecId: SQLITE_DATETIME_CODEC_ID, received: value } },
+      );
     }
     return date;
   }
@@ -219,7 +230,11 @@ export class SqliteDatetimeCodec extends CodecImpl<
   }
   decodeJson(json: JsonValue): Date {
     if (typeof json !== 'string') {
-      throw new TypeError('sqlite/datetime@1 contract value must be an ISO-8601 string');
+      throw sqliteError(
+        'RUNTIME.DECODE_FAILED',
+        'sqlite/datetime@1 contract value must be an ISO-8601 string',
+        { meta: { codecId: SQLITE_DATETIME_CODEC_ID, received: typeof json } },
+      );
     }
     return this.parseDate(json);
   }
@@ -296,16 +311,28 @@ export class SqliteBigintCodec extends CodecImpl<
   encodeJson(value: bigint): JsonValue {
     const number = Number(value);
     if (!Number.isSafeInteger(number)) {
-      throw new TypeError('sqlite/bigint@1 database JSON value must be a safe integer');
+      throw sqliteError(
+        'RUNTIME.ENCODE_FAILED',
+        'sqlite/bigint@1 database JSON value must be a safe integer',
+        { meta: { codecId: SQLITE_BIGINT_CODEC_ID, received: String(value) } },
+      );
     }
     return number;
   }
   decodeJson(json: JsonValue): bigint {
     if (typeof json !== 'number') {
-      throw new TypeError('sqlite/bigint@1 database JSON value must be a number');
+      throw sqliteError(
+        'RUNTIME.DECODE_FAILED',
+        'sqlite/bigint@1 database JSON value must be a number',
+        { meta: { codecId: SQLITE_BIGINT_CODEC_ID, received: typeof json } },
+      );
     }
     if (!Number.isSafeInteger(json)) {
-      throw new TypeError('sqlite/bigint@1 database JSON value must be a safe integer');
+      throw sqliteError(
+        'RUNTIME.DECODE_FAILED',
+        'sqlite/bigint@1 database JSON value must be a safe integer',
+        { meta: { codecId: SQLITE_BIGINT_CODEC_ID, received: json } },
+      );
     }
     return BigInt(json);
   }

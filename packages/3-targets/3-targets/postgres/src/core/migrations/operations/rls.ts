@@ -7,6 +7,7 @@ import {
   disableRowLevelSecurity as disableRowLevelSecurityDdl,
   dropPolicy,
 } from '../../../contract-free/ddl';
+import { postgresError } from '../../errors';
 import type { PostgresRlsPolicy } from '../../postgres-rls-policy';
 import { qualifyTableName } from '../planner-sql-checks';
 import { type Op, step, targetDetails } from './shared';
@@ -15,8 +16,10 @@ const PLAIN_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_$]*$/;
 
 function validateRoleName(role: string): string {
   if (!PLAIN_IDENTIFIER.test(role)) {
-    throw new Error(
+    throw postgresError(
+      'CONTRACT.ROLE_INVALID',
       `Invalid role name ${JSON.stringify(role)}: role names must be plain SQL identifiers matching ^[A-Za-z_][A-Za-z0-9_$]*$`,
+      { meta: { role, reason: 'not-a-plain-identifier' } },
     );
   }
   return role;

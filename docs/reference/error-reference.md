@@ -198,9 +198,21 @@ A foreign key's target refs are empty or inconsistent: no target ref given, refs
 
 A model's identity is wrong: multiple fields marked `.id()`, identity declared both inline and in `.attributes(...)`, an empty identity, a model with non-owning relations but no id to anchor them, or an M:N target with no primary/unique key to derive junction columns from. Raised while lowering/building a SQL contract. Meta: `modelName`, `reason`.
 
+### CONTRACT.IDENTIFIER_INVALID
+
+A SQL identifier or literal fails escaping-safety checks while rendering DDL/SQL: an empty identifier, a null byte in an identifier or string literal, or a native enum label exceeding PostgreSQL's 63-byte limit. Raised by the Postgres and SQLite SQL utilities (formerly the `SqlEscapeError` class, removed at 0.17). Meta: `value`, `context`.
+
 ### CONTRACT.INDEX_INVALID
 
-A Mongo variant model declares an index that conflicts with the discriminator scope of its variant. Raised by the Mongo contract builder. Meta: `variantName`, `indexLabel`, `reason`.
+A Mongo variant model declares an index that conflicts with the discriminator scope of its variant, or a SQL index option value is not a string, finite number, or boolean. Raised by the Mongo contract builder and the Postgres index DDL renderer. Meta: `variantName`, `indexLabel`, `reason`, `key`.
+
+### CONTRACT.INFER_UNSUPPORTED
+
+`contract infer` met a database shape it cannot express yet: duplicate table names across schemas, a column typed by a native enum that an extension pack space already describes in another schema, or native enum adoption with content spanning multiple schemas. Meta: `tableName`, `columnName`, `schemas`.
+
+### CONTRACT.INTROSPECTION_UNSUPPORTED
+
+Introspection read an unrecognized or malformed database shape — an unknown referential action rule, or a malformed index reloption entry. Raised by the Postgres and SQLite control adapters. Meta: `rule`, `entry`, `indexName`.
 
 ### CONTRACT.MARKER_MISMATCH
 
@@ -250,6 +262,10 @@ A model references a namespace that is not in the contract's declared `namespace
 
 Namespaces are declared (contract-level list or a model-level `namespace`) on a target that has no schema/namespace concept, i.e. SQLite. Raised by the SQL contract builder. Meta: `namespaces`, `modelKey`, `targetId`.
 
+### CONTRACT.NATIVE_TYPE_INVALID
+
+A native type name in the contract fails the identifier-safety pattern required to render it into DDL. Raised by the Postgres and SQLite migration planners while building column DDL. Meta: `nativeType`.
+
 ### CONTRACT.PACK_CONTRIBUTION_INVALID
 
 A composed pack's contribution is malformed or collides with another contribution — this is the extension-author-facing bucket. Covers: entity types colliding with reserved helper keys, duplicate entity kinds or index-type registrations, a registered entity kind with no `lowerEntityHandles` lowering, an invalid `indexTypes` shape, entries-slot collisions between a model attribute and a block entry kind, bad authoring-helper paths, a codec registered with an entity-ref arg but no `columnFromEntity` hook, and print-time contribution mismatches (missing/mismatched PSL block descriptor, param descriptor kind disagreeing with the AST node, unregistered codec id, raw literal that is not valid JSON). Raised during contract authoring/lowering and PSL printing. Meta: `packId`, `contribution`, `reason`, `keyword`, `paramName`, `codecId`.
@@ -270,9 +286,17 @@ Something other than an extension pack reference was passed in `defineContract`'
 
 An extension pack targets a different database target than the contract does (e.g. a Postgres-only extension pack in a SQLite contract). Raised by the SQL and Mongo contract builders. Meta: `packId`, `packTargetId`, `contractTargetId`.
 
+### CONTRACT.POLICY_INVALID
+
+An RLS policy declaration is invalid: it targets a model in another contract space, its prefix exceeds the length limit or is declared twice in one namespace, or it targets a table that is not RLS-enabled or not present in the namespace. Raised by the Postgres `defineContract` builder and while deriving the Postgres schema tree from the contract. Meta: `prefix`/`policyName`, `tableName`, `namespaceId`, `reason`.
+
 ### CONTRACT.RELATION_INVALID
 
 A relation's shape is wrong: `.sql(...)` on a non-belongsTo relation, mismatched field counts between the two sides, an N:M relation without `through` metadata, or a relation target referencing a field of another model. Raised while authoring/building a contract (SQL and Mongo). Meta: `modelName`, `relationName`, `reason`.
+
+### CONTRACT.ROLE_INVALID
+
+A role entity is declared more than once in the entities list, or a role name is not a plain SQL identifier. Raised by the Postgres contract builder and RLS DDL rendering. Meta: `role`, `reason`.
 
 ### CONTRACT.SCHEMA_VERIFICATION_FAILED
 
@@ -424,6 +448,14 @@ An in-flight `execute()` was cancelled via the per-query `AbortSignal` passed as
 
 A lane terminal (SQL DSL `.build()`, ORM collection terminal) received an annotation whose declared `applicableTo` set does not include the operation kind being built — the runtime check that backs up the type-level annotation validation when it is bypassed via casts or dynamic invocation. Meta: `namespace`, `terminalName`, `kind`, `applicableTo`.
 
+### RUNTIME.AST_INVALID
+
+A lowered SQL AST is structurally invalid at render time: a subquery projecting other than one column, an INSERT with zero rows, a missing column value, an empty onConflict column list or do-update-set, an UPDATE with no SET assignments, or an INSERT target table absent from contract storage. Raised by the Postgres and SQLite SQL renderers. Meta: `node`, `table`, `column`.
+
+### RUNTIME.AST_UNSUPPORTED
+
+The authored SQL AST uses a feature this target cannot render — currently DEFAULT as a value in INSERT … VALUES on SQLite. Meta: `node`.
+
 ### RUNTIME.CODEC_DESCRIPTOR_MISSING
 
 A column (or AST-carried CodecRef) references a `codecId` for which no runtime component registered a codec descriptor — usually the extension pack that owns the codec is missing from the runtime stack. Surfaces at SQL context construction during the contract codec walk, or lazily when the AST codec resolver materializes a codec at query time. Meta: `codecId`; on the column path also `table`, `column`.
@@ -447,6 +479,10 @@ At SQL context construction, the contract's target family (e.g. `mongo`) does no
 ### RUNTIME.CONTRACT_TARGET_MISMATCH
 
 At SQL context construction, the contract's target (e.g. `sqlite`) does not match the runtime stack's target descriptor (e.g. `postgres`) — the contract and the adapter/driver stack disagree about the database target. Meta: `actual`, `expected`.
+
+### RUNTIME.DDL_UNSUPPORTED
+
+`lower()` was asked to lower DDL on a surface that cannot do it: the runtime adapter (DDL lowering is a control-plane concern), or the synchronous control lowering path (DDL default literals require async codec encoding — use `lowerToExecuteRequest()`). Raised by the Postgres and SQLite adapters. Meta: `surface`.
 
 ### RUNTIME.DECODE_FAILED
 
@@ -495,6 +531,10 @@ At SQL context construction, the contract requires one or more extension packs t
 ### RUNTIME.MUTATION_DEFAULT_GENERATOR_MISSING
 
 The contract declares column defaults produced by a mutation default generator (e.g. a nanoid/uuid generator) that no runtime component provides — detected up front when the SQL context validates generator coverage, or at mutation time when a generator-kind default spec is resolved. Meta: `ids` (validation pass) or `id` (resolution).
+
+### RUNTIME.NAMESPACE_UNKNOWN
+
+At query-render time a table references a namespace that is not present, or not materialised as a database schema, on the contract. Raised by the Postgres and SQLite SQL renderers. Meta: `table`, `namespaceId`, `reason`.
 
 ### RUNTIME.NO_ROWS
 
@@ -738,7 +778,7 @@ The migration name given to `migration new`/`migration plan --name` contains no 
 
 ### MIGRATION.INVALID_OPERATION_ENTRY
 
-An operation returned by an authored migration class failed schema validation during emit — each entry of `operations` must carry `id`, `label`, and an `operationClass` of `additive`, `widening`, `destructive`, or `data`. Meta: `index`, `reason`.
+An operation returned by an authored migration class failed schema validation during emit — each entry of `operations` must carry `id`, `label`, and an `operationClass` of `additive`, `widening`, `destructive`, or `data`. Also raised when deserializing a persisted Mongo migration plan hits a malformed or unknown entry (filter, pipeline stage, DML/DDL/inspection command). Meta: `index`, `reason` (emit validation) or `context`, `kind` (plan deserialization).
 
 ### MIGRATION.INVALID_REF_FILE
 
@@ -799,6 +839,10 @@ The target (or named ref) requires data invariants, and no path through the migr
 ### MIGRATION.NO_TARGET
 
 The migration history contains cycles (e.g. after a rollback migration C1→C2→C1) and no target can be resolved automatically. Pass `--from <hash>` to specify the planning origin explicitly. Meta: `reachableHashes`.
+
+### MIGRATION.OPERATION_UNSUPPORTED
+
+A Mongo migration check uses a filter feature the check evaluator does not support — an unsupported filter operator, or an aggregation-expression filter. Meta: `operator`.
 
 ### MIGRATION.PATH_UNREACHABLE
 

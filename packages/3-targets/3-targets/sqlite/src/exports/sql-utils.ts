@@ -1,1 +1,1 @@
-export { escapeLiteral, quoteIdentifier, SqlEscapeError } from '../core/sql-utils';
+export { escapeLiteral, quoteIdentifier } from '../core/sql-utils';

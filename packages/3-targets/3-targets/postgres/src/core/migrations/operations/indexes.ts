@@ -1,5 +1,6 @@
 import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adapter';
 import { indexExistsAst } from '../../../contract-free/checks';
+import { postgresError } from '../../errors';
 import { escapeLiteral, quoteIdentifier } from '../../sql-utils';
 import { qualifyTableName } from '../planner-sql-checks';
 import { type Op, step, targetDetails } from './shared';
@@ -26,8 +27,10 @@ function renderIndexOptionValue(key: string, value: unknown): string {
   if (typeof value === 'string') return `'${escapeLiteral(value)}'`;
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
   if (typeof value === 'boolean') return value ? 'true' : 'false';
-  throw new Error(
+  throw postgresError(
+    'CONTRACT.INDEX_INVALID',
     `Index option "${key}" must be a string, finite number, or boolean; got ${typeof value}`,
+    { meta: { key, valueType: typeof value } },
   );
 }
 

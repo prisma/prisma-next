@@ -1,4 +1,5 @@
 import type { OpFactoryCall } from '@prisma-next/framework-components/control';
+import { isStructuredError } from '@prisma-next/utils/structured-error';
 import { describe, expect, it } from 'vitest';
 import { renderOps } from '../../src/core/migrations/render-ops';
 
@@ -33,5 +34,19 @@ describe('renderOps', () => {
     expect(() => renderOps([makeCall('sqlite', 'table.users.create', 'createTable')])).toThrow(
       /expected postgres op.+target\.id="sqlite".+factoryName="createTable"/,
     );
+  });
+
+  it('reports the mismatch as MIGRATION.TARGET_MISMATCH with op metadata', () => {
+    let caught: unknown;
+    try {
+      renderOps([makeCall('sqlite', 'table.users.create', 'createTable')]);
+    } catch (error) {
+      caught = error;
+    }
+    expect(isStructuredError(caught)).toBe(true);
+    expect(caught).toMatchObject({
+      code: 'MIGRATION.TARGET_MISMATCH',
+      meta: { opId: 'table.users.create', targetId: 'sqlite', factoryName: 'createTable' },
+    });
   });
 });

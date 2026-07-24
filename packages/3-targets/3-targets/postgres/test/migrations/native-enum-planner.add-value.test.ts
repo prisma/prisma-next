@@ -13,6 +13,7 @@ import type { ExecuteRequestLowerer } from '@prisma-next/family-sql/control-adap
 import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import { applicationDomainOf } from '@prisma-next/test-utils';
+import { isStructuredError } from '@prisma-next/utils/structured-error';
 import { describe, expect, it } from 'vitest';
 import { buildPostgresPlanDiff } from '../../src/core/migrations/diff-database-schema';
 import { coalesceSubtreeIssues, planIssues } from '../../src/core/migrations/issue-planner';
@@ -25,7 +26,6 @@ import { PostgresDatabaseSchemaNode } from '../../src/core/schema-ir/postgres-da
 import { PostgresNamespaceSchemaNode } from '../../src/core/schema-ir/postgres-namespace-schema-node';
 import { PostgresNativeEnumSchemaNode } from '../../src/core/schema-ir/postgres-native-enum-schema-node';
 import { PostgresTableSchemaNode } from '../../src/core/schema-ir/postgres-table-schema-node';
-import { SqlEscapeError } from '../../src/core/sql-utils';
 
 const EXPECTED_MEMBERS = ['draft', 'review', 'done'] as const;
 
@@ -302,8 +302,19 @@ describe('AddNativeEnumValueCall op', () => {
   it('throws when constructed with a value exceeding the 63-byte enum label limit', () => {
     const tooLong = 'x'.repeat(64);
     expect(() => new AddNativeEnumValueCall('sales', 'order_status', tooLong)).toThrow(
-      SqlEscapeError,
+      'byte label limit',
     );
+    let caught: unknown;
+    try {
+      new AddNativeEnumValueCall('sales', 'order_status', tooLong);
+    } catch (error) {
+      caught = error;
+    }
+    expect(isStructuredError(caught)).toBe(true);
+    expect(caught).toMatchObject({
+      code: 'CONTRACT.IDENTIFIER_INVALID',
+      meta: { value: tooLong, context: 'enum-label' },
+    });
   });
 
   it('throws when toOp is called without a lowerer', async () => {

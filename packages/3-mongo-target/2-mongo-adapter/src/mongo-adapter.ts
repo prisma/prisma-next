@@ -30,6 +30,7 @@ import {
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-wire';
 import { blindCast } from '@prisma-next/utils/casts';
+import { assertNever } from '@prisma-next/utils/internal-error';
 import { buildStandardCodecRegistry } from './core/codecs';
 import { structuralLowerFilter, structuralLowerPipeline } from './lowering';
 import { resolveDraftDoc } from './resolve-value';
@@ -72,7 +73,8 @@ function lowerDdlCommand(command: AnyMongoDdlCommand): AnyMongoDdlWireCommand {
     // v8 ignore next 4
     default: {
       const _exhaustive: never = command;
-      throw new Error(
+      return assertNever(
+        _exhaustive,
         `Unknown DDL command kind: ${blindCast<{ kind: string }, 'exhaustive switch fallback for error message'>(_exhaustive).kind}`,
       );
     }
@@ -206,7 +208,8 @@ class MongoAdapterImpl implements MongoAdapter {
       // v8 ignore next 4
       default: {
         const _exhaustive: never = command;
-        throw new Error(
+        return assertNever(
+          _exhaustive,
           `Unknown command kind: ${blindCast<{ kind: string }, 'exhaustive switch fallback for error message'>(_exhaustive).kind}`,
         );
       }
@@ -307,7 +310,8 @@ class MongoAdapterImpl implements MongoAdapter {
       // v8 ignore next 4
       default: {
         const _exhaustive: never = draft;
-        throw new Error(
+        return assertNever(
+          _exhaustive,
           `Unknown draft kind: ${blindCast<{ kind: string }, 'exhaustive switch fallback for error message'>(_exhaustive).kind}`,
         );
       }

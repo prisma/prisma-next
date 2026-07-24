@@ -6,6 +6,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { blindCast } from '@prisma-next/utils/casts';
 import { isThenable } from '@prisma-next/utils/promise';
+import { sqliteError } from '../errors';
 import type { SqlitePlanTargetDetails } from './planner-target-details';
 
 type Op = SqlMigrationPlanOperation<SqlitePlanTargetDetails>;
@@ -16,8 +17,10 @@ function assertSqliteOp(op: MigrationPlanOperation, callFactoryName: string): as
     'op.target is present on concrete SqlMigrationPlanOperation but absent on the framework MigrationPlanOperation base'
   >(op).target?.id;
   if (targetId !== 'sqlite') {
-    throw new Error(
+    throw sqliteError(
+      'MIGRATION.TARGET_MISMATCH',
       `renderOps: expected sqlite op but got target.id="${String(targetId)}" for op.id="${op.id}" (factoryName="${callFactoryName}"). An OpFactoryCall produced an op for a different target on the sqlite planner path; check the call's target binding.`,
+      { meta: { opId: op.id, targetId: String(targetId), factoryName: callFactoryName } },
     );
   }
 }

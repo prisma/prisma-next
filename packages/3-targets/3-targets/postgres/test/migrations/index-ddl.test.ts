@@ -70,13 +70,17 @@ describe('createIndex DDL emission', () => {
     expect(await executeSql(op)).toContain(`"needle" = 'with''quote'`);
   });
 
-  it('rejects null option values', async () => {
+  it('rejects null option values as CONTRACT.INDEX_INVALID', async () => {
     await expect(
       createIndex('public', 'doc', 'doc_body_idx', ['body'], stubLowerer(), {
         type: 'demo',
         options: { weird: null },
       }),
-    ).rejects.toThrow(/Index option/);
+    ).rejects.toMatchObject({
+      code: 'CONTRACT.INDEX_INVALID',
+      message: 'Index option "weird" must be a string, finite number, or boolean; got object',
+      meta: { key: 'weird', valueType: 'object' },
+    });
   });
 
   it('rejects non-finite numeric option values', async () => {

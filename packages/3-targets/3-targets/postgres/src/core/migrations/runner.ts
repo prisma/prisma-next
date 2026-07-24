@@ -20,8 +20,10 @@ import { SqlQueryError } from '@prisma-next/sql-errors';
 import type { SqlExecuteRequest } from '@prisma-next/sql-relational-core/ast';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { InternalError } from '@prisma-next/utils/internal-error';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok, okVoid } from '@prisma-next/utils/result';
+import { postgresError } from '../errors';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 interface ApplyPlanSuccessValue {
@@ -76,8 +78,10 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
       UNBOUND_NAMESPACE_ID;
     const driver = options.driver;
     if (options.space !== undefined && options.space !== options.plan.spaceId) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.CONTRACT_SPACE_VIOLATION',
         `SqlMigrationRunner: options.space (${options.space}) does not match plan.spaceId (${options.plan.spaceId})`,
+        { meta: { space: options.space, planSpaceId: options.plan.spaceId } },
       );
     }
     const space = options.plan.spaceId;
@@ -283,7 +287,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     const bootstrapQueries = this.family.bootstrapControlTableQueries();
     const [schemaQuery, ...tableQueries] = bootstrapQueries;
     if (schemaQuery === undefined) {
-      throw new Error('Postgres control-table bootstrap must include CREATE SCHEMA');
+      throw new InternalError('Postgres control-table bootstrap must include CREATE SCHEMA');
     }
     await this.executeStatement(driver, await this.family.lowerAst(schemaQuery, lowererContext));
     const legacyDetection = await this.detectLegacyMarkerShape(driver);
@@ -640,7 +644,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     const edges = options.migrationEdges;
     const totalEdgeOps = edges.reduce((sum, edge) => sum + edge.operationCount, 0);
     if (totalEdgeOps !== planOpsLength) {
-      throw new Error(
+      throw new InternalError(
         `Ledger write: plan.operations length (${planOpsLength}) does not match sum of migrationEdges operationCount (${totalEdgeOps})`,
       );
     }

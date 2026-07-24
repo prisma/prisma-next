@@ -1,4 +1,28 @@
 import { CliStructuredError } from '@prisma-next/errors/control';
+import type { StructuredError, StructuredErrorOptions } from '@prisma-next/utils/structured-error';
+import { structuredError } from '@prisma-next/utils/structured-error';
+
+export type SqliteTargetErrorCode =
+  | 'CONTRACT.CONSTRAINT_INVALID'
+  | 'CONTRACT.DEFAULT_INVALID'
+  | 'CONTRACT.IDENTIFIER_INVALID'
+  | 'CONTRACT.NAMESPACE_INVALID'
+  | 'CONTRACT.NATIVE_TYPE_INVALID'
+  | 'CONTRACT.TARGET_MISMATCH'
+  | 'CONTRACT.TYPE_UNKNOWN'
+  | 'MIGRATION.CONTRACT_SPACE_VIOLATION'
+  | 'MIGRATION.SQLITE_CONTROL_STACK_MISSING'
+  | 'MIGRATION.TARGET_MISMATCH'
+  | 'RUNTIME.DECODE_FAILED'
+  | 'RUNTIME.ENCODE_FAILED';
+
+export function sqliteError(
+  code: SqliteTargetErrorCode,
+  message: string,
+  options?: StructuredErrorOptions,
+): StructuredError {
+  return structuredError(code, message, options);
+}
 
 /**
  * A `SqliteMigration` operation that needs the materialized control adapter

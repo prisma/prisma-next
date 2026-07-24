@@ -236,6 +236,20 @@ changes:
         - '@db\.Date'
         - '\sDate(\s|\?|\[|$)'
       anyMatch: true
+  - id: sql-escape-error-class-removed
+    summary: |
+      The `SqlEscapeError` class is deleted from `@prisma-next/target-postgres` and
+      `@prisma-next/target-sqlite` (including its re-export from the postgres/sqlite
+      adapter `control` entrypoints). Identifier/literal escaping failures now throw a
+      structured envelope with code `CONTRACT.IDENTIFIER_INVALID`. Replace
+      `error instanceof SqlEscapeError` with
+      `isStructuredError(error) && error.code === 'CONTRACT.IDENTIFIER_INVALID'`
+      (`isStructuredError` from `@prisma-next/utils/structured-error`). Message text is
+      unchanged.
+    detection:
+      glob: "**/*.{ts,mts,cts}"
+      contains:
+        - "SqlEscapeError"
 
 ---
 

@@ -38,6 +38,7 @@ import { FunctionColumnDefault, LiteralColumnDefault } from '@prisma-next/sql-re
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { assertNever } from '@prisma-next/utils/internal-error';
 import {
   columnExistsAst,
   nativeEnumTypeExistsAst,
@@ -45,6 +46,7 @@ import {
   tableExistsAst,
 } from '../../contract-free/checks';
 import * as contractFreeDdl from '../../contract-free/ddl';
+import { postgresError } from '../errors';
 import type { PostgresRlsPolicy, PostgresRlsPolicyInput } from '../postgres-rls-policy';
 import {
   escapeLiteral,
@@ -138,7 +140,8 @@ export function postgresDefaultToDdlColumnDefault(
       );
     default: {
       const exhaustive: never = columnDefault;
-      throw new Error(
+      return assertNever(
+        exhaustive,
         `postgresDefaultToDdlColumnDefault: unhandled kind "${blindCast<{ kind: string }, 'exhaustiveness: surface the unhandled default kind'>(exhaustive).kind}"`,
       );
     }
@@ -241,8 +244,10 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `CreateTableCall.toOp: a DDL lowerer is required on the Postgres planner path (table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'CreateTableCall' } },
       );
     }
     const ddlNode = contractFreeDdl.createTable({
@@ -324,8 +329,10 @@ export class DropTableCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `DropTableCall.toOp: a lowerer is required on the Postgres planner path (table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'DropTableCall' } },
       );
     }
     return dropTable(this.schemaName, this.tableName, lowerer);
@@ -368,8 +375,10 @@ export class AddColumnCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `AddColumnCall.toOp: a DDL lowerer is required on the Postgres planner path (column "${this.column.name}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'AddColumnCall' } },
       );
     }
     const ddlNode = contractFreeDdl.alterTable({
@@ -435,8 +444,10 @@ export class DropColumnCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `DropColumnCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'DropColumnCall' } },
       );
     }
     return dropColumn(this.schemaName, this.tableName, this.columnName, lowerer);
@@ -490,8 +501,10 @@ export class AlterColumnTypeCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `AlterColumnTypeCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'AlterColumnTypeCall' } },
       );
     }
     return alterColumnType(this.schemaName, this.tableName, this.columnName, this.options, lowerer);
@@ -532,8 +545,10 @@ export class SetNotNullCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `SetNotNullCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'SetNotNullCall' } },
       );
     }
     return setNotNull(this.schemaName, this.tableName, this.columnName, lowerer);
@@ -573,8 +588,10 @@ export class DropNotNullCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `DropNotNullCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'DropNotNullCall' } },
       );
     }
     return dropNotNull(this.schemaName, this.tableName, this.columnName, lowerer);
@@ -623,8 +640,10 @@ export class SetDefaultCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `SetDefaultCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'SetDefaultCall' } },
       );
     }
     return setDefault(
@@ -675,8 +694,10 @@ export class DropDefaultCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `DropDefaultCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'DropDefaultCall' } },
       );
     }
     return dropDefault(this.schemaName, this.tableName, this.columnName, lowerer);
@@ -730,8 +751,10 @@ export class AddNotNullColumnDirectCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `AddNotNullColumnDirectCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'AddNotNullColumnDirectCall' } },
       );
     }
     return addNotNullColumnDirect(this.schemaName, this.tableName, this.column, lowerer);
@@ -787,8 +810,10 @@ export class AddNotNullColumnWithTempDefaultCall extends PostgresOpFactoryCallNo
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `AddNotNullColumnWithTempDefaultCall.toOp: a lowerer is required on the Postgres planner path (column "${this.columnName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'AddNotNullColumnWithTempDefaultCall' } },
       );
     }
     return buildAddNotNullColumnWithTemporaryDefaultOperation({
@@ -852,8 +877,10 @@ export class AddPrimaryKeyCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `AddPrimaryKeyCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.constraintName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'AddPrimaryKeyCall' } },
       );
     }
     return addPrimaryKey(
@@ -900,8 +927,10 @@ export class AddUniqueCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `AddUniqueCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.constraintName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'AddUniqueCall' } },
       );
     }
     return addUnique(this.schemaName, this.tableName, this.constraintName, this.columns, lowerer);
@@ -935,8 +964,10 @@ export class AddForeignKeyCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `AddForeignKeyCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.fk.name}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'AddForeignKeyCall' } },
       );
     }
     return addForeignKey(this.schemaName, this.tableName, this.fk, lowerer);
@@ -983,8 +1014,10 @@ export class DropConstraintCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `DropConstraintCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.constraintName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'DropConstraintCall' } },
       );
     }
     return dropConstraint(this.schemaName, this.tableName, this.constraintName, lowerer, this.kind);
@@ -1032,8 +1065,10 @@ export class AddCheckConstraintCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `AddCheckConstraintCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.constraintName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'AddCheckConstraintCall' } },
       );
     }
     return addCheckConstraint(
@@ -1074,8 +1109,10 @@ export class DropCheckConstraintCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `DropCheckConstraintCall.toOp: a lowerer is required on the Postgres planner path (constraint "${this.constraintName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'DropCheckConstraintCall' } },
       );
     }
     return dropCheckConstraint(this.schemaName, this.tableName, this.constraintName, lowerer);
@@ -1127,8 +1164,10 @@ export class CreateIndexCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `CreateIndexCall.toOp: a lowerer is required on the Postgres planner path (index "${this.indexName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'CreateIndexCall' } },
       );
     }
     const extras: { type?: string; options?: Record<string, unknown> } = {};
@@ -1185,8 +1224,10 @@ export class DropIndexCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `DropIndexCall.toOp: a lowerer is required on the Postgres planner path (index "${this.indexName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'DropIndexCall' } },
       );
     }
     return dropIndex(this.schemaName, this.tableName, this.indexName, lowerer);
@@ -1288,8 +1329,10 @@ export class CreateSchemaCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `CreateSchemaCall.toOp: a DDL lowerer is required on the Postgres planner path (schema "${this.schemaName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'CreateSchemaCall' } },
       );
     }
     const ddlNode = contractFreeDdl.createSchema({ schema: this.schemaName, ifNotExists: true });
@@ -1344,8 +1387,10 @@ export class CreateNativeEnumTypeCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `CreateNativeEnumTypeCall.toOp: a DDL lowerer is required on the Postgres planner path (type "${this.typeName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'CreateNativeEnumTypeCall' } },
       );
     }
     return createNativeEnumType(this.schemaName, this.typeName, this.members, lowerer);
@@ -1382,8 +1427,10 @@ export class DropNativeEnumTypeCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `DropNativeEnumTypeCall.toOp: a DDL lowerer is required on the Postgres planner path (type "${this.typeName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'DropNativeEnumTypeCall' } },
       );
     }
     return dropNativeEnumType(this.schemaName, this.typeName, lowerer);
@@ -1444,8 +1491,10 @@ export class AddNativeEnumValueCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `AddNativeEnumValueCall.toOp: a lowerer is required on the Postgres planner path (type "${this.typeName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'AddNativeEnumValueCall' } },
       );
     }
     const { schemaName, typeName, value } = this;
@@ -1571,8 +1620,10 @@ export class CreatePostgresRlsPolicyCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `CreatePostgresRlsPolicyCall.toOp: a lowerer is required on the Postgres planner path (policy "${this.policy.name}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'CreatePostgresRlsPolicyCall' } },
       );
     }
     return createRlsPolicy(this.schemaName, this.tableName, this.policy, lowerer);
@@ -1618,8 +1669,10 @@ export class DropPostgresRlsPolicyCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `DropPostgresRlsPolicyCall.toOp: a lowerer is required on the Postgres planner path (policy "${this.policyName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'DropPostgresRlsPolicyCall' } },
       );
     }
     return dropRlsPolicy(this.schemaName, this.tableName, this.policyName, lowerer);
@@ -1651,8 +1704,10 @@ export class EnableRowLevelSecurityCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `EnableRowLevelSecurityCall.toOp: a lowerer is required on the Postgres planner path (table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'EnableRowLevelSecurityCall' } },
       );
     }
     return enableRowLevelSecurity(this.schemaName, this.tableName, lowerer);
@@ -1684,8 +1739,10 @@ export class DisableRowLevelSecurityCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `DisableRowLevelSecurityCall.toOp: a lowerer is required on the Postgres planner path (table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'DisableRowLevelSecurityCall' } },
       );
     }
     return disableRowLevelSecurity(this.schemaName, this.tableName, lowerer);
@@ -1725,8 +1782,10 @@ export class RenamePostgresRlsPolicyCall extends PostgresOpFactoryCallNode {
 
   async toOp(lowerer?: ExecuteRequestLowerer): Promise<Op> {
     if (lowerer === undefined) {
-      throw new Error(
+      throw postgresError(
+        'MIGRATION.POSTGRES_CONTROL_STACK_MISSING',
         `RenamePostgresRlsPolicyCall.toOp: a lowerer is required on the Postgres planner path (policy "${this.oldPolicyName}" on table "${this.tableName}"). Pass the control adapter to createPostgresMigrationPlanner.`,
+        { meta: { factory: 'RenamePostgresRlsPolicyCall' } },
       );
     }
     return renameRlsPolicy(

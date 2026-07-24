@@ -10,16 +10,7 @@
  * home that both adapters can depend on without crossing planes.
  */
 
-export class SqlEscapeError extends Error {
-  constructor(
-    message: string,
-    public readonly value: string,
-    public readonly kind: 'identifier' | 'literal',
-  ) {
-    super(message);
-    this.name = 'SqlEscapeError';
-  }
-}
+import { postgresError } from './errors';
 
 const MAX_IDENTIFIER_LENGTH = 63;
 
@@ -31,18 +22,18 @@ const MAX_IDENTIFIER_LENGTH = 63;
  * - Rejects empty identifiers
  * - Warns on identifiers exceeding PostgreSQL's 63-character limit
  *
- * @throws {SqlEscapeError} If the identifier contains null bytes or is empty
+ * @throws `CONTRACT.IDENTIFIER_INVALID` structured error If the identifier contains null bytes or is empty
  */
 export function quoteIdentifier(identifier: string): string {
   if (identifier.length === 0) {
-    throw new SqlEscapeError('Identifier cannot be empty', identifier, 'identifier');
+    throw postgresError('CONTRACT.IDENTIFIER_INVALID', 'Identifier cannot be empty', {
+      meta: { value: identifier, context: 'identifier' },
+    });
   }
   if (identifier.includes('\0')) {
-    throw new SqlEscapeError(
-      'Identifier cannot contain null bytes',
-      identifier.replace(/\0/g, '\\0'),
-      'identifier',
-    );
+    throw postgresError('CONTRACT.IDENTIFIER_INVALID', 'Identifier cannot contain null bytes', {
+      meta: { value: identifier.replace(/\0/g, '\\0'), context: 'identifier' },
+    });
   }
   if (identifier.length > MAX_IDENTIFIER_LENGTH) {
     console.warn(
@@ -61,15 +52,13 @@ export function quoteIdentifier(identifier: string): string {
  * Note: This assumes PostgreSQL's `standard_conforming_strings` is ON (default since PG 9.1).
  * Backslashes are treated as literal characters, not escape sequences.
  *
- * @throws {SqlEscapeError} If the value contains null bytes
+ * @throws `CONTRACT.IDENTIFIER_INVALID` structured error If the value contains null bytes
  */
 export function escapeLiteral(value: string): string {
   if (value.includes('\0')) {
-    throw new SqlEscapeError(
-      'Literal value cannot contain null bytes',
-      value.replace(/\0/g, '\\0'),
-      'literal',
-    );
+    throw postgresError('CONTRACT.IDENTIFIER_INVALID', 'Literal value cannot contain null bytes', {
+      meta: { value: value.replace(/\0/g, '\\0'), context: 'literal' },
+    });
   }
   return value.replace(/'/g, "''");
 }
@@ -103,15 +92,15 @@ export function quoteQualifiedName(name: string): string {
  *
  * @param value - The enum value to validate
  * @param enumTypeName - Name of the enum type (for error messages)
- * @throws {SqlEscapeError} If the value exceeds the maximum length
+ * @throws `CONTRACT.IDENTIFIER_INVALID` structured error If the value exceeds the maximum length
  */
 export function validateEnumValueLength(value: string, enumTypeName: string): void {
   if (new TextEncoder().encode(value).length > MAX_IDENTIFIER_LENGTH) {
-    throw new SqlEscapeError(
+    throw postgresError(
+      'CONTRACT.IDENTIFIER_INVALID',
       `Enum value "${value.slice(0, 20)}..." for type "${enumTypeName}" exceeds PostgreSQL's ` +
         `${MAX_IDENTIFIER_LENGTH}-byte label limit`,
-      value,
-      'literal',
+      { meta: { value, context: 'enum-label' } },
     );
   }
 }

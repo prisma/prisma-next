@@ -11,6 +11,7 @@ import {
   type StorageTable,
 } from '@prisma-next/sql-contract/types';
 import { blindCast } from '@prisma-next/utils/casts';
+import { sqliteError } from './errors';
 
 export type SqliteDatabaseInput = {
   readonly id: string;
@@ -97,8 +98,10 @@ export function buildSqliteNamespace(
   input: SqlNamespaceInput,
 ): SqliteDatabase | SqliteUnboundDatabase {
   if (input.id !== UNBOUND_NAMESPACE_ID) {
-    throw new Error(
+    throw sqliteError(
+      'CONTRACT.NAMESPACE_INVALID',
       `buildSqliteNamespace: SQLite has no schema concept; the only valid namespace id is "${UNBOUND_NAMESPACE_ID}" (received "${input.id}").`,
+      { meta: { received: input.id } },
     );
   }
   const tableKind = input.entries['table'];

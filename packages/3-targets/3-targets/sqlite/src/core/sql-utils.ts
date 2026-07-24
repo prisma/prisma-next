@@ -10,38 +10,27 @@
  * back into `adapter-sqlite` for these primitives.
  */
 
-export class SqlEscapeError extends Error {
-  constructor(
-    message: string,
-    public readonly value: string,
-    public readonly kind: 'identifier' | 'literal',
-  ) {
-    super(message);
-    this.name = 'SqlEscapeError';
-  }
-}
+import { sqliteError } from './errors';
 
 export function quoteIdentifier(identifier: string): string {
   if (identifier.length === 0) {
-    throw new SqlEscapeError('Identifier cannot be empty', identifier, 'identifier');
+    throw sqliteError('CONTRACT.IDENTIFIER_INVALID', 'Identifier cannot be empty', {
+      meta: { value: identifier, context: 'identifier' },
+    });
   }
   if (identifier.includes('\0')) {
-    throw new SqlEscapeError(
-      'Identifier cannot contain null bytes',
-      identifier.replace(/\0/g, '\\0'),
-      'identifier',
-    );
+    throw sqliteError('CONTRACT.IDENTIFIER_INVALID', 'Identifier cannot contain null bytes', {
+      meta: { value: identifier.replace(/\0/g, '\\0'), context: 'identifier' },
+    });
   }
   return `"${identifier.replace(/"/g, '""')}"`;
 }
 
 export function escapeLiteral(value: string): string {
   if (value.includes('\0')) {
-    throw new SqlEscapeError(
-      'Literal value cannot contain null bytes',
-      value.replace(/\0/g, '\\0'),
-      'literal',
-    );
+    throw sqliteError('CONTRACT.IDENTIFIER_INVALID', 'Literal value cannot contain null bytes', {
+      meta: { value: value.replace(/\0/g, '\\0'), context: 'literal' },
+    });
   }
   return value.replace(/'/g, "''");
 }

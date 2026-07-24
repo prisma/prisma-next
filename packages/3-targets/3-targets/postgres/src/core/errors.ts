@@ -1,4 +1,34 @@
 import { CliStructuredError } from '@prisma-next/errors/control';
+import type { StructuredError, StructuredErrorOptions } from '@prisma-next/utils/structured-error';
+import { structuredError } from '@prisma-next/utils/structured-error';
+
+export type PostgresTargetErrorCode =
+  | 'CONTRACT.CODEC_DESCRIPTOR_MISSING'
+  | 'CONTRACT.DEFAULT_INVALID'
+  | 'CONTRACT.ENTITY_KIND_INVALID'
+  | 'CONTRACT.IDENTIFIER_INVALID'
+  | 'CONTRACT.INDEX_INVALID'
+  | 'CONTRACT.INFER_UNSUPPORTED'
+  | 'CONTRACT.MODEL_UNKNOWN'
+  | 'CONTRACT.NAME_DUPLICATE'
+  | 'CONTRACT.NATIVE_TYPE_INVALID'
+  | 'CONTRACT.PACK_CONTRIBUTION_INVALID'
+  | 'CONTRACT.POLICY_INVALID'
+  | 'CONTRACT.ROLE_INVALID'
+  | 'MIGRATION.CONTRACT_SPACE_VIOLATION'
+  | 'MIGRATION.POSTGRES_CONTROL_STACK_MISSING'
+  | 'MIGRATION.TARGET_MISMATCH'
+  | 'RUNTIME.DECODE_FAILED'
+  | 'RUNTIME.ENCODE_FAILED'
+  | 'RUNTIME.TYPE_PARAMS_INVALID';
+
+export function postgresError(
+  code: PostgresTargetErrorCode,
+  message: string,
+  options?: StructuredErrorOptions,
+): StructuredError {
+  return structuredError(code, message, options);
+}
 
 /**
  * A `PostgresMigration` operation that needs the materialized control adapter

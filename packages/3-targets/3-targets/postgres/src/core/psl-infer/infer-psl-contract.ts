@@ -46,6 +46,8 @@ import type { SqlColumnIR, SqlForeignKeyIR } from '@prisma-next/sql-schema-ir/ty
 import { SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { InternalError } from '@prisma-next/utils/internal-error';
+import { postgresError } from '../errors';
 import type { PostgresDatabaseSchemaNode } from '../schema-ir/postgres-database-schema-node';
 import { createPostgresDefaultMapping } from './postgres-default-mapping';
 import { createPostgresTypeMap } from './postgres-type-map';
@@ -224,11 +226,13 @@ function resolveForeignKeys(
         if (owner !== undefined) {
           const target = resolveCrossSpaceTarget(owner, fk.referencedSchema, fk.referencedTable);
           if (target === undefined) {
-            throw new Error(
+            throw postgresError(
+              'CONTRACT.PACK_CONTRIBUTION_INVALID',
               `contract infer: described contract space "${owner.spaceId}" owns storage ` +
                 `coordinate "${fk.referencedSchema}.${fk.referencedTable}" but declares no ` +
                 'domain model mapped to it. A pack that describes a table must also declare the ' +
                 'domain model it maps to; this pack is malformed.',
+              { meta: { spaceId: owner.spaceId, tableName: fk.referencedTable } },
             );
           }
 
@@ -384,22 +388,26 @@ export function inferPostgresPslContract(
         continue;
       }
       if (tables[tableName] !== undefined) {
-        throw new Error(
+        throw postgresError(
+          'CONTRACT.INFER_UNSUPPORTED',
           `contract infer: duplicate table name "${tableName}" across schemas is not yet supported ` +
             '(single-namespace PSL inference emits one flat bucket; multi-namespace `namespace { … }` ' +
             'output is a later slice).',
+          { meta: { tableName } },
         );
       }
       if (ownedEnumTypes !== undefined) {
         for (const column of Object.values(table.columns)) {
           const owningSpaceId = ownedEnumTypes.get(column.nativeType);
           if (owningSpaceId !== undefined) {
-            throw new Error(
+            throw postgresError(
+              'CONTRACT.INFER_UNSUPPORTED',
               `contract infer: column "${tableName}"."${column.name}" is typed by native enum ` +
                 `type "${column.nativeType}", which extension pack space "${owningSpaceId}" ` +
                 'already describes. A cross-space enum-typed column has no authorable PSL form ' +
                 "yet; describe the table in that pack's contract or retype the column before " +
                 're-running contract infer.',
+              { meta: { tableName, columnName: column.name } },
             );
           }
         }
@@ -418,12 +426,14 @@ export function inferPostgresPslContract(
   if (enumDefinitions.size > 0) {
     const contentNamespaces = new Set([...enumNamespaceNames, ...tableNamespaceNames]);
     if (contentNamespaces.size > 1) {
-      throw new Error(
+      throw postgresError(
+        'CONTRACT.INFER_UNSUPPORTED',
         'contract infer: native enum adoption with content across multiple schemas is not yet ' +
           'supported (single-namespace PSL inference emits one `namespace { … }` block; ' +
           `multi-namespace output is a later slice). Schemas: ${[...contentNamespaces]
             .sort()
             .join(', ')}.`,
+        { meta: { schemas: [...contentNamespaces].sort() } },
       );
     }
     wrapNamespaceName = [...contentNamespaces][0];
@@ -1222,7 +1232,11 @@ function buildTopLevelNameMap(
           .map((source) => `"${source}"`)
           .join(', ')}`,
     );
-    throw new Error(`PSL ${kind} name collisions detected:\n${details.join('\n')}`);
+    throw postgresError(
+      'CONTRACT.NAME_DUPLICATE',
+      `PSL ${kind} name collisions detected:\n${details.join('\n')}`,
+      { meta: { kind, names: duplicates.map(([normalizedName]) => normalizedName) } },
+    );
   }
 
   return results;
@@ -1331,7 +1345,9 @@ function resolveNamedTypeName(
     return existing.name;
   }
 
-  throw new Error(`Named type registry was not seeded for native type "${resolution.nativeType}"`);
+  throw new InternalError(
+    `Named type registry was not seeded for native type "${resolution.nativeType}"`,
+  );
 }
 
 function createNamedTypeSignatureKey(resolution: {

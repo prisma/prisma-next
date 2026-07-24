@@ -1,4 +1,5 @@
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import { isStructuredError } from '@prisma-next/utils/structured-error';
 import { describe, expect, it } from 'vitest';
 import { extractDb } from '../src/core/runner-deps';
 
@@ -20,5 +21,19 @@ describe('extractDb', () => {
   it('throws when the value is not a Mongo control driver', () => {
     const driver = {} as unknown as ControlDriverInstance<'mongo', 'mongo'>;
     expect(() => extractDb(driver)).toThrowError(/Expected a Mongo control driver/);
+  });
+
+  it('throws CONFIG.VALIDATION_FAILED when the value is not a Mongo control driver', () => {
+    const driver = { familyId: 'mongo' } as unknown as ControlDriverInstance<'mongo', 'mongo'>;
+    let caught: unknown;
+    try {
+      extractDb(driver);
+    } catch (err) {
+      caught = err;
+    }
+    expect(isStructuredError(caught)).toBe(true);
+    if (!isStructuredError(caught)) return;
+    expect(caught.code).toBe('CONFIG.VALIDATION_FAILED');
+    expect(caught.meta).toEqual({ received: 'object with keys [familyId]' });
   });
 });

@@ -1,6 +1,7 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import { parseMarkerRowSafely } from '@prisma-next/errors/execution';
 import { type } from 'arktype';
+import { mongoAdapterError } from './errors';
 
 export const COLLECTION = '_prisma_migrations';
 export const MONGO_MARKER_COLLECTION = `_prisma_migrations marker documents in ${COLLECTION}`;
@@ -22,7 +23,11 @@ const MongoMarkerDocSchema = type({
 export function parseMongoMarkerDoc(doc: unknown): ContractMarkerRecord {
   const result = MongoMarkerDocSchema(doc);
   if (result instanceof type.errors) {
-    throw new Error(`Invalid marker doc on ${COLLECTION}: ${result.summary}`);
+    throw mongoAdapterError(
+      'CONTRACT.MARKER_ROW_CORRUPT',
+      `Invalid marker doc on ${COLLECTION}: ${result.summary}`,
+      { meta: { collection: COLLECTION, detail: result.summary } },
+    );
   }
   return {
     storageHash: result.storageHash,

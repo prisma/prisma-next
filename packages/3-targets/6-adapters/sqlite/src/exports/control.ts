@@ -23,17 +23,13 @@ const sqliteAdapterDescriptor: SqlControlAdapterDescriptor<'sqlite'> = {
 export default sqliteAdapterDescriptor;
 
 // `parseSqliteDefault`, `normalizeSqliteNativeType`, `quoteIdentifier`,
-// `escapeLiteral`, and `SqlEscapeError` live target-side (one-way
-// `adapter → target` edge, matching Postgres). Re-exported from the
-// adapter so consumers — both internal and downstream — see the same
-// adapter-shaped surface across SQL targets.
+// and `escapeLiteral` live target-side (one-way `adapter → target` edge,
+// matching Postgres). Re-exported from the adapter so consumers — both
+// internal and downstream — see the same adapter-shaped surface across
+// SQL targets.
 export { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
 export { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
-export {
-  escapeLiteral,
-  quoteIdentifier,
-  SqlEscapeError,
-} from '@prisma-next/target-sqlite/sql-utils';
+export { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
 export { createSqliteBuiltinCodecLookup } from '../core/codec-lookup';
 // `SqlControlAdapterDescriptor` is declared in two places in the codebase
 // (`family-sql/control-adapter` and `family-sql/migrations/types`); the
