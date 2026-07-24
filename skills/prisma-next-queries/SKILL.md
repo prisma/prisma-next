@@ -2,7 +2,8 @@
 name: prisma-next-queries
 description: >-
   Write Prisma Next queries for Postgres, SQLite, or Mongo — pick a lane
-  (Postgres/SQLite `db.orm.<Model>` + `db.sql.<table>`; Mongo `db.orm.<root>`
+  (Postgres `db.orm.<ns>.<Model>` + `db.sql.<ns>.<table>`; SQLite flat
+  `db.orm.<Model>` + `db.sql.<table>`; Mongo `db.orm.<root>`
   + `db.query.from(...)` pipeline builder), filter / project / sort / paginate,
   eager-load with `.include(...)`, Postgres/SQLite `db.transaction(...)`,
   Postgres/SQLite ORM `.aggregate(...)`, Mongo aggregations via query builder,
@@ -45,22 +46,22 @@ Prisma Next ships **two query lanes per target** on the same `db` value from `sr
 
 | Runtime import in `db.ts` | Load |
 |---|---|
-| `@prisma-next/postgres/runtime` | [`postgres.md`](./postgres.md) — `db.orm.<Model>` + `db.sql.<table>` |
+| `@prisma-next/postgres/runtime` | [`postgres.md`](./postgres.md) — `db.orm.<ns>.<Model>` + `db.sql.<ns>.<table>` |
 | `@prisma-next/mongo/runtime` | [`mongo.md`](./mongo.md) — `db.orm.<root>` + `db.query.from(...)` |
-| `@prisma-next/extension-supabase/runtime` | [`postgres.md`](./postgres.md) — a Supabase `RoleBoundDb` is a Postgres surface (`db.orm.<Model>` + `db.sql.<table>`); bind a role first via `prisma-next-supabase` |
+| `@prisma-next/extension-supabase/runtime` | [`postgres.md`](./postgres.md) — a Supabase `RoleBoundDb` is a Postgres surface (`db.orm.<ns>.<Model>` + `db.sql.<ns>.<table>`); bind a role first via `prisma-next-supabase` |
 
 Both targets share the contract and connection on one `db` value. Reach for the ORM first; drop to the lower-level lane when the ORM can't express the shape. Lane choice is local — one query function picks one lane, not the whole app.
 
-**Do not mix target examples.** Postgres uses PascalCase model roots (`db.orm.User`) and `db.sql.user`; Mongo uses lowercased plural roots (`db.orm.users`) and `db.query.from('users')`. There is no `db.sql` on Mongo and no `db.query` SQL-builder equivalent on Postgres.
+**Do not mix target examples.** Postgres uses namespace-qualified PascalCase model roots (`db.orm.public.User`) and `db.sql.public.user`; Mongo uses lowercased plural roots (`db.orm.users`) and `db.query.from('users')`. There is no `db.sql` on Mongo and no `db.query` SQL-builder equivalent on Postgres.
 
 ## Namespace-aware accessors
 
-When a contract declares more than one namespace (e.g. `public` and `auth`), models and tables are addressed by namespace coordinate:
+On Postgres, models and tables are **always** addressed by namespace coordinate:
 
 - **ORM**: `db.orm.<namespace>.<Model>` — e.g. `db.orm.public.User`, `db.orm.auth.User`
 - **SQL builder**: `db.sql.<namespace>.<table>` — e.g. `db.sql.public.users`, `db.sql.auth.users`
 
-The flat `db.orm.User` / `db.sql.users` form still works for single-namespace contracts (or when all table names are unique across namespaces). When the same bare name appears in more than one namespace, you must use the namespace coordinate.
+The flat `db.orm.User` / `db.sql.users` form does **not** work on Postgres, even for single-namespace contracts: `db.orm.User` is `undefined` at runtime. Models declared at the top level of the PSL live in the default `public` namespace; models declared inside a `namespace <name> { ... }` block use that namespace. Single-namespace targets (SQLite, Mongo) keep flat access.
 
 See [`postgres.md` § Namespace-aware accessors](./postgres.md#namespace-aware-accessors) for a worked example.
 
@@ -69,7 +70,7 @@ See [`postgres.md` § Namespace-aware accessors](./postgres.md#namespace-aware-a
 Critical to get right early — on **both Postgres and Mongo**, `.all()` returns an **`AsyncIterableResult<Row>`**, which is *both* a `PromiseLike<Row[]>` and an `AsyncIterable<Row>`. That means three consumption forms all work, and the canonical one is the shortest:
 
 ```typescript
-const users = await db.orm.User.select('id', 'email').all();
+const users = await db.orm.public.User.select('id', 'email').all();
 //    ^? Row[]   ← the Thenable resolves to a real array. This is the default idiom.
 ```
 
@@ -84,12 +85,12 @@ You do **not** need a `collect()` / `toArray()` helper — `await` is enough. In
 // `Promise.race` combinators all accept the thenable directly — those are
 // NOT reasons to call `.toArray()`. Whenever you are just going to await it
 // here, use `await ...all()` and skip `.toArray()`.
-const rows: Promise<User[]> = db.orm.User.select('id', 'email').all().toArray();
+const rows: Promise<User[]> = db.orm.public.User.select('id', 'email').all().toArray();
 
 // Streaming — process rows one at a time without buffering the whole result.
 // Use for genuinely large result sets (anything that wouldn't fit comfortably
 // in memory) or pipelines where you can start work before all rows arrive.
-for await (const user of db.orm.User.select('id', 'email').all()) {
+for await (const user of db.orm.public.User.select('id', 'email').all()) {
   process(user);
 }
 ```
@@ -97,9 +98,9 @@ for await (const user of db.orm.User.select('id', 'email').all()) {
 Two single-row shortcuts also exist on the result, in addition to the collection-level `.first()` (which issues `LIMIT 1` on Postgres):
 
 ```typescript
-const user = await db.orm.User.where({ id }).all().first();
+const user = await db.orm.public.User.where({ id }).all().first();
 //    ^? Row | null   ← buffers, returns the first row or null. Issues no LIMIT.
-const required = await db.orm.User.where({ id }).all().firstOrThrow();
+const required = await db.orm.public.User.where({ id }).all().firstOrThrow();
 //    ^? Row          ← buffers; throws `RUNTIME.NO_ROWS` if empty.
 ```
 
@@ -109,12 +110,12 @@ For genuine single-row reads, prefer the *collection*-level `.first()` (which ad
 
 ```typescript
 // Bad — second await throws RUNTIME.ITERATOR_CONSUMED.
-const result = db.orm.User.select('id', 'email').all();
+const result = db.orm.public.User.select('id', 'email').all();
 const a = await result;
 const b = await result;
 
 // Good — buffer once, reuse the array.
-const users = await db.orm.User.select('id', 'email').all();
+const users = await db.orm.public.User.select('id', 'email').all();
 const a = users;
 const b = users;
 ```
@@ -129,9 +130,14 @@ When the user is running a one-off `tsx my-script.ts` (not a long-lived server),
 // src/scripts/seed.ts
 import { db } from '../prisma/db';
 
-// Postgres — PascalCase model root from contract
+const users = [
+  { email: 'alice@example.com', displayName: 'Alice' },
+  { email: 'bob@example.com', displayName: 'Bob' },
+];
+
+// Postgres — namespace-qualified PascalCase model root from contract
 for (const u of users) {
-  await db.orm.User.create(u);
+  await db.orm.public.User.create(u);
 }
 
 // Mongo — lowercased plural root from contract (e.g. users, not User)
@@ -153,10 +159,10 @@ Target-specific pitfalls live in the per-target guides.
 
 ## What Prisma Next doesn't do yet
 
-- **N:M `.include()` across a junction table.** The contract IR supports many-to-many relations with a `through` junction table, and `N:M` relations appear as valid relation names on the ORM collection. However, `.include()` on an N:M relation does not emit the two-step junction join — the query plan builder only handles the direct join columns (`localColumn` / `targetColumn`) and ignores the `through` metadata. Attempting it either produces wrong results or an error. Workaround: express the N:M traversal through `db.sql.<table>` with an explicit join on the junction table.
+- **N:M `.include()` across a junction table.** The contract IR supports many-to-many relations with a `through` junction table, and `N:M` relations appear as valid relation names on the ORM collection. However, `.include()` on an N:M relation does not emit the two-step junction join — the query plan builder only handles the direct join columns (`localColumn` / `targetColumn`) and ignores the `through` metadata. Attempting it either produces wrong results or an error. Workaround: express the N:M traversal through `db.sql.<ns>.<table>` with an explicit join on the junction table.
 - **N:M nested mutations.** `mutation-executor.ts` explicitly throws `'N:M nested mutations are not supported yet'` for nested creates/links through an N:M relation.
 - **`and` / `or` / `not` combinators in the postgres façade.** The combinators currently import from `@prisma-next/sql-orm-client` (an internal package). Workaround today: import them from `@prisma-next/sql-orm-client` directly, the way the example apps do. If you want them on `@prisma-next/postgres/runtime`, file a feature request via `prisma-next-feedback`.
-- **`.orderBy(...)` / `.take(...)` on grouped aggregates (Postgres).** `db.orm.<Model>.groupBy(...).aggregate(...)` materializes a `Promise<Array<Group & Aggregates>>` and exposes neither ordering nor row limits at the DB layer. Result: a "top-N groups by SUM" query falls back to JS-side sort + slice over the full grouped result, which is fine at small cardinalities and bad at scale. Workarounds: (a) drop to `db.sql.<table>` and write the `GROUP BY` + `ORDER BY` + `LIMIT` against the aggregated table directly; (b) live with the JS-side sort/slice if the grouped cardinality is bounded. File a feature request via `prisma-next-feedback` if this is hitting you in production.
+- **`.orderBy(...)` / `.take(...)` on grouped aggregates (Postgres).** `db.orm.<Model>.groupBy(...).aggregate(...)` materializes a `Promise<Array<Group & Aggregates>>` and exposes neither ordering nor row limits at the DB layer. Result: a "top-N groups by SUM" query falls back to JS-side sort + slice over the full grouped result, which is fine at small cardinalities and bad at scale. Workarounds: (a) drop to `db.sql.<ns>.<table>` and write the `GROUP BY` + `ORDER BY` + `LIMIT` against the aggregated table directly; (b) live with the JS-side sort/slice if the grouped cardinality is bounded. File a feature request via `prisma-next-feedback` if this is hitting you in production.
 - **A raw-SQL lane.** Prisma Next does not currently expose a user-facing raw-SQL surface (no `db.sql.raw(...)`). Workaround: model the query through the SQL builder or — for shapes the builder can't yet express — file a feature request via `prisma-next-feedback` describing the shape so the team can decide whether to grow the builder or ship a raw lane.
 - **TypedSQL (`.sql` files compiled into typed callables).** Not implemented. Workaround: stick to the SQL builder; for repeated queries, extract a function that returns the built plan and call `db.runtime().execute(plan)` at the call site. If you want a `.sql`-file compile path, file a feature request via `prisma-next-feedback`.
 - **`EXPLAIN` / query-plan inspection.** Prisma Next does not expose an `.explain()` method. Workaround: connect a `pg.Pool` you control via the runtime's `pg:` binding (see `prisma-next-runtime`) and issue `EXPLAIN ANALYZE` through it. If you want a first-class plan-inspection surface, file a feature request via `prisma-next-feedback`.
@@ -177,7 +183,7 @@ This skill is split for selective loading. Target-specific reference paths live 
 ## Checklist
 
 - [ ] Confirmed the active target from `db.ts` and loaded the matching guide ([`postgres.md`](./postgres.md) or [`mongo.md`](./mongo.md)).
-- [ ] For multi-namespace contracts, used `db.orm.<ns>.<Model>` / `db.sql.<ns>.<table>` coordinates when the same bare name exists in more than one namespace.
+- [ ] On Postgres, used namespace-qualified `db.orm.<ns>.<Model>` / `db.sql.<ns>.<table>` coordinates everywhere (the flat form resolves to `undefined`).
 - [ ] Chose the right lane (ORM by default; lower-level builder for shapes the ORM doesn't express).
 - [ ] Used `.first()` / `.first({ pk })` (Postgres) or `.where({ ... }).first()` (Mongo) for single-row reads — not `.all()`.
 - [ ] Consumed `.all()` with plain `await` (not a `collect()` / `toArray()` helper). Used `for await` only when streaming is actually wanted, and never iterated the same result twice.
