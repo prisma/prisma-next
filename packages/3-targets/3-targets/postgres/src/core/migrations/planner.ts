@@ -26,8 +26,7 @@ import { UNBOUND_NAMESPACE_ID } from '@prisma-next/framework-components/ir';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { parseWireName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { indexOptionsLooselyEqual, SqlIndexIR } from '@prisma-next/sql-schema-ir/types';
-import { isArrayEqual } from '@prisma-next/utils/array-equal';
+import { SqlIndexIR } from '@prisma-next/sql-schema-ir/types';
 import { blindCast } from '@prisma-next/utils/casts';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { PostgresRlsPolicy } from '../postgres-rls-policy';
@@ -476,7 +475,10 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
           !consumed.has(extraFinding.issue) &&
           extraFinding.ddlSchema === missingFinding.ddlSchema &&
           extraFinding.tableName === missingFinding.tableName &&
-          indexContentEqual(missingFinding.node, extraFinding.node),
+          missingFinding.node.contentEquals(extraFinding.node, {
+            columnPresence: 'matching',
+            bodies: 'verbatim',
+          }),
       );
       if (candidate === undefined) continue;
       rename(missingFinding, candidate);
@@ -730,25 +732,4 @@ function policyNodeToContractPolicy(node: PostgresPolicySchemaNode): PostgresRls
     ...ifDefined('withCheck', node.withCheck),
     permissive: node.permissive,
   });
-}
-
-/**
- * D7 content equality for rename phase 2: `columns` ordered-strict
- * (both-defined or both-undefined — a column index never pairs an
- * expression index), `unique`/`type` strict, `options` loose (the same
- * String()-coerced relation the differ uses), `expression`/`where`
- * byte-equal with absent ≡ empty.
- */
-function indexContentEqual(a: SqlIndexIR, b: SqlIndexIR): boolean {
-  if ((a.columns === undefined) !== (b.columns === undefined)) return false;
-  if (a.columns !== undefined && b.columns !== undefined && !isArrayEqual(a.columns, b.columns)) {
-    return false;
-  }
-  return (
-    a.unique === b.unique &&
-    a.type === b.type &&
-    indexOptionsLooselyEqual(a.options, b.options) &&
-    (a.expression ?? '') === (b.expression ?? '') &&
-    (a.where ?? '') === (b.where ?? '')
-  );
 }

@@ -34,7 +34,6 @@ export {
   type SqlReferentialAction,
 } from './ir/sql-foreign-key-ir';
 export {
-  indexOptionsLooselyEqual,
   SqlIndexIR,
   type SqlIndexIRInput,
 } from './ir/sql-index-ir';

@@ -161,13 +161,30 @@ describe('computeIndexContentHash', () => {
       expect(typed).toBe(stringly);
     });
 
-    it('String()-coerces booleans the same way', () => {
-      const typed = computeIndexContentHash({ ...base, options: { deduplicate_items: false } });
-      const stringly = computeIndexContentHash({
+    it("canonicalizes boolean values to the catalog reprint form ('on'/'off')", () => {
+      const typedTrue = computeIndexContentHash({ ...base, options: { deduplicate_items: true } });
+      const reprintOn = computeIndexContentHash({
+        ...base,
+        options: { deduplicate_items: 'on' },
+      });
+      expect(typedTrue).toBe(reprintOn);
+
+      const typedFalse = computeIndexContentHash({
+        ...base,
+        options: { deduplicate_items: false },
+      });
+      const reprintOff = computeIndexContentHash({
+        ...base,
+        options: { deduplicate_items: 'off' },
+      });
+      expect(typedFalse).toBe(reprintOff);
+      // The catalog stores whatever spelling the DDL used, so the string
+      // spellings canonicalize to the same form too.
+      const stringlyFalse = computeIndexContentHash({
         ...base,
         options: { deduplicate_items: 'false' },
       });
-      expect(typed).toBe(stringly);
+      expect(typedFalse).toBe(stringlyFalse);
     });
 
     it('is insensitive to option key order', () => {
