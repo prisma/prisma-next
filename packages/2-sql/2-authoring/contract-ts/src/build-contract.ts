@@ -922,7 +922,10 @@ export function buildSqlContractFromDefinition(
       }));
       const declaredIndexes = (semanticModel.indexes ?? []).map((i) =>
         lowerAuthoredIndex(tableName, {
-          columns: i.columns,
+          ...ifDefined('columns', i.columns),
+          ...ifDefined('expression', i.expression),
+          ...ifDefined('where', i.where),
+          ...ifDefined('unique', i.unique),
           ...ifDefined('map', i.map),
           ...ifDefined('name', i.name),
           ...ifDefined('type', i.type),
