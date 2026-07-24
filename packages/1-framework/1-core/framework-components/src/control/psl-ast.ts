@@ -1,5 +1,6 @@
 export type { AuthoringPslBlockDescriptorNamespace } from '../shared/framework-authoring';
 export type {
+  ContributedPslDiagnosticCode,
   PslBlockParam,
   PslBlockParamList,
   PslBlockParamOption,
@@ -22,10 +23,15 @@ export type {
 import { blindCast } from '@prisma-next/utils/casts';
 import type { CodecLookup } from '../shared/codec-types';
 import type { AuthoringPslBlockDescriptorNamespace } from '../shared/framework-authoring';
-import type { PslDiagnosticCode, PslExtensionBlock, PslSpan } from '../shared/psl-extension-block';
+import type {
+  ContributedPslDiagnosticCode,
+  PslDiagnosticCode,
+  PslExtensionBlock,
+  PslSpan,
+} from '../shared/psl-extension-block';
 
 export interface PslDiagnostic {
-  readonly code: PslDiagnosticCode;
+  readonly code: PslDiagnosticCode | ContributedPslDiagnosticCode;
   readonly message: string;
   readonly sourceId: string;
   readonly span: PslSpan;
