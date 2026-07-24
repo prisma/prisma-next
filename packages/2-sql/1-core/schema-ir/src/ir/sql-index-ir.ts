@@ -13,9 +13,10 @@ import { assertNode, defineNonEnumerable, SqlSchemaIRNode } from './sql-schema-i
  * authored `type: "btree"` and a default-method introspected index compare
  * equal — both derivation paths construct through this class. The contract
  * JSON and the wire-name content hash keep the authored spelling, so
- * `@@index([a], type: "btree")` and `@@index([a])` are distinct wire names
- * (a spelling change between them is a content edit — create + drop, not a
- * rename).
+ * `@@index([a], type: "btree")` and `@@index([a])` are distinct wire names —
+ * but content-equal after normalization, so a spelling change between them
+ * converges as a rename via the planner's phase-2 content pairing (the
+ * hashes differ, so phase-1 never pairs them).
  */
 const DEFAULT_INDEX_TYPE = 'btree';
 
