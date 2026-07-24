@@ -273,7 +273,7 @@ changes:
       (`isStructuredError` from `@prisma-next/utils/structured-error`). Message
       text is unchanged.
     detection:
-      glob: "**/*.{ts,mts,cts}"
+      glob: "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"
       contains:
         - "SupabaseConfigError"
         - "InvalidJwtError"

@@ -989,7 +989,7 @@ The `lints` middleware found an UPDATE plan with no WHERE clause and blocks exec
 
 ### PARADEDB.ARGUMENT_INVALID
 
-A ParadeDB search-function helper received an invalid argument — a malformed query object, an out-of-range numeric option, or an option combination the function does not accept. Raised while authoring/lowering the search expression. Meta: `function`, `argument`, `received`.
+A ParadeDB search-function helper received an invalid argument — a malformed query object, an out-of-range numeric option, or an option combination the function does not accept. Raised while authoring/lowering the search expression. Meta: `helper`, `argument`, `received`.
 
 ## POSTGIS
 

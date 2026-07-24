@@ -70,6 +70,7 @@ describe('geometry helpers raise POSTGIS.GEOMETRY_INVALID', () => {
         [1, 1],
       ]),
     );
+    expect(isStructuredError(error)).toBe(true);
     expect(error).toMatchObject({
       code: 'POSTGIS.GEOMETRY_INVALID',
       message: 'polygon: ring must contain at least 3 distinct positions',
@@ -135,6 +136,7 @@ describe('codec encode raises RUNTIME.ENCODE_FAILED', () => {
     const error = capture(() =>
       codec().encodeJson({ type: 'Point', coordinates: [Number.NaN, 0] }),
     );
+    expect(isStructuredError(error)).toBe(true);
     expect(error).toMatchObject({
       code: 'RUNTIME.ENCODE_FAILED',
       message: 'Geometry encode: coordinates must be finite numbers',
@@ -165,6 +167,7 @@ describe('codec decode raises RUNTIME.DECODE_FAILED', () => {
 
   it('non-string database JSON value', () => {
     const error = capture(() => codec().decodeJson(42));
+    expect(isStructuredError(error)).toBe(true);
     expect(error).toMatchObject({
       code: 'RUNTIME.DECODE_FAILED',
       message: 'Geometry database JSON value must be a HEXEWKB string',

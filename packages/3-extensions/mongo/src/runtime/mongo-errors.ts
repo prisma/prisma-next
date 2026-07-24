@@ -14,6 +14,6 @@ export function mongoError(
 ): StructuredError {
   return structuredError(code, message, {
     ...options,
-    meta: { extension: 'mongo', ...options?.meta },
+    meta: { ...options?.meta, extension: 'mongo' },
   });
 }

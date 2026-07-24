@@ -48,6 +48,7 @@ export type ArktypeJsonTypeParams = {
 
 type ArktypeSchemaLike = ((value: unknown) => unknown) & {
   readonly expression: string;
+  readonly json?: unknown;
 };
 
 function isArktypeSchemaLike(value: unknown): value is ArktypeSchemaLike {
@@ -69,7 +70,19 @@ function validateSchema<TInferred>(schema: ArktypeSchemaLike, value: unknown): T
 }
 
 function serializeWire<TInferred>(value: TInferred): string {
-  const wire: string | undefined = JSON.stringify(value);
+  let wire: string | undefined;
+  try {
+    wire = JSON.stringify(value);
+  } catch (error) {
+    throw Object.assign(
+      runtimeError(
+        'RUNTIME.ENCODE_FAILED',
+        `arktype-json value could not be serialized to JSON (codecId: ${ARKTYPE_JSON_CODEC_ID})`,
+        { codecId: ARKTYPE_JSON_CODEC_ID },
+      ),
+      { cause: error },
+    );
+  }
   if (typeof wire !== 'string') {
     throw runtimeError(
       'RUNTIME.ENCODE_FAILED',
@@ -245,7 +258,7 @@ export function arktypeJsonColumn<S extends Type<unknown>>(
       { helperPath: 'arktypeJsonColumn', expected: 'arktype Type', received: typeof schema },
     );
   }
-  const jsonIr: unknown = (schema as { readonly json?: unknown }).json;
+  const jsonIr: unknown = schema.json;
   if (jsonIr === null || typeof jsonIr !== 'object') {
     throw runtimeError(
       'CONTRACT.ARGUMENT_INVALID',

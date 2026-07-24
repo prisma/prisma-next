@@ -273,6 +273,24 @@ describe('structured error codes', () => {
     });
   });
 
+  it('encode of a value JSON.stringify throws on raises RUNTIME.ENCODE_FAILED', async () => {
+    const codec = arktypeJsonColumn(type('object')).codecFactory(SYNTH_CTX);
+
+    const error = await codec.encode({ big: 1n } as never, CALL_CTX).then(
+      () => {
+        throw new Error('expected encode to reject');
+      },
+      (err: unknown) => err,
+    );
+    expect(isStructuredError(error)).toBe(true);
+    expect(error).toMatchObject({
+      code: 'RUNTIME.ENCODE_FAILED',
+      message: `arktype-json value could not be serialized to JSON (codecId: ${ARKTYPE_JSON_CODEC_ID})`,
+      details: { codecId: ARKTYPE_JSON_CODEC_ID },
+      cause: expect.any(TypeError),
+    });
+  });
+
   it('encodeJson of a non-JSON-representable value raises RUNTIME.ENCODE_FAILED', () => {
     const codec = arktypeJsonColumn(type('object')).codecFactory(SYNTH_CTX);
 
