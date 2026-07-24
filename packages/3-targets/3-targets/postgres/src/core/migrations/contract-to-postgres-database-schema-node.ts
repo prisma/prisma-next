@@ -196,14 +196,23 @@ export function contractToPostgresDatabaseSchemaNode(
       const indexes = sqlTable.indexes.map(
         (i) =>
           new SqlIndexIR({
+            name: i.name,
+            prefix: i.prefix,
             columns: i.columns,
+            expression: i.expression,
+            where: i.where,
             unique: i.unique,
             partial: i.partial,
-            name: i.name,
             type: i.type,
             options: i.options,
             annotations: i.annotations,
-            dependsOn: columnDependsOn(ddlSchema, tableName, i.columns),
+            // Expression indexes stamp chains to every column of the table —
+            // the same over-approximation the family derivation uses.
+            dependsOn: columnDependsOn(
+              ddlSchema,
+              tableName,
+              i.columns ?? Object.keys(sqlTable.columns),
+            ),
           }),
       );
       const primaryKey =

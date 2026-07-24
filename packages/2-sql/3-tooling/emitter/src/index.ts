@@ -612,12 +612,20 @@ function generateTableLiteralType(table: StorageTable): string {
 
   const indexes = table.indexes
     .map((i) => {
-      const cols = i.columns.map((c: string) => serializeValue(c)).join(', ');
-      const name = i.name !== undefined ? `; readonly name: ${serializeValue(i.name)}` : '';
+      const name = `readonly name: ${serializeValue(i.name)}`;
+      const prefix = i.prefix !== undefined ? `; readonly prefix: ${serializeValue(i.prefix)}` : '';
+      const cols =
+        i.columns !== undefined
+          ? `; readonly columns: readonly [${i.columns.map((c: string) => serializeValue(c)).join(', ')}]`
+          : '';
+      const expression =
+        i.expression !== undefined ? `; readonly expression: ${serializeValue(i.expression)}` : '';
+      const where = i.where !== undefined ? `; readonly where: ${serializeValue(i.where)}` : '';
+      const unique = `; readonly unique: ${i.unique}`;
       const indexType = i.type !== undefined ? `; readonly type: ${serializeValue(i.type)}` : '';
       const indexOptions =
         i.options !== undefined ? `; readonly options: ${serializeValue(i.options)}` : '';
-      return `{ readonly columns: readonly [${cols}]${name}${indexType}${indexOptions} }`;
+      return `{ ${name}${prefix}${cols}${expression}${where}${unique}${indexType}${indexOptions} }`;
     })
     .join(', ');
   tableParts.push(`indexes: readonly [${indexes}]`);
