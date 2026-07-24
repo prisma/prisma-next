@@ -248,6 +248,7 @@ function conflictKindForCall(call: PostgresOpFactoryCall): SqlPlannerConflict['k
     case 'dropConstraint':
       return 'foreignKeyConflict';
     case 'createIndex':
+    case 'renameIndex':
     case 'dropIndex':
       return 'indexIncompatible';
     default:
@@ -263,6 +264,7 @@ function locationForCall(call: PostgresOpFactoryCall): SqlPlannerConflict['locat
     tableName?: string;
     columnName?: string;
     indexName?: string;
+    newIndexName?: string;
     constraintName?: string;
     typeName?: string;
   };
@@ -281,7 +283,10 @@ function locationForCall(call: PostgresOpFactoryCall): SqlPlannerConflict['locat
     location.entityName = anyCall.typeName;
   }
   if (anyCall.columnName) location.column = anyCall.columnName;
+  // A rename call carries old/new index names; the new name is the index's
+  // contract-side identity, so it is the conflict location.
   if (anyCall.indexName) location.index = anyCall.indexName;
+  else if (anyCall.newIndexName) location.index = anyCall.newIndexName;
   if (anyCall.constraintName) location.constraint = anyCall.constraintName;
   return Object.keys(location).length > 0 ? (location as SqlPlannerConflictLocation) : undefined;
 }
