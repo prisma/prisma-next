@@ -173,7 +173,10 @@ function buildRlsPolicyEntity(input: {
   readonly roles: readonly string[];
   readonly using?: string;
   readonly withCheck?: string;
+  /** Defaults to PERMISSIVE — the hash tuple slot already existed. */
+  readonly permissive?: boolean;
 }): PostgresRlsPolicy {
+  const permissive = input.permissive ?? true;
   const wireHash = computeContentHash({
     ...ifDefined('using', input.using !== undefined ? normalizeSqlBody(input.using) : undefined),
     ...ifDefined(
@@ -182,7 +185,7 @@ function buildRlsPolicyEntity(input: {
     ),
     roles: input.roles,
     operation: input.operation,
-    permissive: true,
+    permissive,
   });
 
   return new PostgresRlsPolicy({
@@ -194,7 +197,7 @@ function buildRlsPolicyEntity(input: {
     roles: input.roles,
     using: input.using,
     withCheck: input.withCheck,
-    permissive: true,
+    permissive,
   });
 }
 
@@ -239,6 +242,18 @@ function lowerRlsPolicyFromBlock(
   const using = usingRaw !== undefined ? unwrapQuotedString(usingRaw) : undefined;
   const withCheck = withCheckRaw !== undefined ? unwrapQuotedString(withCheckRaw) : undefined;
 
+  const permissiveRaw = readValueParam(block, 'permissive');
+  if (permissiveRaw !== undefined && permissiveRaw !== 'true' && permissiveRaw !== 'false') {
+    ctx.diagnostics?.push({
+      code: 'PSL_EXTENSION_INVALID_VALUE',
+      message: `\`${block.keyword}\` policy "${block.name}" \`permissive\` must be \`true\` or \`false\`, got ${permissiveRaw}.`,
+      sourceId: ctx.sourceId ?? 'unknown',
+      span: block.parameters['permissive']?.span ?? block.span,
+    });
+    return undefined;
+  }
+  const permissive = permissiveRaw !== 'false';
+
   // `@@map("physical name")` adopts an EXACT-named policy: the lowered
   // entity's name is the map value verbatim — no prefix, no content hash,
   // and no wire-prefix length cap (exact names are verbatim physical names,
@@ -270,7 +285,7 @@ function lowerRlsPolicyFromBlock(
       roles,
       using,
       withCheck,
-      permissive: true,
+      permissive,
     });
   }
 
@@ -282,6 +297,7 @@ function lowerRlsPolicyFromBlock(
     roles,
     ...ifDefined('using', using),
     ...ifDefined('withCheck', withCheck),
+    permissive,
   });
 }
 
@@ -500,6 +516,7 @@ const policyRolesParam = {
   of: { kind: 'ref', refKind: 'role', scope: 'cross-space' },
 } as const;
 const policyPredicateParam = { kind: 'value', codecId: 'pg/text@1', required: true } as const;
+const policyPermissiveParam = { kind: 'value', codecId: 'pg/bool@1' } as const;
 // A policy may only target an RLS-controlled model: the model named by
 // `target` must declare `@@rls`, or the load fails with a diagnostic naming
 // the model and the policy prefix.
@@ -517,7 +534,12 @@ export const postgresAuthoringPslBlockDescriptors = {
     keyword: 'policy_select',
     discriminator: 'policy',
     name: { required: true },
-    parameters: { target: policyTargetParam, roles: policyRolesParam, using: policyPredicateParam },
+    parameters: {
+      target: policyTargetParam,
+      roles: policyRolesParam,
+      using: policyPredicateParam,
+      permissive: policyPermissiveParam,
+    },
     requiresModelAttribute: policyRequiresRls,
   },
   policy_delete: {
@@ -525,7 +547,12 @@ export const postgresAuthoringPslBlockDescriptors = {
     keyword: 'policy_delete',
     discriminator: 'policy',
     name: { required: true },
-    parameters: { target: policyTargetParam, roles: policyRolesParam, using: policyPredicateParam },
+    parameters: {
+      target: policyTargetParam,
+      roles: policyRolesParam,
+      using: policyPredicateParam,
+      permissive: policyPermissiveParam,
+    },
     requiresModelAttribute: policyRequiresRls,
   },
   policy_insert: {
@@ -537,6 +564,7 @@ export const postgresAuthoringPslBlockDescriptors = {
       target: policyTargetParam,
       roles: policyRolesParam,
       withCheck: policyPredicateParam,
+      permissive: policyPermissiveParam,
     },
     requiresModelAttribute: policyRequiresRls,
   },
@@ -550,6 +578,7 @@ export const postgresAuthoringPslBlockDescriptors = {
       roles: policyRolesParam,
       using: policyPredicateParam,
       withCheck: policyPredicateParam,
+      permissive: policyPermissiveParam,
     },
     requiresModelAttribute: policyRequiresRls,
   },
@@ -563,6 +592,7 @@ export const postgresAuthoringPslBlockDescriptors = {
       roles: policyRolesParam,
       using: policyPredicateParam,
       withCheck: policyPredicateParam,
+      permissive: policyPermissiveParam,
     },
     requiresModelAttribute: policyRequiresRls,
   },
