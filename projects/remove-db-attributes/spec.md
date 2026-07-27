@@ -100,6 +100,7 @@ No change to the contract format or the contract surface packages. `document.typ
 
 ## Project Definition of Done
 
+- [x] Mandatory final retro completed: [`retros.md`](./retros.md) records the project-close lesson and its landing surface.
 - [ ] Team-DoD floor items (inherited; see [`drive/calibration/dod.md`](../../drive/calibration/dod.md)).
 - [ ] `rg '@db\.'` over `packages/`, `examples/`, and PSL fixtures returns no live usages (historical docs — release notes, ADR history, planning notes — exempt).
 - [ ] All former `@db.*` mappings are authorable as bare types, in both named-type and field position, with contract-emission parity proven by tests for the twelve non-JSON mappings, including `Inet`.

@@ -514,6 +514,24 @@ Patterns to **catch** the F-family modes live in [`grep-library.md`](./grep-libr
 
 **Reference incident.** 2026-07-02→06, native-postgres-enums (PR #906). Round 1: `CodecRef.nativeType` flagged ("SQL-specific, cannot live in the framework domain") — fixed by moving the cast to a codec hook placed on the *framework* `CodecDescriptor`. Round 2: the hook flagged ("NATIVETYPE CANNOT BE REFERENCED IN THE FRAMEWORK DOMAIN") — relocated, but a new framework type (`AuthoringEntityRefResolution`) kept `nativeType` + a `valueSetEnforcement` strategy string-enum under a grandfathering argument. Round 3: both flagged, plus derivation logic (`deriveValueSet`) in framework core. Three rounds, one class. Operator intervention produced the class-sweep rule, the vocabulary ratchet, and this entry.
 
+### F27. Tight subprocess test deadline fails only on the mounted worktree
+
+**Symptom.** A CLI test whose behavior is unchanged from `main` repeatedly times out at a narrow Vitest deadline in the mounted development worktree, while the exact same commit passes from an isolated VM-local filesystem. Retrying the source-worktree command can consume a full validation window without changing the result.
+
+**Detection signal.**
+
+- Failures cluster exactly at the package timeout across unrelated CLI invocations such as redirects and `--version`.
+- The affected CLI subtree is byte-identical to `origin/main`, and a clean exact-HEAD checkout on VM-local storage passes the focused tests.
+- Host filesystem inspection identifies a mounted filesystem such as `virtiofs` for the source worktree and a local filesystem such as `ext4` for the passing checkout.
+
+**Mitigation.**
+
+- Do not relax the test deadline or classify the branch green from a failed source-worktree run.
+- Create an independent exact-HEAD checkout on VM-local storage, install with `pnpm install --offline --frozen-lockfile`, run `pnpm build`, then rerun the prescribed validation matrix there.
+- Record the source and temporary HEAD/tree hashes, imported `origin/main` ancestry, and clean tracked diffs so the alternate environment is evidence for the same branch rather than a substitute build.
+
+**Reference incident.** 2026-07-24, `remove-db-attributes` final validation. CLI redirect tests repeatedly exceeded the 500 ms Vitest deadline on `virtiofs`; the byte-identical CLI subtree passed from an exact-HEAD ext4 clone, where the full validation matrix also passed.
+
 ## Slice-shape scope traps
 
 Patterns that have produced scope creep in the past — catch these at triage or slice-spec time, not at execution time.
