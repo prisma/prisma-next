@@ -19,6 +19,18 @@ describe('toStructuredConfigError', () => {
     });
   });
 
+  it('maps a CONFIG.VALIDATION_FAILED structured error without field or why using the config fallback and message', () => {
+    const mapped = toStructuredConfigError(
+      structuredError('CONFIG.VALIDATION_FAILED', 'invalid config shape'),
+    );
+
+    expect(mapped).toMatchObject({
+      name: 'CliStructuredError',
+      code: 'CONFIG.VALIDATION_FAILED',
+      why: 'invalid config shape',
+    });
+  });
+
   it('passes a CONFIG.FILE_NOT_FOUND CliStructuredError through unchanged', () => {
     const notFound = errorConfigFileNotFound('/project/prisma-next.config.ts');
 
