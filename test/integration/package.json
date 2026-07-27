@@ -41,6 +41,7 @@
     "@prisma-next/sql-contract-emitter": "workspace:0.16.0",
     "@prisma-next/sql-contract-psl": "workspace:0.16.0",
     "@prisma-next/sql-contract-ts": "workspace:0.16.0",
+    "@prisma-next/sql-errors": "workspace:0.16.0",
     "@prisma-next/sql-orm-client": "workspace:0.16.0",
     "@prisma-next/sql-builder": "workspace:0.16.0",
     "@prisma-next/sql-relational-core": "workspace:0.16.0",
