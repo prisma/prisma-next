@@ -1,12 +1,12 @@
 import type { StructuredError, StructuredErrorOptions } from '@prisma-next/utils/structured-error';
 import { structuredError } from '@prisma-next/utils/structured-error';
 
-export type PslCode = `PSL.${PslSubcode}`;
+export type ConfigCode = `CONFIG.${ConfigSubcode}`;
 
-type PslSubcode = 'FORMAT_OPTION_INVALID' | 'PARSE_FAILED';
+type ConfigSubcode = 'VALIDATION_FAILED';
 
-export function pslError(
-  code: PslCode,
+export function configError(
+  code: ConfigCode,
   message: string,
   options?: StructuredErrorOptions,
 ): StructuredError {

@@ -1,12 +1,15 @@
-import { ConfigValidationError } from '@prisma-next/config/config-validation';
+import { errorConfigFileNotFound } from '@prisma-next/errors/control';
+import { structuredError } from '@prisma-next/utils/structured-error';
 import { describe, expect, it } from 'vitest';
-import { ConfigFileNotFoundError } from '../src/errors';
 import { toStructuredConfigError } from '../src/load';
 
 describe('toStructuredConfigError', () => {
-  it('maps ConfigValidationError to a CONFIG.VALIDATION_FAILED structured error carrying the field reason', () => {
+  it('maps a CONFIG.VALIDATION_FAILED structured error to a CliStructuredError carrying the field reason', () => {
     const mapped = toStructuredConfigError(
-      new ConfigValidationError('contract.output', 'collides with input'),
+      structuredError('CONFIG.VALIDATION_FAILED', 'collides with input', {
+        why: 'collides with input',
+        meta: { field: 'contract.output' },
+      }),
     );
 
     expect(mapped).toMatchObject({
@@ -16,15 +19,10 @@ describe('toStructuredConfigError', () => {
     });
   });
 
-  it('maps ConfigFileNotFoundError to a CONFIG.FILE_NOT_FOUND structured error', () => {
-    const mapped = toStructuredConfigError(
-      new ConfigFileNotFoundError('/project/prisma-next.config.ts'),
-    );
+  it('passes a CONFIG.FILE_NOT_FOUND CliStructuredError through unchanged', () => {
+    const notFound = errorConfigFileNotFound('/project/prisma-next.config.ts');
 
-    expect(mapped).toMatchObject({
-      name: 'CliStructuredError',
-      code: 'CONFIG.FILE_NOT_FOUND',
-    });
+    expect(toStructuredConfigError(notFound)).toBe(notFound);
   });
 
   it('passes a structured error (one carrying a string code) through unchanged', () => {

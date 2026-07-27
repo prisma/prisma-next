@@ -1,12 +1,13 @@
 import type { StructuredError, StructuredErrorOptions } from '@prisma-next/utils/structured-error';
 import { structuredError } from '@prisma-next/utils/structured-error';
 
-export type PslCode = `PSL.${PslSubcode}`;
+export type EmitterErrorCode =
+  | 'CONFIG.VALIDATION_FAILED'
+  | 'CONTRACT.NAMESPACE_INVALID'
+  | 'CONTRACT.RELATION_INVALID';
 
-type PslSubcode = 'FORMAT_OPTION_INVALID' | 'PARSE_FAILED';
-
-export function pslError(
-  code: PslCode,
+export function emitterError(
+  code: EmitterErrorCode,
   message: string,
   options?: StructuredErrorOptions,
 ): StructuredError {
