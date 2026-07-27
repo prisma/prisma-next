@@ -22,6 +22,7 @@ import {
   type ProjectionExpr,
   SubqueryExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { describe, expect, it } from 'vitest';
 import {
@@ -167,7 +168,7 @@ function vectorRef(typeParams: JsonValue, many?: true): CodecRef {
   return {
     codecId: 'demo/direct-vector@1',
     typeParams,
-    ...(many === undefined ? {} : { many }),
+    ...ifDefined('many', many),
   };
 }
 

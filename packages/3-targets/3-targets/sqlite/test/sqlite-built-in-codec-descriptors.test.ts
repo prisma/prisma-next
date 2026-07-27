@@ -10,6 +10,7 @@ import {
   sqlIntDescriptor,
   sqlVarcharDescriptor,
 } from '@prisma-next/sql-relational-core/ast';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import type { AnySqliteCodecDescriptor } from '../src/core/codec-descriptor';
 import {
@@ -47,7 +48,7 @@ const refFor = (
   typeParams?: CodecRef['typeParams'],
 ): CodecRef => ({
   codecId: descriptor.codecId,
-  ...(typeParams === undefined ? {} : { typeParams }),
+  ...ifDefined('typeParams', typeParams),
 });
 
 const codecContext: CodecInstanceContext = { name: 'test' };
