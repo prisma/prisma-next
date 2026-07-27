@@ -27,6 +27,8 @@ PostgreSQL and SQLite target descriptors also declare AST-to-AST JSON projection
 
 The same three artifacts express the full spectrum: non-parameterized, parameterized with literal preservation, and parameterized with a typed schema.
 
+Case 1 carries the full framework import block; Cases 2 and 3 continue from it and list only the imports each one adds. All three elide the pack's own internals — `Vector` / `parseVector` in Case 2, `ArktypeSchemaLike` / `rehydrateSchema` / `validateSchema` in Case 3 — so read them as descriptor shape rather than as complete files.
+
 ### Case 1 — Non-parameterized codec (`pg/text@1`)
 
 ```ts
