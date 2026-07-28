@@ -437,3 +437,7 @@ Under an **additive-only** policy (e.g. `db init`'s class set) the rename pairin
 ### Hard-coded names
 
 If application code, tests, or operational scripts hard-code physical index names (e.g. `user_email_idx`), read the new names from the regenerated `contract.json` — managed names now carry the hash suffix. PSL schemas that must keep a byte-exact legacy name can pin it with `@@index([...], map: "<exact name>")`.
+
+## Incidental dependency bumps in examples
+
+Routine runtime dependency bumps in `examples/` (dependabot `runtime-deps` group, PR #1065) carry no consumer-facing behaviour change and require no upgrade action.
