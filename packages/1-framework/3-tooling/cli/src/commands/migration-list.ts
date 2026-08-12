@@ -1,0 +1,330 @@
+import { loadConfig } from '@prisma-next/config-loader';
+import type {
+  AggregateContractSpace,
+  ContractSpaceAggregate,
+} from '@prisma-next/migration-tools/aggregate';
+import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
+import { HEAD_REF_NAME, refsByContractHash } from '@prisma-next/migration-tools/refs';
+import {
+  APP_SPACE_ID,
+  isValidSpaceId,
+  listContractSpaceDirectories,
+} from '@prisma-next/migration-tools/spaces';
+import { ifDefined } from '@prisma-next/utils/defined';
+import { notOk, ok, type Result } from '@prisma-next/utils/result';
+import { Command } from 'commander';
+import {
+  type CliStructuredError,
+  errorInvalidSpaceId,
+  errorSpaceNotFound,
+} from '../utils/cli-errors';
+import {
+  addGlobalOptions,
+  resolveMigrationPaths,
+  setCommandDescriptions,
+  setCommandExamples,
+  setCommandSeeAlso,
+} from '../utils/command-helpers';
+import { buildReadAggregate } from '../utils/contract-space-aggregate-loader';
+import { renderMigrationGraphLegend } from '../utils/formatters/migration-graph-labels';
+import { renderMigrationListWithStyle } from '../utils/formatters/migration-list-render';
+import { createAnsiMigrationListStyler } from '../utils/formatters/migration-list-styler';
+import type {
+  MigrationListEntry,
+  MigrationListResult,
+  MigrationSpaceListEntry,
+} from '../utils/formatters/migration-list-types';
+import { formatStyledHeader } from '../utils/formatters/styled';
+import type { CommonCommandOptions } from '../utils/global-flags';
+import { type GlobalFlags, parseGlobalFlagsOrExit } from '../utils/global-flags';
+import type { GlyphMode } from '../utils/glyph-mode';
+import { shouldShowLegend, validateLegendOptions } from '../utils/legend';
+import { handleResult } from '../utils/result-handler';
+import { createTerminalUI, type TerminalUI } from '../utils/terminal-ui';
+
+function compareSpaceIds(a: string, b: string): number {
+  if (a === APP_SPACE_ID) return b === APP_SPACE_ID ? 0 : -1;
+  if (b === APP_SPACE_ID) return 1;
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
+function compareDirNamesDescending(a: MigrationListEntry, b: MigrationListEntry): number {
+  if (a.name < b.name) return 1;
+  if (a.name > b.name) return -1;
+  return 0;
+}
+
+/**
+ * Ref names decorating a space's destination contract hashes. The
+ * tolerant `space.refs` deliberately omits the structural `head.json`;
+ * for extension spaces the old enumerator surfaced it as a `head`
+ * decoration on the tip migration, so fold `space.headRef` back in to
+ * keep that output. The app space synthesises its head, so it carries
+ * no on-disk `head` ref to restore.
+ */
+export function listRefsByContractHash(
+  space: AggregateContractSpace,
+): ReadonlyMap<string, readonly string[]> {
+  const byHash = new Map(refsByContractHash(space.refs));
+  if (space.spaceId !== APP_SPACE_ID && space.headRef !== null) {
+    const hash = space.headRef.hash;
+    const bucket = byHash.get(hash) ?? [];
+    if (!bucket.includes(HEAD_REF_NAME)) {
+      byHash.set(hash, [...bucket, HEAD_REF_NAME].sort());
+    }
+  }
+  return byHash;
+}
+
+async function orderedOnDiskSpaceIds(projectMigrationsDir: string): Promise<readonly string[]> {
+  const candidateDirs = await listContractSpaceDirectories(projectMigrationsDir);
+  return candidateDirs.filter(isValidSpaceId).sort(compareSpaceIds);
+}
+
+/**
+ * Project the loaded {@link ContractSpaceAggregate} into the render-ready
+ * {@link MigrationSpaceListEntry} rows `migration list` displays.
+ *
+ * Space membership matches the on-disk contract-space directories (not the
+ * aggregate's always-present synthesized app space when `migrations/app/`
+ * is absent); package and ref data come from `aggregate.space(id)`.
+ */
+export async function migrationSpaceListEntriesFromAggregate(
+  aggregate: ContractSpaceAggregate,
+  projectMigrationsDir: string,
+): Promise<readonly MigrationSpaceListEntry[]> {
+  const spaceIds = await orderedOnDiskSpaceIds(projectMigrationsDir);
+  const spaces: MigrationSpaceListEntry[] = [];
+
+  for (const spaceId of spaceIds) {
+    const space = aggregate.space(spaceId);
+    if (space === undefined) {
+      continue;
+    }
+    const refsByHash = listRefsByContractHash(space);
+    const migrations: MigrationListEntry[] = space.packages
+      .map((pkg) => ({
+        name: pkg.dirName,
+        hash: pkg.metadata.migrationHash,
+        fromContract: pkg.metadata.from,
+        toContract: pkg.metadata.to,
+        operationCount: pkg.ops.length,
+        createdAt: pkg.metadata.createdAt,
+        refs: [...(refsByHash.get(pkg.metadata.to) ?? [])],
+        providedInvariants: [...pkg.metadata.providedInvariants],
+      }))
+      .sort(compareDirNamesDescending);
+
+    spaces.push({ space: spaceId, migrations });
+  }
+
+  return spaces;
+}
+
+interface MigrationListOptions extends CommonCommandOptions {
+  readonly config?: string;
+  readonly space?: string;
+  readonly ascii?: boolean;
+  readonly legend?: boolean;
+}
+
+export interface MigrationListExecuteResult {
+  readonly list: MigrationListResult;
+  readonly liveContractHash: string;
+  readonly aggregate: ContractSpaceAggregate;
+}
+
+export interface MigrationListHumanRenderOptions {
+  readonly glyphMode: GlyphMode;
+  readonly useColor: boolean;
+  readonly liveContractHash: string;
+  readonly graphForSpace: (spaceId: string) => MigrationGraph | undefined;
+  readonly appSpaceId?: string;
+}
+
+export function renderMigrationListHumanOutput(
+  result: MigrationListResult,
+  options: MigrationListHumanRenderOptions,
+): string {
+  const styler = createAnsiMigrationListStyler({ useColor: options.useColor });
+  return renderMigrationListWithStyle(result, styler, options.glyphMode, {
+    colorize: options.useColor,
+    liveContractHash: options.liveContractHash,
+    graphForSpace: options.graphForSpace,
+    ...(options.appSpaceId !== undefined ? { appSpaceId: options.appSpaceId } : {}),
+  });
+}
+
+/**
+ * Inputs for {@link runMigrationList} — the policy core of `migration list`
+ * that tests exercise directly.
+ *
+ * The core does not call `loadConfig`, parse CLI flags, render a styled
+ * header, or write to any stream. Enumeration is supplied by the caller
+ * (the CLI shell builds it from {@link migrationSpaceListEntriesFromAggregate}).
+ */
+export interface RunMigrationListInputs {
+  readonly spaces: readonly MigrationSpaceListEntry[];
+  readonly spaceFilter?: string;
+}
+
+function computeSummary(spaces: readonly MigrationSpaceListEntry[]): string {
+  const totalMigrations = spaces.reduce((count, space) => count + space.migrations.length, 0);
+  if (spaces.length <= 1) {
+    return `${totalMigrations} migration(s) on disk`;
+  }
+  return `${totalMigrations} migration(s) across ${spaces.length} contract space(s)`;
+}
+
+/**
+ * Policy core of `migration list`: validates `--space`, narrows the
+ * pre-enumerated spaces, and assembles a {@link MigrationListResult}.
+ *
+ * - `migrations/` missing or contains no valid space directories →
+ *   caller passes `spaces: []`; this synthesizes `[{ spaceId: APP_SPACE_ID, migrations: [] }]`.
+ * - `--space <id>` on an existing-but-empty space → `{ spaceId, migrations: [] }` in the input.
+ * - `--space <id>` on a non-existent (or reserved) space → `SPACE_NOT_FOUND`.
+ */
+export function runMigrationList(
+  inputs: RunMigrationListInputs,
+): Result<MigrationListResult, CliStructuredError> {
+  const { spaces, spaceFilter } = inputs;
+
+  if (spaceFilter !== undefined && !isValidSpaceId(spaceFilter)) {
+    return notOk(errorInvalidSpaceId(spaceFilter));
+  }
+
+  if (spaceFilter !== undefined && !spaces.some((s) => s.space === spaceFilter)) {
+    return notOk(errorSpaceNotFound(spaceFilter, spaces.map((s) => s.space).sort()));
+  }
+
+  const scopedSpaces =
+    spaceFilter !== undefined ? spaces.filter((s) => s.space === spaceFilter) : spaces;
+
+  const resultSpaces: readonly MigrationSpaceListEntry[] =
+    scopedSpaces.length === 0 ? [{ space: APP_SPACE_ID, migrations: [] }] : scopedSpaces;
+
+  return ok({
+    ok: true,
+    spaces: [...resultSpaces],
+    summary: computeSummary(resultSpaces),
+  });
+}
+
+/**
+ * CLI shell: loads config, resolves paths, prints the styled header on
+ * stderr (interactive mode only), and delegates to {@link runMigrationList}.
+ * Kept intentionally thin so the unit-testable surface lives in the core.
+ */
+export async function executeMigrationListCommand(
+  options: MigrationListOptions,
+  flags: GlobalFlags,
+  ui: TerminalUI,
+): Promise<Result<MigrationListExecuteResult, CliStructuredError>> {
+  const config = await loadConfig(options.config);
+  const { configPath, migrationsDir, migrationsRelative } = resolveMigrationPaths(
+    options.config,
+    config,
+  );
+
+  if (!flags.json && !flags.quiet) {
+    const header = formatStyledHeader({
+      command: 'migration list',
+      description: 'List on-disk migrations per contract space',
+      details: [
+        { label: 'config', value: configPath },
+        { label: 'migrations', value: migrationsRelative },
+        ...(options.space !== undefined ? [{ label: 'space', value: options.space }] : []),
+      ],
+      flags,
+    });
+    ui.stderr(header);
+    if (shouldShowLegend(options, flags)) {
+      ui.stderr(
+        renderMigrationGraphLegend({
+          colorize: flags.color !== false,
+          glyphMode: ui.resolveGlyphMode(options.ascii === true),
+        }),
+      );
+      ui.stderr('');
+    }
+  }
+
+  const loaded = await buildReadAggregate(config, { migrationsDir });
+  if (!loaded.ok) {
+    return notOk(loaded.failure);
+  }
+
+  const { aggregate, contractHash: liveContractHash } = loaded.value;
+
+  const spaces = await migrationSpaceListEntriesFromAggregate(aggregate, migrationsDir);
+
+  const listResult = runMigrationList({
+    spaces,
+    ...ifDefined('spaceFilter', options.space),
+  });
+  if (!listResult.ok) {
+    return listResult;
+  }
+  return ok({ list: listResult.value, liveContractHash, aggregate });
+}
+
+export function createMigrationListCommand(): Command {
+  const command = new Command('list');
+  setCommandDescriptions(
+    command,
+    'List on-disk migrations per contract space',
+    'Enumerates every on-disk migration under migrations/<space>/ for every\n' +
+      'contract space found on disk. Offline — does not consult the database.\n' +
+      'Human output draws the shared migration graph tree with operation counts,\n' +
+      'invariants on each migration row, and refs on destination contract nodes.\n' +
+      'Pass --space <id> to narrow to one contract space. --ascii forces ASCII\n' +
+      'tree glyphs (orthogonal to --no-color).',
+  );
+  setCommandExamples(command, [
+    'prisma-next migration list',
+    'prisma-next migration list --space app',
+    'prisma-next migration list --ascii',
+    'prisma-next migration list --legend',
+    'prisma-next migration list --json',
+  ]);
+  setCommandSeeAlso(command, [
+    { verb: 'migration status', oneLiner: 'Show migration path and pending status' },
+    { verb: 'migration log', oneLiner: 'Show executed migration history' },
+    { verb: 'migration graph', oneLiner: 'Show the migration graph topology' },
+    { verb: 'migration show', oneLiner: 'Display migration package contents' },
+  ]);
+  addGlobalOptions(command)
+    .option('--config <path>', 'Path to prisma-next.config.ts')
+    .option('--space <id>', 'Narrow output to a single contract space')
+    .option('--ascii', 'Use ASCII kind glyphs (pipe-friendly)')
+    .option('--legend', 'Print a key for the tree glyphs and lane colors')
+    .action(async (options: MigrationListOptions) => {
+      const flags = parseGlobalFlagsOrExit(options);
+      const ui = createTerminalUI(flags);
+      const legendValidation = validateLegendOptions(options, flags);
+      if (!legendValidation.ok) {
+        process.exit(handleResult(legendValidation, flags, ui));
+      }
+      const result = await executeMigrationListCommand(options, flags, ui);
+      const exitCode = handleResult(result, flags, ui, ({ list, liveContractHash, aggregate }) => {
+        if (flags.json) {
+          ui.output(JSON.stringify(list, null, 2));
+        } else if (!flags.quiet) {
+          ui.output(
+            renderMigrationListHumanOutput(list, {
+              glyphMode: ui.resolveGlyphMode(options.ascii === true),
+              useColor: ui.useColor,
+              liveContractHash,
+              graphForSpace: (spaceId) => aggregate.space(spaceId)?.graph(),
+              appSpaceId: aggregate.app.spaceId,
+            }),
+          );
+        }
+      });
+      process.exit(exitCode);
+    });
+  return command;
+}

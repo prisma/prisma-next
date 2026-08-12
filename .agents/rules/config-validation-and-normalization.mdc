@@ -1,0 +1,121 @@
+---
+description: Patterns for config validation and normalization using Arktype
+globs: ["packages/1-framework/3-tooling/cli/**", "**/prisma-next.config.ts"]
+alwaysApply: false
+---
+
+# Config Validation and Normalization
+
+When implementing config files (e.g. `prisma-next.config.ts`), use Arktype for validation and
+normalization. This gives type safety, clear error messages, and sensible defaults.
+
+## Pattern: Validate + Normalize in `defineConfig()`
+
+```typescript
+import { type } from 'arktype';
+import { join, dirname } from 'node:path';
+
+const ConfigSchema = type({
+  required: 'string',
+  'optional?': 'string',
+  nested: type({ 'nestedOptional?': 'number' }),
+});
+
+export function defineConfig(config: ConfigInput): ConfigOutput {
+  // 1. Validate structure with Arktype
+  const validated = ConfigSchema(config);
+  if (validated instanceof type.errors) {
+    const messages = validated.map((p: { message: string }) => p.message).join('; ');
+    throw new Error(`Config validation failed: ${messages}`);
+  }
+  // 2. Normalize by applying defaults
+  const normalized: ConfigOutput = {
+    ...config,
+    optional: config.optional ?? 'default-value',
+    nested: { ...config.nested, nestedOptional: config.nested?.nestedOptional ?? 42 },
+  };
+  // 3. Return the normalized IR (not the raw input)
+  return normalized;
+}
+```
+
+Validation catches structural errors early with clear messages; normalization applies defaults in
+one place; Arktype keeps structure aligned with TypeScript types.
+
+## Normalization Responsibilities
+
+**`defineConfig()` is the ONLY place normalization happens.** It validates structure, applies
+defaults for optional fields, returns the normalized config IR, and throws on invalid structure. It
+should always output a fully normalized config. All other components assume configs are already
+normalized:
+
+- **Config loader — loading only.** Loads the config file (c12 or similar) and calls `defineConfig()`
+  to validate/normalize, then returns the result. Does NOT set defaults or normalize structure.
+- **Command handlers — using only.** Use normalized values directly, accessing fields without
+  checking for defaults. Do NOT set defaults or normalize structure.
+- **Validators.** Never normalize.
+
+## Default Path Resolution
+
+Use `join()` and `dirname()` so defaults handle relative/absolute paths, work cross-platform, and
+cover edge cases (paths without extensions, directory paths):
+
+```typescript
+import { join, dirname } from 'node:path';
+
+const output = config.contract.output ?? 'src/prisma/contract.json';
+const types = output.endsWith('.json')
+  ? output.slice(0, -5) + '.d.ts'
+  : join(dirname(output), 'contract.d.ts');
+```
+
+## Nested Config Structures
+
+When config has nested structures, validate and normalize each level:
+
+```typescript
+const NestedConfigSchema = type({ source: 'unknown', 'output?': 'string' });
+const ConfigSchema = type({
+  family: 'unknown',
+  target: 'unknown',
+  adapter: 'unknown',
+  'contract?': NestedConfigSchema,
+});
+
+export function defineConfig(config: ConfigInput): ConfigOutput {
+  const validated = ConfigSchema(config);
+  if (validated instanceof type.errors) throw new Error(/* ... */);
+  if (config.contract) {
+    return {
+      ...config,
+      contract: {
+        source: config.contract.source,
+        output: config.contract.output ?? 'src/prisma/contract.json',
+      },
+    };
+  }
+  return config;
+}
+```
+
+## Error Messages
+
+Provide clear, actionable messages; Arktype gives detailed errors, and joining multiple makes them
+all visible so users can fix issues quickly:
+
+```typescript
+if (validated instanceof type.errors) {
+  const messages = validated.map((p: { message: string }) => p.message).join('; ');
+  throw new Error(`Config validation failed: ${messages}`);
+}
+```
+
+Benefits: single responsibility (normalization in one place), predictable defaults, type safety,
+maintainability (default changes touch one function), and testability (normalization tested in
+isolation).
+
+## Related Patterns
+
+- `.cursor/rules/arktype-usage.mdc`: Arktype validation patterns
+- `.cursor/rules/contract-normalization-responsibilities.mdc`: Similar pattern for contracts
+- `.cursor/rules/declarative-config.mdc`: Declarative configuration patterns

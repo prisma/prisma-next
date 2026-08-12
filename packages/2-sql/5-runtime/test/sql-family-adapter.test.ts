@@ -1,0 +1,114 @@
+import type { Contract } from '@prisma-next/contract/types';
+import { coreHash, profileHash } from '@prisma-next/contract/types';
+import { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { AdapterProfile } from '@prisma-next/sql-relational-core/ast';
+import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
+import { applicationDomainOf } from '@prisma-next/test-utils';
+import { describe, expect, it } from 'vitest';
+import { createTestSqlNamespace } from '../../1-core/contract/test/test-support';
+import { SqlFamilyAdapter } from '../src/sql-family-adapter';
+import { stubAst } from './utils';
+
+// Minimal test contract
+const testContract: Contract<SqlStorage> = {
+  targetFamily: 'sql',
+  target: 'postgres',
+  profileHash: profileHash('test-hash'),
+  domain: applicationDomainOf({ models: {} }),
+  roots: {},
+  storage: new SqlStorage({
+    storageHash: coreHash('test-hash'),
+    namespaces: {
+      __unbound__: createTestSqlNamespace({ id: '__unbound__', entries: { table: {} } }),
+    },
+  }),
+  extensions: {},
+  capabilities: {},
+  meta: {},
+};
+
+const testProfile: AdapterProfile = {
+  id: 'test/default@1',
+  target: 'postgres',
+  capabilities: {},
+  readMarker: async () => ({ kind: 'absent' }),
+};
+
+describe('SqlFamilyAdapter', () => {
+  it('creates adapter with contract and marker reader', () => {
+    const adapter = new SqlFamilyAdapter(testContract, testProfile);
+
+    expect(adapter.contract).toBe(testContract);
+    expect(adapter.markerReader).toBeDefined();
+    expect(adapter.markerReader.readMarker).toBeDefined();
+  });
+
+  it('delegates readMarker to adapter profile', async () => {
+    const adapter = new SqlFamilyAdapter(testContract, testProfile);
+    const fakeQueryable = {
+      execute: () => {
+        throw new Error('not used');
+      },
+      executePrepared: () => {
+        throw new Error('not used');
+      },
+      query: async () => ({ rows: [] }),
+    };
+    const result = await adapter.markerReader.readMarker(fakeQueryable);
+
+    expect(result).toEqual({ kind: 'absent' });
+  });
+
+  it('validates plan with matching target and hash', () => {
+    const adapter = new SqlFamilyAdapter(testContract, testProfile);
+    const plan: SqlExecutionPlan = {
+      meta: {
+        target: 'postgres',
+        storageHash: 'test-hash',
+        lane: 'sql',
+      },
+      sql: 'SELECT 1',
+      params: [],
+      ast: stubAst(),
+    };
+
+    // Should not throw
+    expect(() => adapter.validatePlan(plan, testContract)).not.toThrow();
+  });
+
+  it('throws on plan target mismatch', () => {
+    const adapter = new SqlFamilyAdapter(testContract, testProfile);
+    const plan: SqlExecutionPlan = {
+      meta: {
+        target: 'mysql', // Wrong target
+        storageHash: 'test-hash',
+        lane: 'sql',
+      },
+      sql: 'SELECT 1',
+      params: [],
+      ast: stubAst(),
+    };
+
+    expect(() => adapter.validatePlan(plan, testContract)).toThrow(
+      'Plan target does not match runtime target',
+    );
+  });
+
+  it('throws on plan storageHash mismatch', () => {
+    const adapter = new SqlFamilyAdapter(testContract, testProfile);
+    const plan: SqlExecutionPlan = {
+      meta: {
+        target: 'postgres',
+        storageHash: 'different-hash', // Wrong hash
+        lane: 'sql',
+      },
+      sql: 'SELECT 1',
+      params: [],
+      ast: stubAst(),
+    };
+
+    expect(() => adapter.validatePlan(plan, testContract)).toThrow(
+      'Plan storage hash does not match runtime contract',
+    );
+  });
+});

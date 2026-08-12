@@ -1,0 +1,51 @@
+import type {
+  PreserveEmptyPredicate,
+  SerializeContract,
+  StorageSort,
+} from '@prisma-next/contract/hashing';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
+
+/**
+ * The subset of ControlStack that emit() reads.
+ * All fields are optional so tests can pass minimal objects.
+ * A full ControlStack satisfies this via structural typing.
+ */
+export interface EmitStackInput {
+  readonly codecTypeImports?: ReadonlyArray<TypesImportSpec>;
+  readonly queryOperationTypeImports?: ReadonlyArray<TypesImportSpec>;
+  readonly extensionIds?: ReadonlyArray<string>;
+  readonly codecLookup?: CodecLookup;
+}
+
+export interface EmitOptions {
+  readonly outputJsonPath?: string;
+  /**
+   * Per-target serializer that converts the in-memory contract into its
+   * canonical on-disk JsonObject shape before the framework's
+   * key-ordering / default-omission walk runs. Threaded from the
+   * descriptor (`descriptor.contractSerializer.serializeContract`) at
+   * the CLI / control-API call site so target classes decide what
+   * appears in the JSON envelope rather than the framework guessing
+   * via property enumerability.
+   */
+  readonly serializeContract: SerializeContract;
+  /**
+   * Optional family-contributed preserve-empty predicate. Threaded from
+   * `descriptor.contractSerializer.shouldPreserveEmpty` when present.
+   */
+  readonly shouldPreserveEmpty?: PreserveEmptyPredicate;
+  /**
+   * Optional family-contributed storage sort hook. Threaded from
+   * `descriptor.contractSerializer.sortStorage` when present.
+   */
+  readonly sortStorage?: StorageSort;
+}
+
+export interface EmitResult {
+  readonly contractJson: string;
+  readonly contractDts: string;
+  readonly storageHash: string;
+  readonly executionHash?: string;
+  readonly profileHash: string;
+}
