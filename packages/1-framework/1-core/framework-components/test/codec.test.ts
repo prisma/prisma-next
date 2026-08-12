@@ -10,12 +10,15 @@ import type { JsonValue } from '@prisma-next/contract/types';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { test } from 'vitest';
 import {
+  type AnyCodecDescriptor,
   type CodecCallContext,
   type CodecDescriptor,
   CodecDescriptorImpl,
   CodecImpl,
   type CodecInstanceContext,
+  type CodecRef,
   type CodecTrait,
+  materializeCodec,
   voidParamsSchema,
 } from '../src/exports/codec';
 
@@ -126,4 +129,34 @@ test('alias descriptor produces codec whose id reads the alias codecId', ({ expe
   const codec = aliased.factory()(stubCtx);
   expect(codec.id).toBe('demo/aliased-int@1');
   expect(codec.id).not.toBe(int4FixtureDescriptor.codecId);
+});
+
+test('materializeCodec preserves the descriptor reference on the codec (non-parameterized)', ({
+  expect,
+}) => {
+  // The production runtime resolves every codec through `materializeCodec`
+  // (via the AST codec resolver). Real descriptors are class methods whose
+  // factory closes over `this` (`() => new Int4FixtureCodec(this)`), so the
+  // materialized codec must carry the source descriptor for `CodecImpl.id` to
+  // proxy `descriptor.codecId`. Calling the extracted method unbound drops
+  // `this`; this test locks the binding so error envelopes (`codec.id`) don't
+  // throw `TypeError: undefined is not an object` while formatting.
+  const ref: CodecRef = { codecId: int4FixtureDescriptor.codecId };
+  const codec = materializeCodec(int4FixtureDescriptor as AnyCodecDescriptor, ref, stubCtx);
+
+  expect(codec.id).toBe(int4FixtureDescriptor.codecId);
+  expect(codec.id).toBe('demo/int4@1');
+});
+
+test('materializeCodec preserves the descriptor reference on the codec (parameterized)', ({
+  expect,
+}) => {
+  const ref: CodecRef = {
+    codecId: vectorFixtureDescriptor.codecId,
+    typeParams: { length: 1536 },
+  };
+  const codec = materializeCodec(vectorFixtureDescriptor as AnyCodecDescriptor, ref, stubCtx);
+
+  expect(codec.id).toBe(vectorFixtureDescriptor.codecId);
+  expect(codec.id).toBe('demo/vector@1');
 });

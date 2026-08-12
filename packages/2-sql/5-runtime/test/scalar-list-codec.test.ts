@@ -275,6 +275,65 @@ describe('decodeRow — many CodecRef via ProjectionItem', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Decode — native-enum array-literal wire values (prisma/prisma#29989)
+// ---------------------------------------------------------------------------
+//
+// The bundled `pg` driver registers parsers only for built-in array types; a
+// PostgreSQL native-enum scalar list arrives as its text-array literal (e.g.
+// `{GOOGLE_MEET}`) instead of a driver-parsed JS array. The many decode path
+// must normalize that literal before mapping the element codec.
+
+describe('decodeRow — native-enum array-literal wire value', () => {
+  const enumIdentity = (v: unknown) => v as never;
+
+  function buildEnumRegistry(): ContractCodecRegistry {
+    const codec = defineTestCodec({
+      typeId: 'pg/enum@1',
+      encode: (v: string) => v,
+      decode: (w: string) => w,
+      encodeJson: enumIdentity,
+      decodeJson: enumIdentity,
+    });
+    return buildTestContractCodecs([codec]);
+  }
+
+  function buildEnumPlan(): SelectAst {
+    return SelectAst.from(TableSource.named('t')).withProjection([
+      ProjectionItem.of('providers', ColumnRef.of('t', 'providers'), {
+        codecId: 'pg/enum@1',
+        many: true,
+      }),
+    ]);
+  }
+
+  it('decodes a native-enum array-literal string into an array of element values', async () => {
+    const ctx = buildDecodeContext(buildEnumPlan(), buildEnumRegistry());
+
+    const result = await decodeRow({ providers: '{GOOGLE_MEET}' }, ctx, CTX);
+
+    expect(result['providers']).toEqual(['GOOGLE_MEET']);
+  });
+
+  it('handles the empty literal, quoted elements, and SQL NULL elements', async () => {
+    const ctx = buildDecodeContext(buildEnumPlan(), buildEnumRegistry());
+
+    expect((await decodeRow({ providers: '{}' }, ctx, CTX))['providers']).toEqual([]);
+    expect((await decodeRow({ providers: '{"a,b",NULL}' }, ctx, CTX))['providers']).toEqual([
+      'a,b',
+      null,
+    ]);
+  });
+
+  it('still rejects a non-array, non-literal wire value with RUNTIME.DECODE_FAILED', async () => {
+    const ctx = buildDecodeContext(buildEnumPlan(), buildEnumRegistry());
+
+    await expect(decodeRow({ providers: 'GOOGLE_MEET' }, ctx, CTX)).rejects.toMatchObject({
+      code: 'RUNTIME.DECODE_FAILED',
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // ParamRef.of — many flag is preserved on the AST node
 // ---------------------------------------------------------------------------
 

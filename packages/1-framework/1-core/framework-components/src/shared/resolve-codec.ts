@@ -79,8 +79,18 @@ export function materializeCodec(
   ctx: CodecInstanceContext,
 ): Codec {
   const validated = validateCodecTypeParams(descriptor, ref);
-  return blindCast<
+  // Call the factory with `this` bound to the descriptor. Curried codec
+  // factories close over `this` to thread the descriptor into the codec
+  // constructor (e.g. Postgres's `PgEnumDescriptor.factory(params) { return () => new PgEnumCodec(this); }`).
+  // The previous `blindCast(descriptor.factory)(validated)(ctx)` extracted the
+  // method and invoked it unbound, so `this` was `undefined` inside the factory
+  // and every materialized codec carried `descriptor === undefined`. `CodecImpl.id`
+  // (`this.descriptor.codecId`) then threw `TypeError: undefined is not an object`
+  // whenever a decode/encode error envelope read `codec.id`, masking the real
+  // `RUNTIME.DECODE_FAILED` / `RUNTIME.ENCODE_FAILED` error.
+  const factory = blindCast<
     (params: unknown) => (ctx: CodecInstanceContext) => Codec,
     'registry erases P to any; paramsSchema validates input before forwarding'
-  >(descriptor.factory)(validated)(ctx);
+  >(descriptor.factory.bind(descriptor));
+  return factory(validated)(ctx);
 }

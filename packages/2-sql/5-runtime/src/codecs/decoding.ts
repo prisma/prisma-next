@@ -102,6 +102,90 @@ function previewWireValue(wireValue: unknown): string {
   return String(wireValue).substring(0, WIRE_PREVIEW_LIMIT);
 }
 
+/**
+ * Normalize a PostgreSQL array-literal string into a JS array of raw element
+ * values, or return `undefined` when `literal` is not a syntactically valid
+ * array literal.
+ *
+ * The bundled `pg` driver only registers parsers for built-in array types; a
+ * custom (e.g. native-enum) array arrives as its text-array literal
+ * (`{GOOGLE_MEET}`). The scalar-list (`many`) decode path expects a
+ * driver-parsed JS array, so we normalize the wire form here before mapping the
+ * element codec. A SQL `NULL` element maps to `null`; quoted elements are
+ * unquoted (`""` → `"`) and backslash escapes are resolved per the PostgreSQL
+ * array output grammar. Returns `undefined` for a non-literal string so the
+ * caller can fall back to the existing "expected an array from the driver"
+ * failure.
+ */
+function parsePgArrayLiteral(literal: string): Array<string | null> | undefined {
+  const length = literal.length;
+  if (length < 2 || literal[0] !== '{' || literal[length - 1] !== '}') {
+    return undefined;
+  }
+
+  const elements: Array<string | null> = [];
+  let index = 1; // skip '{'
+  const end = length - 1; // exclude trailing '}'
+
+  while (index < end) {
+    if (literal[index] === '"') {
+      // Quoted element: `""` escapes a literal quote; `\X` escapes X.
+      index++;
+      let value = '';
+      let closed = false;
+      while (index < end) {
+        const char = literal[index];
+        if (char === '"') {
+          if (literal[index + 1] === '"') {
+            value += '"';
+            index += 2;
+            continue;
+          }
+          closed = true;
+          index++;
+          break;
+        }
+        if (char === '\\' && index + 1 < end) {
+          value += literal[index + 1];
+          index += 2;
+          continue;
+        }
+        value += char;
+        index++;
+      }
+      if (!closed) return undefined;
+      elements.push(value);
+    } else {
+      // Unquoted element: consume until an unescaped ',' or the closing '}'.
+      let value = '';
+      let sawAny = false;
+      while (index < end) {
+        const char = literal[index];
+        if (char === '\\' && index + 1 < end) {
+          value += literal[index + 1];
+          index += 2;
+          sawAny = true;
+          continue;
+        }
+        if (char === ',') break;
+        value += char;
+        index++;
+        sawAny = true;
+      }
+      const trimmed = value.trim();
+      if (!sawAny || trimmed.length === 0) return undefined;
+      elements.push(/^NULL$/i.test(trimmed) ? null : trimmed);
+    }
+
+    if (index < end) {
+      if (literal[index] !== ',') return undefined;
+      index++;
+    }
+  }
+
+  return elements;
+}
+
 function wrapDecodeFailure(
   error: unknown,
   alias: string,
@@ -168,7 +252,7 @@ function decodeIncludeAggregate(alias: string, wireValue: unknown): unknown {
  * The row-level `rowCtx` is repackaged into a per-cell `SqlCodecCallContext` whose `column = { table, name }` is a structural projection of the per-cell `ColumnRef = { table, column }` resolved from the AST-backed `DecodeContext` (the same resolution `wrapDecodeFailure` uses for envelope construction — one resolution per cell, two consumers). Cells the runtime cannot resolve to a single underlying column (aggregate
  * aliases, computed projections without a simple ref) get `column: undefined`, matching the spec contract that the runtime never silently defaults this field.
  *
- * For `many`-flagged aliases the driver has already parsed the wire form into a JS array; this function maps the element codec over that array element-by-element, passing `null` elements through unchanged. Element-level failures surface through the existing `RUNTIME.DECODE_FAILED` envelope with the column/codec context from the parent cell.
+ * For `many`-flagged aliases the driver has usually already parsed the wire form into a JS array; this function maps the element codec over that array element-by-element, passing `null` elements through unchanged. PostgreSQL returns custom (e.g. native-enum) arrays as text-array literals (`{GOOGLE_MEET}`), so a string wire value is normalized into a JS array via {@link parsePgArrayLiteral} before the element loop. Element-level failures surface through the existing `RUNTIME.DECODE_FAILED` envelope with the column/codec context from the parent cell.
  */
 async function decodeField(
   alias: string,
@@ -196,7 +280,17 @@ async function decodeField(
   }
 
   if (decodeCtx.manyAliases.has(alias)) {
-    if (!Array.isArray(wireValue)) {
+    // A string wire value is a PostgreSQL text-array literal (native-enum
+    // arrays arrive this way because `pg` has no parser for a user-defined
+    // type's array OID). Normalize it into a JS array before the element loop;
+    // anything that is neither an array nor a parseable literal keeps the
+    // structured "expected an array from the driver" failure below.
+    const wireElements = Array.isArray(wireValue)
+      ? wireValue
+      : typeof wireValue === 'string'
+        ? parsePgArrayLiteral(wireValue)
+        : undefined;
+    if (wireElements === undefined) {
       wrapDecodeFailure(
         new TypeError(
           `expected an array from the driver for many-typed column, got ${typeof wireValue}`,
@@ -208,7 +302,7 @@ async function decodeField(
       );
     }
     const decoded: unknown[] = [];
-    for (const elem of wireValue) {
+    for (const elem of wireElements) {
       if (elem === null || elem === undefined) {
         decoded.push(null);
         continue;
