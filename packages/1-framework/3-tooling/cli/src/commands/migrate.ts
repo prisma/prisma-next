@@ -682,12 +682,16 @@ async function executeMigrateCommand(
     return notOk(loadedAggregate.failure);
   }
   const aggregate = loadedAggregate.value;
-  const integrityFailure = refuseContractSpaceIntegrity(aggregate, {
-    declaredExtensions: toDeclaredExtensionsFromRaw(
-      (config.extensions ?? []) as ReadonlyArray<unknown>,
-    ),
-    checkContracts: true,
-  });
+  const integrityFailure = refuseContractSpaceIntegrity(
+    aggregate,
+    {
+      declaredExtensions: toDeclaredExtensionsFromRaw(
+        (config.extensions ?? []) as ReadonlyArray<unknown>,
+      ),
+      checkContracts: true,
+    },
+    migrationsDir,
+  );
   if (integrityFailure) {
     return notOk(integrityFailure);
   }

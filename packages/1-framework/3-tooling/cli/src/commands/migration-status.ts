@@ -329,7 +329,7 @@ export async function executeMigrationStatusCommand(
   const { aggregate } = loaded.value;
   const contractRawForAggregate = await loadContractRawSafely(config);
   if (contractRawForAggregate !== null) {
-    const corruptionFailure = refusePackageCorruptionOnAggregate(aggregate);
+    const corruptionFailure = refusePackageCorruptionOnAggregate(aggregate, migrationsDir);
     if (corruptionFailure) {
       return notOk(corruptionFailure);
     }
