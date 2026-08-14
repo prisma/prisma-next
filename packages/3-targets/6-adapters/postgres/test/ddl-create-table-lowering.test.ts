@@ -62,7 +62,10 @@ describe('PostgresCreateTable DDL lowering', () => {
     const adapter = new PostgresControlAdapter(createPostgresBuiltinCodecLookup());
     await expect(
       adapter.lowerToExecuteRequest(ast, { contract: {} as PostgresContract }),
-    ).rejects.toThrow(/autoincrement\(\).*SERIAL|SERIAL.*autoincrement\(\)/);
+    ).rejects.toMatchObject({
+      code: 'CONTRACT.DEFAULT_INVALID',
+      meta: { nativeType: 'int4' },
+    });
   });
 
   it('accepts lowercase SERIAL-family pseudo-types paired with autoincrement()', async () => {
