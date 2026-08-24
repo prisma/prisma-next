@@ -33,7 +33,7 @@
     "@prisma-next/operations": "workspace:0.16.0",
     "@prisma-next/utils": "workspace:0.16.0",
     "arktype": "catalog:",
-    "bson": "^7.3.1"
+    "bson": "^7.3.2"
   },
   "devDependencies": {
     "mongodb": "catalog:",
